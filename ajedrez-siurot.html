@@ -397,6 +397,22 @@ input.txt:focus{outline:none;border-color:var(--pri)}
  @page{size:A4;margin:10mm}
 }
 
+/* ---------- partida: tiras de jugador, reloj y barra de ventaja ---------- */
+.bwrap{display:flex;gap:6px;align-items:stretch}
+.evbar{position:relative;width:32px;border-radius:8px;overflow:hidden;background:#3a3a3a;border:2px solid var(--frame);flex:none}
+.evbar i{position:absolute;left:0;right:0;background:#fafafa;transition:height .5s}
+.evbar b{position:absolute;left:0;right:0;text-align:center;font-size:.62rem;letter-spacing:-.3px;font-weight:900;z-index:1}
+.trainer.game.ev .board{width:calc(var(--bs) - 38px);min-width:200px}
+.pstrip{width:var(--bs);display:flex;align-items:center;gap:8px;min-height:30px;font-weight:800}
+.pstrip .pn{font-size:.85rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%}
+.pstrip .cp{flex:1;display:flex;align-items:center;gap:6px;font-size:1.15rem;letter-spacing:-2px;overflow:hidden;min-width:0}
+.pstrip .adv{font-size:.85rem;font-weight:900;letter-spacing:0;color:var(--ink)}
+.clk{font-variant-numeric:tabular-nums;font-weight:900;font-size:1.1rem;background:#fff;border:2px solid var(--line);border-radius:8px;padding:0 8px;min-width:66px;text-align:center}
+.clk.on{background:var(--acc);border-color:#d99a1c}.clk.low{color:var(--bad)}.clk.low.on{background:#fde0dc}
+.trainer.game{--bs:min(92vw,calc(100vh - var(--hh) - 190px),600px)}
+@media (max-width:900px){.trainer.game{--bs:clamp(220px,calc(100vh - var(--hh) - 320px),94vw)}}
+@media (max-width:900px) and (orientation:landscape) and (max-height:560px){.trainer.game{--bs:calc(100vh - var(--hh) - 140px)}}
+
 </style>
 </head>
 <body>
@@ -2249,8 +2265,8 @@ function viewPlay(m){
   d.innerHTML=`<div class="be">${b.emoji}</div><h3>Nivel ${b.n} · ${b.nombre}</h3><div class="muted" style="font-size:.9rem">${b.desc}</div><div class="rec">🏆 ${g.w} · 🤝 ${g.d} · ❌ ${g.l} · +${b.xp} XP</div><div class="rec">♟ ELO ≈ ${ELO_BOT[b.n]}</div>`;
   d.onclick=()=>{if(lk){toast('🔒 Gana al nivel '+(b.n-1)+' para desbloquearlo');return;}playCfg.level=b.n;$$('#bots .bot',m).forEach(x=>x.classList.remove('selected'));d.classList.add('selected');$('#lvn',m).textContent=b.n;};$('#bots',m).appendChild(d);});
   $('#startg',m).onclick=async()=>{
-  const c=await modal({title:'¿Con qué color quieres jugar?',html:`<p class="muted" style="margin:0">Nivel ${playCfg.level} · ${BOTS[playCfg.level-1].nombre}</p>`,buttons:[{t:'⚪ Blancas',v:'w'},{t:'⚫ Negras',v:'b'},{t:'🎲 Al azar',cls:'acc',v:'r'},{t:'Cancelar',cls:'ghost',v:null}]});
-  if(!c)return;go('partida',{level:playCfg.level,color:c==='r'?(Math.random()<.5?'w':'b'):c});
+  const cfg=await gameSetup();if(!cfg)return;
+  go('partida',{level:playCfg.level,color:cfg.color==='r'?(Math.random()<.5?'w':'b'):cfg.color,tc:cfg.tc,ev:cfg.ev});
  };
  const hs=(P.hist||[]).slice().reverse();
  const cont=P.cur&&P.cur.moves&&P.cur.moves.length?P.cur:null;
@@ -2267,33 +2283,97 @@ function viewPlay(m){
    else go('analisis',{id:g.id});};gl.appendChild(r);});
  $('#gimp',box).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
 }
-function viewGame(m,{level,color,resume}){
+
+// ---- configuración de partida: color, tiempo y barra de ventaja ----
+const TC_PRESETS=[[0,0,'Sin tiempo'],[1,0,'1 min'],[3,0,'3 min'],[5,0,'5 min'],[10,0,'10 min'],[15,0,'15 min'],[30,0,'30 min'],[3,2,'3 + 2'],[5,3,'5 + 3'],[10,5,'10 + 5']];
+async function gameSetup(){
+ const S=DB.settings;const g=Object.assign({color:'w',m:0,i:0,ev:false},S.gcfg||{});
+ const chip=(on,attrs,t)=>`<button class="chip" style="min-width:auto;padding:0 12px;${on?'background:var(--acc);border-color:#d99a1c':''}" ${attrs}>${t}</button>`;
+ const html=`<div style="text-align:left"><p class="muted" style="margin:0 0 8px">Nivel ${playCfg.level} · ${BOTS[playCfg.level-1].nombre}</p>
+  <b>Color</b><div class="chips" id="gc" style="margin:6px 0 12px">${[['w','⚪ Blancas'],['b','⚫ Negras'],['r','🎲 Al azar']].map(([v,t])=>chip(g.color===v,`data-c="${v}"`,t)).join('')}</div>
+  <b>⏱️ Tiempo por jugador</b><div class="chips" id="gt" style="margin:6px 0">${TC_PRESETS.map(([mm,ii,t])=>chip(g.m===mm&&g.i===ii,`data-m="${mm}" data-i="${ii}"`,t)).join('')}</div>
+  <div class="btnrow" style="align-items:center;gap:8px;margin:6px 0 12px"><span class="muted" style="font-weight:800">Personalizado:</span><input id="gm" type="number" min="1" max="90" placeholder="min" style="width:70px;padding:6px;border:2px solid var(--line);border-radius:8px"><span>min +</span><input id="gi" type="number" min="0" max="60" placeholder="seg" style="width:70px;padding:6px;border:2px solid var(--line);border-radius:8px"><span>seg</span></div>
+  <label class="btnrow" style="align-items:center;gap:8px;font-weight:800"><input type="checkbox" id="gev" ${g.ev?'checked':''}> 📊 Barra de ventaja (Stockfish)</label></div>`;
+ const pr=modal({title:'♟️ Nueva partida',html,buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:'▶ ¡A jugar!',v:true}],dismiss:true});
+ const bg=$$('.modalbg').pop();
+ const paint=()=>{$$('#gc .chip',bg).forEach(b=>{const on=b.dataset.c===g.color;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});$$('#gt .chip',bg).forEach(b=>{const on=+b.dataset.m===g.m&&+b.dataset.i===g.i;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});};
+ $$('#gc .chip',bg).forEach(b=>b.onclick=()=>{g.color=b.dataset.c;paint();});
+ $$('#gt .chip',bg).forEach(b=>b.onclick=()=>{g.m=+b.dataset.m;g.i=+b.dataset.i;$('#gm',bg).value='';$('#gi',bg).value='';paint();});
+ const cust=()=>{const mm=Math.max(0,Math.min(90,Math.floor(+$('#gm',bg).value||0))),ii=Math.max(0,Math.min(60,Math.floor(+$('#gi',bg).value||0)));if(mm>=1||ii>0){g.m=mm||1;g.i=ii;}paint();};
+ $('#gm',bg).oninput=cust;$('#gi',bg).oninput=cust;
+ $('#gev',bg).onchange=e=>{g.ev=e.target.checked;};
+ const ok=await pr;if(!ok)return null;
+ S.gcfg={color:g.color,m:g.m,i:g.i,ev:g.ev};save();
+ return {color:g.color,tc:g.m>0?{m:g.m,i:g.i}:null,ev:g.ev};
+}
+function viewGame(m,{level,color,resume,tc,ev}){
  const tok=VIEW;const bot=BOTS[level-1];const pos=new E.Pos();let over=false,thinking=false,undoUsed=false,hints=3,castled=false,gid=0;const sans=[];
- const {board,body,under}=trainerShell(m,`Nivel ${level} · ${bot.nombre}`,async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;go('jugar');});
- body.innerHTML=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>${bot.nombre}</b><div class="muted" style="font-size:.85rem">${bot.desc}</div><div id="st" style="font-weight:800;margin-top:2px"></div></div></div>
-  <div class="captured" id="capTop"></div><div class="movelist" id="ml"></div><div class="captured" id="capBot"></div><div id="fb"></div>`;
- under.innerHTML=`<button class="btn ghost sm" id="hint"><span>💡 Pista (<b id="hn">3</b>)</span></button><button class="btn ghost sm" id="undo">↶ Deshacer</button><button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
+ const resumed=!!(resume&&P.cur&&P.cur.level===level&&P.cur.color===color);
+ if(resumed)tc=P.cur.tc||null;
+ if(ev===undefined)ev=!!(DB.settings.gcfg&&DB.settings.gcfg.ev);
+ let evOn=ev,evSeq=0,lastCp=0;
+ const clk={w:tc?tc.m*60000:0,b:tc?tc.m*60000:0};
+ if(resumed&&tc&&P.cur.clk){clk.w=P.cur.clk.w;clk.b=P.cur.clk.b;}
+ const tcTxt=tc?` · ⏱️ ${tc.m}${tc.i?'+'+tc.i:' min'}`:'';
+ const {board,body,under}=trainerShell(m,`Nivel ${level} · ${bot.nombre}`,async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;clearInterval(timer);go('jugar');});
+ body.innerHTML=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>${bot.nombre}</b><div class="muted" style="font-size:.85rem">${bot.desc}${tcTxt}</div><div id="st" style="font-weight:800;margin-top:2px"></div></div></div>
+  <div class="movelist" id="ml"></div><div id="fb"></div>`;
+ under.innerHTML=`<button class="btn ghost sm" id="hint"><span>💡 Pista (<b id="hn">3</b>)</span></button><button class="btn ghost sm" id="undo">↶ Deshacer</button><button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="evt" title="Barra de ventaja">📊</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
+ // tira de jugador (arriba y abajo del tablero) y barra de ventaja
+ const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
+ const wrap=document.createElement('div');wrap.className='bwrap';bc.insertBefore(wrap,bd);
+ const evb=document.createElement('div');evb.className='evbar';evb.innerHTML='<i></i><b>0.0</b>';wrap.appendChild(evb);wrap.appendChild(bd);
+ const sTop=document.createElement('div'),sBot=document.createElement('div');sTop.className=sBot.className='pstrip';bc.insertBefore(sTop,wrap);bc.insertBefore(sBot,$('#under',m));
+ const setEvVis=()=>{evb.style.display=evOn?'':'none';tr.classList.toggle('ev',evOn);$('#evt',under).classList.toggle('acc',evOn);};setEvVis();
  board.orient=color;board.movable=color;board.interactive=true;board.premoveOK=true;board.set(pos,{last:null});
  const setFb=(h,c)=>$('#fb',body).innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';
+ const fmtT=ms=>{ms=Math.max(0,ms);if(ms<20000)return (ms/1000).toFixed(1);const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+ const running=()=>tc&&!over&&pos.played.length>=2;
+ function paintClk(){$$('.clk',bc).forEach(el=>{const c=el.dataset.c;el.textContent=fmtT(clk[c]);el.classList.toggle('low',clk[c]<15000);el.classList.toggle('on',!!running()&&pos.turn===c);});}
+ function paintEv(cp){
+  lastCp=cp;const w=board.orient==='w',pct=WINP(cp),i=evb.querySelector('i'),b=evb.querySelector('b');
+  i.style.height=pct+'%';i.style.top=w?'auto':'0';i.style.bottom=w?'0':'auto';
+  b.textContent=evTxt(cp)||'0.0';const whiteSide=cp>=0;const atBottom=whiteSide?w:!w;
+  b.style.top=atBottom?'auto':'3px';b.style.bottom=atBottom?'3px':'auto';b.style.color=whiteSide?'#222':'#fff';
+ }
+ async function evalNow(){
+  if(!evOn)return;const my=++evSeq,fen=pos.fen(),turn=pos.turn;let cp=null;
+  if(SF.ok){const r=await SF.analyse(fen,220);if(r&&r.lines[1]){const v=cpOf(r.lines[1]);cp=turn==='w'?v:-v;}}
+  if(cp==null){const q=new E.Pos(fen),sc=E.scoreMoves(q,2);if(sc.length){const v=Math.max(-9990,Math.min(9990,sc[0].s));cp=turn==='w'?v:-v;}else cp=q.status()==='mate'?(turn==='w'?-10000:10000):0;}
+  if(my!==evSeq||!alive(tok))return;paintEv(cp);
+ }
+ function saveCur(){P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today(),tc:tc||null,clk:tc?{w:Math.round(clk.w),b:Math.round(clk.b)}:null};save();}
  function updatePanel(){
   let h='';for(let i=0;i<sans.length;i+=2)h+=`<span class="n">${i/2+1}.</span><span class="${i===sans.length-1?'cur':''}">${E.sanES(sans[i])}</span><span class="${i+1===sans.length-1?'cur':''}">${sans[i+1]?E.sanES(sans[i+1]):''}</span>`;
   const ml=$('#ml',body);ml.innerHTML=h||'<span class="muted" style="grid-column:1/-1">¡Empieza la partida! Juegan blancas.</span>';ml.scrollTop=ml.scrollHeight;
   const init={p:8,n:2,b:2,r:2,q:1};const cnt={w:{},b:{}};pos.b.forEach(p=>{if(!p)return;const c=E.colorOf(p),t=p.toLowerCase();cnt[c][t]=(cnt[c][t]||0)+1;});
   const val={p:1,n:3,b:3,r:5,q:9};let mw=0,mb=0;const lost={w:'',b:''};
   for(const t of 'qrbnp'){const lw=Math.max(0,init[t]-(cnt.w[t]||0)),lb=Math.max(0,init[t]-(cnt.b[t]||0));lost.w+=miniPiece(t.toUpperCase()).repeat(lw);lost.b+=miniPiece(t).repeat(lb);mw+=(cnt.w[t]||0)*val[t];mb+=(cnt.b[t]||0)*val[t];}
-  const me=color,op=color==='w'?'b':'w';const myCaps=lost[op],opCaps=lost[me];const diff=(me==='w'?mw-mb:mb-mw);
-  $('#capTop',body).innerHTML=`<span class="pc-list" style="font-family:'Segoe UI Symbol','Noto Sans Symbols 2',sans-serif">${opCaps}</span>${diff<0?`<span class="adv">+${-diff}</span>`:''}`;
-  $('#capBot',body).innerHTML=`<span style="font-family:'Segoe UI Symbol','Noto Sans Symbols 2',sans-serif">${myCaps}</span>${diff>0?`<span class="adv">+${diff}</span>`:''}`;
+  const topC=board.orient==='w'?'b':'w',botC=topC==='w'?'b':'w';
+  const fill=(el,c)=>{const isMe=c===color,opc=c==='w'?'b':'w';const d=c==='w'?mw-mb:mb-mw;
+   el.innerHTML=`<span class="pn">${isMe?esc(P.avatar+' '+P.name):bot.emoji+' '+esc(bot.nombre)}</span><span class="cp"><span style="font-family:'Segoe UI Symbol','Noto Sans Symbols 2',sans-serif">${lost[opc]}</span>${d>0?`<span class="adv">+${d}</span>`:''}</span>${tc?`<span class="clk" data-c="${c}"></span>`:''}`;};
+  fill(sTop,topC);fill(sBot,botC);paintClk();
   const s=pos.status();$('#st',body).innerHTML=thinking?'Pensando<span class="thinking"><i></i><i></i><i></i></span>':s==='jaque'?'<span style="color:var(--bad)">¡Jaque!</span>':over?'Partida terminada':(pos.turn===color?'Te toca a ti':'');
-  $('#hn',under).textContent=hints;$('#hint',under).disabled=over||hints<=0;$('#undo',under).disabled=over||thinking||pos.played.length<(color==='w'?1:2);$('#resign',under).disabled=over;
+  $('#hn',under).textContent=hints;$('#hint',under).disabled=over||hints<=0;$('#undo',under).disabled=over||thinking||!!tc||pos.played.length<(color==='w'?1:2);$('#resign',under).disabled=over;
  }
- function afterMove(mv,anim,san){sans.push(san);P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today()};save();board.hl=[];board.arrows=[];board.set(pos,{last:mv,anim});playSound(pos,mv);updatePanel();return checkEnd();}
+ function afterMove(mv,anim,san){
+  sans.push(san);const mover=pos.turn==='w'?'b':'w';if(tc&&tc.i&&pos.played.length>2)clk[mover]+=tc.i*1000;
+  saveCur();board.hl=[];board.arrows=[];board.set(pos,{last:mv,anim});playSound(pos,mv);updatePanel();
+  const e=checkEnd();if(!e&&evOn&&pos.turn===color)evalNow();return e;}
+ function canMate(c){let n=0;for(const p of pos.b){if(!p||E.colorOf(p)!==c)continue;const t=p.toLowerCase();if(t==='p'||t==='r'||t==='q')return true;if(t==='n'||t==='b')n++;}return n>=2;}
+ function flag(c){
+  if(over)return;const other=c==='w'?'b':'w';
+  if(!canMate(other))return endGame('d','Se acabó el tiempo, pero el rival no puede dar mate');
+  endGame(c===color?'l':'w',c===color?'Se te acabó el tiempo':'Se acabó el tiempo de la máquina');
+ }
+ let last=Date.now();
+ const timer=tc?setInterval(()=>{if(!alive(tok)){clearInterval(timer);return;}const now=Date.now(),dt=now-last;last=now;if(!running())return;const c=pos.turn;clk[c]-=dt;paintClk();if(clk[c]<=0){clk[c]=0;paintClk();flag(c);}},100):null;
  function checkEnd(){const s=pos.status();if(!s||s==='jaque')return false;over=true;board.interactive=false;
   let res;if(s==='mate')res=pos.turn===color?'l':'w';else res='d';
   const why={mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición'}[s];
   endGame(res,why);return true;}
  function endGame(res,why){
-  over=true;board.interactive=false;updatePanel();P.cur=null;
+  over=true;board.interactive=false;board.pickSq=null;clearInterval(timer);updatePanel();P.cur=null;if(evOn)evalNow();
   const g=P.games[level]=P.games[level]||{w:0,d:0,l:0};g[res]++;track('jugar');
   const eloD=eloUpdate(ELO_BOT[level],res==='w'?(undoUsed?.75:1):res==='d'?.5:0,32,'game');
   let xp=0,title,icon,txt;
@@ -2303,10 +2383,10 @@ function viewGame(m,{level,color,resume}){
    confetti(50);sound('win');}
   else if(res==='d'){xp=Math.round(bot.xp/3);title='Tablas';icon='🤝';txt=why+'. ¡Buen resultado!';sound('ok');}
   else{xp=5;title='Esta vez ganó la máquina';icon='🤖';txt=why+'. ¡Cada derrota enseña algo! Inténtalo de nuevo.';sound('bad');}
-  gid=Date.now();P.hist=P.hist||[];P.hist.push({id:gid,date:today(),level,color,res,moves:pos.played.map(x=>E.uci(x))});pruneHist();
+  gid=Date.now();P.hist=P.hist||[];P.hist.push({id:gid,date:today(),level,color,res,moves:pos.played.map(x=>E.uci(x)),tc:tc||undefined});pruneHist();
   save();if(xp)addXP(xp,res==='w'?'Victoria':res==='d'?'Tablas':'Por intentarlo');
   setFb(`${icon} <span><b>${title}</b><br>${why} ${eloTag(eloD)}</span>`,res==='w'?'ok':res==='d'?'info':'bad');
-  setTimeout(()=>{if(!alive(tok))return;modal({title,html:`<div class="bigicon">${icon}</div><p>${txt}</p><p>${eloTag(eloD)} → <b>${P.elo}</b></p>${undoUsed&&res==='w'?'<p class="muted"><small>Usaste “deshacer”: XP a la mitad.</small></p>':''}`,buttons:[{t:'Menú',cls:'ghost',v:'m'},{t:'🔍 Analizar',cls:'ghost',v:'a'},{t:'Revancha',v:'r'}]}).then(v=>{if(v==='r')go('partida',{level,color});else if(v==='m')go('jugar');else if(v==='a')go('analisis',{id:gid});});},700);
+  setTimeout(()=>{if(!alive(tok))return;modal({title,html:`<div class="bigicon">${icon}</div><p>${txt}</p><p>${eloTag(eloD)} → <b>${P.elo}</b></p>${undoUsed&&res==='w'?'<p class="muted"><small>Usaste “deshacer”: XP a la mitad.</small></p>':''}`,buttons:[{t:'Menú',cls:'ghost',v:'m'},{t:'🔍 Analizar',cls:'ghost',v:'a'},{t:'Revancha',v:'r'}]}).then(v=>{if(v==='r')go('partida',{level,color,tc,ev:evOn});else if(v==='m')go('jugar');else if(v==='a')go('analisis',{id:gid});});},700);
  }
  async function botTurn(){
   if(over||pos.turn===color)return;thinking=true;updatePanel();
@@ -2316,12 +2396,13 @@ function viewGame(m,{level,color,resume}){
   const san=pos.san(mv);pos.play(mv);board.interactive=true;if(!afterMove(mv,true,san))board.runPremove();
  }
  board.onMove=(mv,anim)=>{if(over||thinking||pos.turn!==color)return;const san=pos.san(mv);if(mv.flag==='k'||mv.flag==='q'){castled=true;award('enroque');}pos.play(mv);if(!afterMove(mv,anim,san))botTurn();};
- $('#flip',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();};
- $('#undo',under).onclick=()=>{if(thinking||over)return;undoUsed=true;pos.undo();sans.pop();if(pos.turn!==color){pos.undo();sans.pop();}P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today()};save();board.set(pos,{last:pos.played[pos.played.length-1]||null});board.interactive=true;setFb('↶ Jugada deshecha (si ganas, recibirás la mitad de XP).','info');updatePanel();};
+ $('#flip',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();updatePanel();if(evOn)paintEv(lastCp);};
+ $('#evt',under).onclick=()=>{evOn=!evOn;DB.settings.gcfg=Object.assign({color:'w',m:0,i:0},DB.settings.gcfg||{},{ev:evOn});save();setEvVis();if(evOn)evalNow();};
+ $('#undo',under).onclick=()=>{if(thinking||over||tc)return;undoUsed=true;pos.undo();sans.pop();if(pos.turn!==color){pos.undo();sans.pop();}saveCur();board.set(pos,{last:pos.played[pos.played.length-1]||null});board.interactive=true;setFb('↶ Jugada deshecha (si ganas, recibirás la mitad de XP).','info');updatePanel();if(evOn)evalNow();};
  $('#hint',under).onclick=async()=>{if(thinking||over||pos.turn!==color||hints<=0)return;hints--;updatePanel();setFb('💡 Pensando una buena jugada…','info');const u=await aiMove(pos.fen(),Math.max(4,level),{time:900,sf:true});if(!alive(tok)||!u)return;const mv=pos.fromUci(u);board.arrows=[[mv.from,mv.to,'o']];board.render();setFb('💡 Prueba la jugada de la flecha naranja.','info');};
  $('#resign',under).onclick=async()=>{if(over)return;if(await confirmModal('¿Rendirte?','La partida contará como derrota.','Me rindo','Seguir jugando',true)){if(alive(tok))endGame('l','Te has rendido');}};
- if(resume&&P.cur&&P.cur.level===level&&P.cur.color===color){for(const u of P.cur.moves){const mm=pos.fromUci(u);if(!mm)break;sans.push(pos.san(mm));pos.play(mm);}board.set(pos,{last:pos.played[pos.played.length-1]||null});updatePanel();if(!checkEnd()&&pos.turn!==color)botTurn();return;}
- updatePanel();if(color==='b')botTurn();
+ if(resumed){for(const u of P.cur.moves){const mm=pos.fromUci(u);if(!mm)break;sans.push(pos.san(mm));pos.play(mm);}board.set(pos,{last:pos.played[pos.played.length-1]||null});updatePanel();last=Date.now();if(!checkEnd()){if(evOn&&pos.turn===color)evalNow();if(pos.turn!==color)botTurn();}return;}
+ updatePanel();if(evOn&&color==='w')evalNow();if(color==='b')botTurn();
 }
 
 // ================= RETOS =================
@@ -3023,31 +3104,30 @@ function explainDanger(pos,d){
 function explainNot(pos,s){
  const p=pos.b[s],col=E.colorOf(p),en=col==='w'?'b':'w',t=p.toLowerCase(),f=PFEM[t];
  const att=attackersOf(pos,s,en);
- if(!att.length)return `${cap1(pdesc(pos,s))}: nadie ${f?'la':'lo'} ataca.`;
+ if(!att.length){const dn=attackersOf(pos,s,col).length;return `${cap1(pdesc(pos,s))}: nadie ${f?'la':'lo'} ataca ahora${dn?'':' (aunque tampoco '+(f?'la':'lo')+' defiende nadie: ¡ojo, puede quedar en peligro más adelante!)'}.`;}
  return `${cap1(pdesc(pos,s))} está atacad${f?'a':'o'} pero <b>bien defendid${f?'a':'o'}</b>: si ${f?'la':'lo'} capturan, recuperas.`;
 }
 // ---------- generador de posiciones (determinista por semilla) ----------
 function rng32(seed){let a=seed>>>0;return function(){a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return((t^(t>>>14))>>>0)/4294967296;};}
 function scanPos(seed){
- let best=null;
- for(let att=0;att<40;att++){
+ // siempre hay algo que encontrar: al menos una pieza propia en peligro y una pieza rival ganable
+ let fb=null;
+ for(let att=0;att<160;att++){
   const R=rng32(seed*7919+att*104729+13);
-  const p=new E.Pos();const plies=10+Math.floor(R()*18);let ok=true;
+  const p=new E.Pos();const plies=12+Math.floor(R()*16);let ok=true;
   for(let i=0;i<plies;i++){
    const lg=p.legal();if(!lg.length){ok=false;break;}
    let m;
-   if(R()<0.22)m=lg[Math.floor(R()*lg.length)];
+   if(R()<0.3)m=lg[Math.floor(R()*lg.length)];
    else{const sc=E.scoreMoves(p,1);const top=sc[0].s;const pool=sc.filter(x=>top-x.s<=110).slice(0,8);m=pool[Math.floor(R()*pool.length)].m;}
    p.play(m);
   }
   if(!ok||p.status()!=='')continue;
   const q=new E.Pos(p.fen());const th=threatsOf(q);
-  const has=th.risk.length+th.targets.length>0;
-  const wantQuiet=R()<0.3;
-  if(!best)best=q;
-  if((has&&!wantQuiet)||(!has&&wantQuiet))return q;
+  if(th.risk.length&&th.targets.length)return q;
+  if(!fb&&(th.risk.length||th.targets.length))fb=q;
  }
- return best||new E.Pos();
+ return fb||new E.Pos();
 }
 // ---------- evaluar una jugada (Stockfish; si no, motor propio) ----------
 const cpOf=l=>l.t==='mate'?(l.v>0?10000-l.v*10:-10000-l.v*10):l.v;
@@ -3158,17 +3238,17 @@ function viewScanner(m,arg){
   if(step===3)return step3();
   const mine=step===1;
   body.innerHTML=head()+`<div class="steptext"><b>Paso ${step} de 3 · ${mine?'🛡️ Mira tus piezas':'🎯 Mira las piezas del rival'}</b><br>${mine?'Toca <b>tus piezas que están en peligro</b>: las que el rival puede capturar ganando material (sin defensa, o atacadas por una pieza de menos valor).':'Toca <b>las piezas del rival que puedes ganar</b>: las que atacas y están sin defensa, o las atacas con una pieza de menos valor.'}</div><div id="fb"></div>`;
-  nav.innerHTML=`<button class="btn ghost sm" id="none">👍 No hay ninguna</button><span style="flex:1"></span><button class="btn sm" id="chk">✅ Comprobar</button>`;
+  nav.innerHTML=`<button class="btn ghost sm" id="sol">👀 Ver solución</button><span style="flex:1"></span><button class="btn sm" id="chk">✅ Comprobar</button>`;
   board.pickSq=s=>{
    if(busy)return;const p=pos.b[s];if(!p||p.toLowerCase()==='k')return;
    const mineP=E.colorOf(p)===pos.turn;if(mineP!==mine)return;
    if(sel.has(s)){sel.delete(s);delete board.marks[s];}else{sel.add(s);board.marks[s]='mk-sel';}
    board.render();
   };
-  $('#none',nav).onclick=()=>{if(busy)return;sel=new Set();board.marks={};board.render();check();};
   $('#chk',nav).onclick=()=>{if(!busy)check();};
+  $('#sol',nav).onclick=()=>{if(!busy){sel=new Set();board.marks={};board.render();check(true);}};
  }
- function check(){
+ function check(reveal){
   busy=true;board.pickSq=null;
   const mine=step===1,items=mine?truth.risk:truth.targets;
   const tset=new Set(items.map(x=>x.sq));
@@ -3185,11 +3265,16 @@ function viewScanner(m,arg){
   if(!mine&&!truth.checks.length)extra='<p style="margin:8px 0 0" class="muted">Y no tienes ningún jaque disponible.</p>';
   board.render();
   let h='';
-  if(good){stars++;sound('ok');h=items.length?`🎉 <b>¡Muy bien!</b> Las viste todas.`:`🎉 <b>¡Correcto!</b> ${mine?'Todas tus piezas están seguras.':'No hay ninguna pieza rival que puedas ganar ahora.'}`;}
-  else{sound('bad');miss[mine?'risk':'targets']++;h=`🧐 <b>Casi.</b> `;}
+  const who=mine?'tuya en peligro':'rival que puedas ganar ahora';
+  if(good&&!reveal){stars++;sound('ok');h=items.length?`🎉 <b>¡Muy bien!</b> Las viste todas.`:`🎉 <b>¡Correcto!</b> ${mine?'Todas tus piezas están seguras.':'No hay ninguna pieza rival que puedas ganar ahora.'}`;}
+  else{sound('bad');miss[mine?'risk':'targets']++;h=reveal?'👀 <b>Solución:</b> ':'🧐 <b>Casi.</b> ';
+   h+=items.length?`Aquí ${items.length===1?'hay <b>1</b> pieza':'hay <b>'+items.length+'</b> piezas'} ${mine?'tuya'+(items.length>1?'s':'')+' en peligro':'rival'+(items.length>1?'es':'')+' que puedes ganar'}.`:`En esta posición <b>no hay ninguna pieza ${who}</b>.`;}
   const lines=[];
   for(const d of items)lines.push((tset.has(d.sq)&&!sel.has(d.sq)?'👀 ':'✅ ')+(mine?explainDanger(pos,d):explainTarget(pos,d)));
   for(const s of wrong)lines.push('❌ '+explainNot(pos,s));
+  {const side=mine?pos.turn:(pos.turn==='w'?'b':'w'),en=side==='w'?'b':'w';const loose=[];
+   for(let q=0;q<64;q++){const pc=pos.b[q];if(!pc||E.colorOf(pc)!==side)continue;const t=pc.toLowerCase();if(t==='k'||t==='p')continue;if(!attackersOf(pos,q,en).length&&!attackersOf(pos,q,side).length)loose.push(pdesc(pos,q));}
+   if(loose.length)lines.push('ℹ️ Sin defensa, pero <b>nadie las ataca ahora</b>: '+joinEs(loose)+'. No están en peligro todavía, pero vigílalas.');}
   setFb(`<div class="fb ${good?'ok':'bad'}">${h}${lines.length?'<div style="margin-top:6px;text-align:left;display:grid;gap:4px">'+lines.map(x=>`<div>${x}</div>`).join('')+'</div>':''}${extra}</div>`);
   nav.innerHTML=`<span style="flex:1"></span><button class="btn sm" id="nx">${step===1?'Paso 2 →':'Paso 3 →'}</button>`;
   $('#nx',nav).onclick=()=>{step++;stepUI();};
@@ -3832,5 +3917,3 @@ async function splashInstallGate(s){
 </script>
 </body>
 </html>
-<!-- v2 -->
-<!-- v3 -->
