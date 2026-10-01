@@ -336,6 +336,11 @@ input.txt:focus{outline:none;border-color:var(--pri)}
 .brand h1{margin:0;font-size:clamp(1.8rem,6vw,2.6rem);font-weight:900;color:#1f5c43;line-height:1.05}
 .brand p{margin:4px 0 0;color:var(--muted);font-weight:800}
 
+.tree .mv{cursor:pointer;padding:1px 5px;border-radius:6px;font-weight:800;white-space:nowrap}
+.tree .mv:hover{background:#f1eadb}.tree .mv.cur{background:#f6d77a}
+.tree .tn{color:#9a8f78;font-weight:800;font-size:.9rem}
+.tree .var{color:#6b6252;font-size:.92em}
+
 </style>
 </head>
 <body>
@@ -1323,7 +1328,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // ================= Almacenamiento =================
 const KEY='ajedrezSiurot.v1';
 const DEF_SET={sound:true,coords:true,dots:true,unlockAll:false,pieces:'cburnett',board:'madera',muted:false,tts:false};
-function loadDB(){let d=null;try{d=JSON.parse(localStorage.getItem(KEY));}catch(e){}if(!(d&&d.profiles))d={profiles:{},current:null};d.settings=Object.assign({},DEF_SET,d.settings||{});if(!d.settings._v33){d.settings.tts=false;d.settings._v33=1;}return d;}
+function loadDB(){let d=null;try{d=JSON.parse(localStorage.getItem(KEY));}catch(e){}if(!(d&&d.profiles))d={profiles:{},current:null};d.studies=d.studies||[];d.settings=Object.assign({},DEF_SET,d.settings||{});if(!d.settings._v33){d.settings.tts=false;d.settings._v33=1;}return d;}
 let DB=loadDB();let P=null;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){}}
 function today(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
@@ -1562,6 +1567,7 @@ class Board{
  select(s){this.sel=s;this.targets=s>=0?new Set(this.legalFrom(s).map(m=>m.to)):null;this.render();}
  _sqFromXY(x,y){const r=this.el.getBoundingClientRect();const c=Math.floor((x-r.left)/r.width*8),w=Math.floor((y-r.top)/r.height*8);if(c<0||c>7||w<0||w>7)return -1;return this.sqAt(w*8+c);}
  _down(e){
+  if(this.pickSq&&this.pos){const s0=this._sqFromXY(e.clientX,e.clientY);if(s0>=0){e.preventDefault();this.pickSq(s0);}return;}
   if(!this.interactive||!this.pos)return;const s=this._sqFromXY(e.clientX,e.clientY);if(s<0)return;
   e.preventDefault();
   if(this.pos.turn!==this.movable){if(this.premoveOK)this._preDown(s);return;}
@@ -1616,14 +1622,14 @@ function playSound(pos,m){if(pos.inCheck())sound('check');else if(m.captured)sou
 
 // ================= Navegación =================
 let VIEW=0;let currentTab='inicio',currentArg=null,CUR_BOARD=null;
-const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['retos','🏆','Retos'],['progreso','📈','Progreso']];
+const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['progreso','📈','Progreso']];
 function go(tab,arg){
  VIEW++;currentTab=tab;currentArg=arg;CUR_BOARD=null;window.scrollTo(0,0);stopSpeech();document.body.classList.remove('intrainer');fitHeader();
  $$('.modalbg').forEach(bg=>bg._close?bg._close(null):bg.remove());closeMenu();
- const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar'};
+ const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy})[tab](m,arg);
 }
 function alive(tok){return tok===VIEW;}
 function renderHeader(){
@@ -2186,11 +2192,21 @@ function viewPlay(m){
   if(!c)return;go('partida',{level:playCfg.level,color:c==='r'?(Math.random()<.5?'w':'b'):c});
  };
  const hs=(P.hist||[]).slice().reverse();
- if(hs.length){const box=document.createElement('div');box.className='card';box.style.marginTop='16px';
-  box.innerHTML=`<h3>📜 Mis últimas partidas</h3><p class="muted" style="margin:4px 0 8px">Pulsa <b>Analizar</b> para ver tus errores y las mejores jugadas, como en chess.com.</p>`+hs.map(g=>`<div class="lrow" data-g="${g.id}" style="cursor:pointer"><div class="ln">${g.res==='w'?'🏆':g.res==='d'?'🤝':'❌'}</div><div class="lt">Nivel ${g.level} · ${BOTS[g.level-1].nombre} · ${g.color==='w'?'⚪':'⚫'}<small>${g.date} · ${Math.ceil(g.moves.length/2)} jugadas${g.an&&g.an.acc?` · Precisión ${g.an.acc[g.color]}%`:''}</small></div><button class="btn sm ghost">🔍 Analizar</button></div>`).join('');
-  m.appendChild(box);$$('[data-g]',box).forEach(r=>r.onclick=()=>go('analisis',{id:+r.dataset.g}));}
+ const cont=P.cur&&P.cur.moves&&P.cur.moves.length?P.cur:null;
+ if(cont){const bx=document.createElement('div');bx.className='card';bx.style.cssText='margin-top:16px;background:#fff8e6;border-color:#f2b134';bx.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:2rem">${BOTS[cont.level-1].emoji}</div><div style="flex:1;min-width:180px"><h3>Partida guardada</h3><div class="muted" style="font-weight:700">Nivel ${cont.level} · ${cont.color==='w'?'⚪':'⚫'} · ${Math.ceil(cont.moves.length/2)} jugadas · ${cont.date}</div></div><button class="btn acc" id="cont">▶ Continuar</button></div>`;m.appendChild(bx);$('#cont',bx).onclick=()=>go('partida',{level:cont.level,color:cont.color,resume:true});}
+ const box=document.createElement('div');box.className='card';box.style.marginTop='16px';
+ box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="flex:1">📜 Mis partidas</h3><button class="btn sm ghost" id="gimp">📥 Importar PGN</button></div><p class="muted" style="margin:4px 0 8px">Se guardan solas. Pulsa <b>Analizar</b> para ver tus errores y las mejores jugadas; con ⭐ una partida no se borra nunca.</p><div id="glist" style="display:flex;flex-direction:column;gap:8px"></div>`;
+ m.appendChild(box);
+ const gl=$('#glist',box);
+ if(!hs.length)gl.innerHTML='<div class="muted" style="font-weight:700">Aún no hay partidas. ¡Juega una!</div>';
+ hs.forEach(g=>{const b=botOf(g);const r=document.createElement('div');r.className='lrow';r.innerHTML=`<div class="ln">${g.res==='w'?'🏆':g.res==='d'?'🤝':g.res==='l'?'❌':'📥'}</div><div class="lt">${g.level?`Nivel ${g.level} · `:''}${esc(b.nombre)} · ${g.color==='w'?'⚪':'⚫'}<small>${g.date} · ${Math.ceil(g.moves.length/2)} jugadas${g.an&&g.an.acc?` · Precisión ${g.an.acc[g.color]}%`:''}</small></div><button class="btn sm ghost" data-a="star" title="Guardar para siempre">${g.keep?'⭐':'☆'}</button><button class="btn sm ghost" data-a="del" title="Borrar">🗑️</button><button class="btn sm" data-a="an">🔍 Analizar</button>`;
+  r.onclick=e=>{const t=e.target.closest('[data-a]');const act=t?t.dataset.a:'an';
+   if(act==='star'){g.keep=!g.keep;save();viewPlay((m.innerHTML='',m));}
+   else if(act==='del'){confirmModal('¿Borrar partida?','Se borrará de este dispositivo.','Borrar','Cancelar',true).then(ok=>{if(ok){P.hist=P.hist.filter(x=>x!==g);save();viewPlay((m.innerHTML='',m));}});}
+   else go('analisis',{id:g.id});};gl.appendChild(r);});
+ $('#gimp',box).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
 }
-function viewGame(m,{level,color}){
+function viewGame(m,{level,color,resume}){
  const tok=VIEW;const bot=BOTS[level-1];const pos=new E.Pos();let over=false,thinking=false,undoUsed=false,hints=3,castled=false,gid=0;const sans=[];
  const {board,body,under}=trainerShell(m,`Nivel ${level} · ${bot.nombre}`,async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;go('jugar');});
  body.innerHTML=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>${bot.nombre}</b><div class="muted" style="font-size:.85rem">${bot.desc}</div><div id="st" style="font-weight:800;margin-top:2px"></div></div></div>
@@ -2210,13 +2226,13 @@ function viewGame(m,{level,color}){
   const s=pos.status();$('#st',body).innerHTML=thinking?'Pensando<span class="thinking"><i></i><i></i><i></i></span>':s==='jaque'?'<span style="color:var(--bad)">¡Jaque!</span>':over?'Partida terminada':(pos.turn===color?'Te toca a ti':'');
   $('#hn',under).textContent=hints;$('#hint',under).disabled=over||hints<=0;$('#undo',under).disabled=over||thinking||pos.played.length<(color==='w'?1:2);$('#resign',under).disabled=over;
  }
- function afterMove(mv,anim,san){sans.push(san);board.hl=[];board.arrows=[];board.set(pos,{last:mv,anim});playSound(pos,mv);updatePanel();return checkEnd();}
+ function afterMove(mv,anim,san){sans.push(san);P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today()};save();board.hl=[];board.arrows=[];board.set(pos,{last:mv,anim});playSound(pos,mv);updatePanel();return checkEnd();}
  function checkEnd(){const s=pos.status();if(!s||s==='jaque')return false;over=true;board.interactive=false;
   let res;if(s==='mate')res=pos.turn===color?'l':'w';else res='d';
   const why={mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición'}[s];
   endGame(res,why);return true;}
  function endGame(res,why){
-  over=true;board.interactive=false;updatePanel();
+  over=true;board.interactive=false;updatePanel();P.cur=null;
   const g=P.games[level]=P.games[level]||{w:0,d:0,l:0};g[res]++;track('jugar');
   const eloD=eloUpdate(ELO_BOT[level],res==='w'?(undoUsed?.75:1):res==='d'?.5:0,32,'game');
   let xp=0,title,icon,txt;
@@ -2226,7 +2242,7 @@ function viewGame(m,{level,color}){
    confetti(50);sound('win');}
   else if(res==='d'){xp=Math.round(bot.xp/3);title='Tablas';icon='🤝';txt=why+'. ¡Buen resultado!';sound('ok');}
   else{xp=5;title='Esta vez ganó la máquina';icon='🤖';txt=why+'. ¡Cada derrota enseña algo! Inténtalo de nuevo.';sound('bad');}
-  gid=Date.now();P.hist=P.hist||[];P.hist.push({id:gid,date:today(),level,color,res,moves:pos.played.map(x=>E.uci(x))});while(P.hist.length>15)P.hist.shift();
+  gid=Date.now();P.hist=P.hist||[];P.hist.push({id:gid,date:today(),level,color,res,moves:pos.played.map(x=>E.uci(x))});pruneHist();
   save();if(xp)addXP(xp,res==='w'?'Victoria':res==='d'?'Tablas':'Por intentarlo');
   setFb(`${icon} <span><b>${title}</b><br>${why} ${eloTag(eloD)}</span>`,res==='w'?'ok':res==='d'?'info':'bad');
   setTimeout(()=>{if(!alive(tok))return;modal({title,html:`<div class="bigicon">${icon}</div><p>${txt}</p><p>${eloTag(eloD)} → <b>${P.elo}</b></p>${undoUsed&&res==='w'?'<p class="muted"><small>Usaste “deshacer”: XP a la mitad.</small></p>':''}`,buttons:[{t:'Menú',cls:'ghost',v:'m'},{t:'🔍 Analizar',cls:'ghost',v:'a'},{t:'Revancha',v:'r'}]}).then(v=>{if(v==='r')go('partida',{level,color});else if(v==='m')go('jugar');else if(v==='a')go('analisis',{id:gid});});},700);
@@ -2240,9 +2256,10 @@ function viewGame(m,{level,color}){
  }
  board.onMove=(mv,anim)=>{if(over||thinking||pos.turn!==color)return;const san=pos.san(mv);if(mv.flag==='k'||mv.flag==='q'){castled=true;award('enroque');}pos.play(mv);if(!afterMove(mv,anim,san))botTurn();};
  $('#flip',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();};
- $('#undo',under).onclick=()=>{if(thinking||over)return;undoUsed=true;pos.undo();sans.pop();if(pos.turn!==color){pos.undo();sans.pop();}board.set(pos,{last:pos.played[pos.played.length-1]||null});board.interactive=true;setFb('↶ Jugada deshecha (si ganas, recibirás la mitad de XP).','info');updatePanel();};
+ $('#undo',under).onclick=()=>{if(thinking||over)return;undoUsed=true;pos.undo();sans.pop();if(pos.turn!==color){pos.undo();sans.pop();}P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today()};save();board.set(pos,{last:pos.played[pos.played.length-1]||null});board.interactive=true;setFb('↶ Jugada deshecha (si ganas, recibirás la mitad de XP).','info');updatePanel();};
  $('#hint',under).onclick=async()=>{if(thinking||over||pos.turn!==color||hints<=0)return;hints--;updatePanel();setFb('💡 Pensando una buena jugada…','info');const u=await aiMove(pos.fen(),Math.max(4,level),{time:900,sf:true});if(!alive(tok)||!u)return;const mv=pos.fromUci(u);board.arrows=[[mv.from,mv.to,'o']];board.render();setFb('💡 Prueba la jugada de la flecha naranja.','info');};
  $('#resign',under).onclick=async()=>{if(over)return;if(await confirmModal('¿Rendirte?','La partida contará como derrota.','Me rindo','Seguir jugando',true)){if(alive(tok))endGame('l','Te has rendido');}};
+ if(resume&&P.cur&&P.cur.level===level&&P.cur.color===color){for(const u of P.cur.moves){const mm=pos.fromUci(u);if(!mm)break;sans.push(pos.san(mm));pos.play(mm);}board.set(pos,{last:pos.played[pos.played.length-1]||null});updatePanel();if(!checkEnd()&&pos.turn!==color)botTurn();return;}
  updatePanel();if(color==='b')botTurn();
 }
 
@@ -2404,7 +2421,7 @@ function closeMenu(){const d=$('.drawerbg');if(d)d.remove();}
 function openMenu(){
  if($('.drawerbg')){closeMenu();return;}
  const bg=document.createElement('div');bg.className='drawerbg';
- const cur=({modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar'})[currentTab]||currentTab;
+ const cur=({modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios'})[currentTab]||currentTab;
  bg.innerHTML=`<div class="drawer"><div class="dh"><b>♞ Ajedrez Siurot</b><button class="iconbtn sm" id="dclose" aria-label="Cerrar">✕</button></div>${TABS.map(([id,ic,t])=>`<button class="ditem ${cur===id?'on':''}" data-tab="${id}"><span>${ic}</span>${t}</button>`).join('')}<hr><button class="ditem" id="dset"><span>⚙️</span>Ajustes</button><button class="ditem" id="dprof"><span>👥</span>Cambiar jugador</button></div>`;
  document.body.appendChild(bg);
  bg.addEventListener('pointerdown',e=>{if(e.target===bg)closeMenu();});
@@ -2447,7 +2464,7 @@ function isSacrifice(pos,m,replyUci){
   if(replyUci){const r=q.fromUci(replyUci);if(r)q.play(r);}
   return matBal(q,mover)-b0<=-2.5;}catch(e){return false;}
 }
-function evTxt(cp){if(cp==null)return '';if(Math.abs(cp)>=9000){const n=Math.round((10000-Math.abs(cp))/10);return (cp>0?'+':'−')+'M'+n;}const v=(cp/100).toFixed(1);return (cp>0?'+':cp<0?'−':'')+Math.abs(cp/100).toFixed(1);}
+function evTxt(cp){if(cp==null)return '';if(Math.abs(cp)>=9000){const n=Math.round((10000-Math.abs(cp))/10);return (cp>0?'+':'−')+'M'+n;}const v=Math.abs(cp/100).toFixed(1);return v==='0.0'?'0.0':(cp>0?'+':'−')+v;}
 async function analyseGame(g,prog,ok){
  const pos=new E.Pos();const fens=[pos.fen()];
  for(const u of g.moves){const m=pos.fromUci(u);if(!m)break;pos.play(m);fens.push(pos.fen());}
@@ -2523,8 +2540,8 @@ function viewAnalysis(m,{id}){
  const {board,body,under}=trainerShell(m,'🔍 Análisis de la partida',()=>go('jugar'));
  if(!g){body.innerHTML='<div class="fb bad">No encuentro esa partida.</div><button class="btn" id="bk">Volver</button>';$('#bk',body).onclick=()=>go('jugar');return;}
  board.interactive=false;board.orient=g.color;board.set(new E.Pos(),{last:null});
- const bot=BOTS[g.level-1];
- const head=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>Nivel ${g.level} · ${bot.nombre}</b><div class="muted" style="font-size:.85rem">${g.res==='w'?'🏆 Ganaste':g.res==='d'?'🤝 Tablas':'❌ Perdiste'} · ${g.color==='w'?'⚪ blancas':'⚫ negras'} · ${g.date}</div></div></div>`;
+ const bot=botOf(g);
+ const head=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>${g.level?'Nivel '+g.level+' · ':''}${esc(bot.nombre)}</b><div class="muted" style="font-size:.85rem">${g.res==='w'?'🏆 Ganaste':g.res==='d'?'🤝 Tablas':g.res==='l'?'❌ Perdiste':'📥 Partida importada'} · ${g.color==='w'?'⚪ blancas':'⚫ negras'} · ${g.date}</div></div></div>`;
  const fail=(t)=>{body.innerHTML=head+`<div class="fb bad">${t}</div><button class="btn" id="bk">Volver</button>`;$('#bk',body).onclick=()=>go('jugar');};
  async function start(){
   if(SF.state==='loading'){for(let k=0;k<40&&SF.state==='loading'&&alive(tok);k++)await sleep(250);}
@@ -2548,7 +2565,9 @@ function viewAnalysis(m,{id}){
   <div class="card" style="padding:10px"><div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:4px">📈 EVALUACIÓN (pulsa para saltar)</div><svg id="gr" viewBox="0 0 300 70" preserveAspectRatio="none" style="width:100%;height:84px;background:#fff;border:2px solid var(--line);border-radius:10px;cursor:pointer"></svg></div>
   <div class="card"><h3>📊 Resumen</h3><div style="display:flex;gap:14px;margin:8px 0"><div class="pill" style="font-size:1.05rem">Tu precisión: <b>${cl.acc[youKey]}%</b></div><div class="pill" style="font-size:1.05rem">Máquina: <b>${cl.acc[botKey]}%</b></div></div>
    <table class="rec"><tr><th style="text-align:left"></th><th>Tú</th><th>Máquina</th></tr>${CLS_ORDER.map(cntRow).join('')}</table></div>
-  <div class="movelist" id="ml" style="max-height:200px"></div>`;
+  <div class="btnrow" style="gap:6px"><button class="btn sm ghost" id="gst">📓 Guardar como estudio</button><button class="btn sm ghost" id="gcp">📋 Copiar PGN</button></div><div class="movelist" id="ml" style="max-height:200px"></div>`;
+  $('#gst',body).onclick=()=>{const s=studyFromAnalysis(g,an,cl);DB.studies=DB.studies||[];DB.studies.push(s);save();toast('📓 Guardado en Estudios');go('estudio',{id:s.id});};
+  $('#gcp',body).onclick=async()=>{toast((await copyText(gamePGN(g)))?'📋 PGN copiado':'No se pudo copiar');};
   under.innerHTML='<button class="btn ghost sm" id="a0">⏮</button><button class="btn ghost sm" id="a1">◀</button><button class="btn sm" id="a2">▶</button><button class="btn ghost sm" id="a3">⏭</button><button class="btn acc sm" id="ae" title="Siguiente error tuyo">⚠️ Siguiente error</button>';
   const W=i=>WINP(an.ev[i]);
   const gr=$('#gr',body);const pts=an.ev.map((e,i)=>`${(i/(an.ev.length-1)*300).toFixed(1)},${(35-(WINP(e)-50)/50*32).toFixed(1)}`);
@@ -2579,6 +2598,306 @@ function viewAnalysis(m,{id}){
   draw();
  }
  start();
+}
+// ================= PGN, ESTUDIOS Y PARTIDAS GUARDADAS =================
+const NAGS={1:'!',2:'?',3:'!!',4:'??',5:'!?',6:'?!'};const NAGN={'!':1,'?':2,'!!':3,'??':4,'!?':5,'?!':6};
+const CALC={G:'g',R:'r',Y:'o',B:'b'},CALR={g:'G',r:'R',o:'Y',b:'B'};
+function newNode(m,san){return {uci:E.uci(m),san,c:'',ar:[],nag:[],ch:[]};}
+function stripTags(h){return String(h).replace(/<br\s*\/?>/g,' ').replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();}
+function parseComment(raw){
+ const ar=[];let t=raw.replace(/\[%cal\s+([^\]]*)\]/g,(a,l)=>{l.split(',').forEach(x=>{x=x.trim();if(/^[GRYB][a-h][1-8][a-h][1-8]$/.test(x))ar.push([x.slice(1,3),x.slice(3,5),CALC[x[0]]]);});return '';});
+ t=t.replace(/\[%[a-z]+[^\]]*\]/gi,'').replace(/\s+/g,' ').trim();return {t,ar};
+}
+// Lee un texto PGN (puede traer varias partidas/capítulos, variantes y comentarios, como los estudios de Lichess)
+function parsePGN(text){
+ const games=[];let i=0;const n=text.length;text=text.replace(/\r/g,'');
+ while(i<n){
+  while(i<n&&/\s/.test(text[i]))i++;if(i>=n)break;
+  const tags={};
+  while(text[i]==='['){const e=text.indexOf(']',i);if(e<0)break;const mm=text.slice(i+1,e).match(/^(\w+)\s+"([\s\S]*)"$/);if(mm)tags[mm[1]]=mm[2];i=e+1;while(i<n&&/\s/.test(text[i]))i++;}
+  const start=i;let depth=0;
+  // fin del movetext: resultado a profundidad 0 o siguiente '[' al principio de línea
+  let j=i;let inC=false;
+  for(;j<n;j++){const c=text[j];if(c==='{'){inC=true;}else if(c==='}'){inC=false;}
+   else if(!inC){if(c==='(')depth++;else if(c===')')depth--;
+    else if(c==='['&&(j===0||text[j-1]==='\n')&&depth<=0&&j>start+1){break;}}}
+  const mt=text.slice(start,j);i=j;if(!mt.trim()&&!Object.keys(tags).length)continue;
+  const g=parseMovetext(mt,tags.FEN&&tags.SetUp!=='0'?tags.FEN:null);g.tags=tags;games.push(g);
+ }
+ return games.filter(g=>g.root.ch.length||g.root.c);
+}
+function parseMovetext(mt,fen){
+ const root={c:'',ar:[],ch:[]};let posCur=new E.Pos(fen||undefined);let node=root,last=null,lastBefore=null;const stack=[];let err=null;
+ const re=/\{([\s\S]*?)\}|;[^\n]*|\(|\)|\$(\d+)|\d+\.+|1-0|0-1|1\/2-1\/2|\*|[^\s(){}]+/g;let t;
+ while((t=re.exec(mt))){
+  const s=t[0];
+  if(s[0]==='{'){const pc=parseComment(t[1]);if(last){last.c=(last.c?last.c+' ':'')+pc.t;last.ar=last.ar.concat(pc.ar);}else{root.c=(root.c?root.c+' ':'')+pc.t;root.ar=root.ar.concat(pc.ar);}}
+  else if(s[0]===';'||s[0]==='%')continue;
+  else if(s==='('){if(!last)continue;stack.push({node,posFen:posCur.fen(),last,lastBefore});node=lastParent.get(last);posCur=new E.Pos(lastBefore);last=null;}
+  else if(s===')'){const f=stack.pop();if(!f)continue;node=f.node;posCur=new E.Pos(f.posFen);last=f.last;lastBefore=f.lastBefore;}
+  else if(t[2]){if(last){const g=NAGS[+t[2]];if(g&&!last.nag.includes(g))last.nag.push(g);}}
+  else if(/^\d+\.+$/.test(s)||/^(1-0|0-1|1\/2-1\/2|\*)$/.test(s))continue;
+  else{
+   const m1=s.match(/^(.*?)([!?]{1,2})?$/);let san=m1[1].replace(/\.\.\./g,'').replace(/^\d+\.+/,'');if(!san)continue;
+   const mv=posCur.fromSan(san);if(!mv){err='Jugada ilegal: '+san;break;}
+   const before=posCur.fen();const nd={uci:E.uci(mv),san:posCur.san(mv),c:'',ar:[],nag:m1[2]&&NAGN[m1[2]]?[m1[2]]:[],ch:[]};
+   const ex=node.ch.find(x=>x.uci===nd.uci);const use=ex||nd;if(!ex)node.ch.push(nd);lastParent.set(use,node);posCur.play(mv);last=use;lastBefore=before;node=use;
+  }
+ }
+ return {root,fen:fen||null,error:err};
+}
+const lastParent=new WeakMap();
+function nagStr(nd){return (nd.nag||[]).join('');}
+function emitPGN(parent,fen,first,onlyIdx){
+ let s='';const p=new E.Pos(fen||undefined);let needNum=first,cur=parent,lvl0=true;
+ while(cur.ch.length){
+  const k0=(lvl0&&onlyIdx!=null)?onlyIdx:0,main=cur.ch[k0];const m=p.fromUci(main.uci);if(!m)break;
+  const fm=+p.fen().split(' ')[5],w=p.turn==='w';
+  if(w)s+=fm+'. ';else if(needNum)s+=fm+'... ';
+  s+=p.san(m)+' ';
+  (main.nag||[]).forEach(g=>{if(NAGN[g])s+='$'+NAGN[g]+' ';});
+  const cc=(main.ar&&main.ar.length?'[%cal '+main.ar.map(a=>CALR[a[2]||'g']+a[0]+a[1]).join(',')+'] ':'')+(main.c||'');
+  if(cc.trim())s+='{ '+cc.trim()+' } ';
+  needNum=false;
+  if(!(lvl0&&onlyIdx!=null)){for(let k=1;k<cur.ch.length;k++){s+='( '+emitPGN(cur,p.fen(),true,k)+') ';needNum=true;}}
+  lvl0=false;p.play(m);cur=main;
+ }
+ return s;
+}
+function chapterPGN(st,ch){
+ const t=[['Event',`${st.title}: ${ch.name}`],['Site','Ajedrez Siurot'],['Result','*']];
+ if(ch.fen){t.push(['SetUp','1'],['FEN',ch.fen]);}if(ch.orient==='b')t.push(['Orientation','black']);
+ let body='';const rc=(ch.root.ar&&ch.root.ar.length?'[%cal '+ch.root.ar.map(a=>CALR[a[2]||'g']+a[0]+a[1]).join(',')+'] ':'')+(ch.root.c||'');if(rc.trim())body+='{ '+rc.trim()+' } ';
+ body+=emitPGN(ch.root,ch.fen,true)+'*';
+ return t.map(([k,v])=>`[${k} "${String(v).replace(/"/g,"'")}"]`).join('\n')+'\n\n'+body.replace(/(.{1,90})(\s|$)/g,'$1\n').trim()+'\n';
+}
+function studyPGN(st){return st.chapters.map(c=>chapterPGN(st,c)).join('\n\n');}
+function downloadText(name,text){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+async function copyText(t){try{await navigator.clipboard.writeText(t);return true;}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(e2){}ta.remove();return ok;}}
+const sid=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+function chapterFromGame(g,i){const ev=g.tags.ChapterName||g.tags.Event||((g.tags.White&&g.tags.Black)?g.tags.White+' - '+g.tags.Black:'');let nm=String(ev);if(nm.includes(': '))nm=nm.split(': ').slice(1).join(': ');return {id:sid(),name:nm&&nm!=='?'?nm:'Capítulo '+(i+1),fen:g.fen,orient:/black/i.test(g.tags.Orientation||'')?'b':'w',root:g.root};}
+function studyFromPGN(text,title){
+ const gs=parsePGN(text);if(!gs.length)return {error:'No encuentro partidas en ese texto.'};
+ const bad=gs.find(g=>g.error);if(bad&&!gs.some(g=>!g.error))return {error:bad.error};
+ const ok=gs.filter(g=>!g.error);
+ let t=title||'';if(!t){const ev=ok[0].tags.Event||'';t=ev.includes(': ')?ev.split(': ')[0]:(ev&&ev!=='?'?ev:'Estudio importado');}
+ return {study:{id:sid(),title:t,created:today(),chapters:ok.map(chapterFromGame)},skipped:gs.length-ok.length};
+}
+const EXAMPLE_PGN=`[Event "Mi primer estudio: Mate del pastor"]
+[Site "Ajedrez Siurot"]
+[Result "*"]
+
+{ Este es un estudio de ejemplo. Pulsa ▶ para avanzar, o prueba el modo Practicar. En ✏️ Editar puedes crear los tuyos con comentarios y flechas. } 1. e4 { [%cal Ge2e4] Las blancas abren el centro y dejan salir al alfil y a la dama. } 1... e5 2. Bc4 { [%cal Gc4f7] El alfil apunta a f7, el punto más débil de las negras. } 2... Nc6 3. Qh5 $5 { [%cal Gh5f7] La dama también ataca f7: ¡amenaza de mate en una jugada! } 3... Nf6?? { Error: el caballo ataca la dama, pero no defiende f7. Mejor era 3...g6 o 3...Qe7. } ( 3... g6 { Esta es la defensa correcta: ataca la dama. } 4. Qf3 Nf6 ) 4. Qxf7# { [%cal Gh5f7] ¡Jaque mate del pastor! } *`;
+
+// ---------- lista de estudios ----------
+function ensureStudies(){DB.studies=DB.studies||[];if(!DB.studies.length&&!DB.studiesSeeded){DB.studiesSeeded=1;const r=studyFromPGN(EXAMPLE_PGN);if(r.study){DB.studies.push(r.study);}save();}return DB.studies;}
+function viewStudies(m){
+ const list=ensureStudies();
+ m.innerHTML=`<div class="sectitle"><h2>📓 Estudios</h2><div class="btnrow"><button class="btn acc sm" id="snew">➕ Nuevo estudio</button><button class="btn ghost sm" id="simp">📥 Importar PGN</button></div></div>
+ <p class="muted" style="font-weight:700;margin-top:0">Crea tus propias lecciones con comentarios, flechas y variantes, como en Lichess. Sirven para repasar aperturas, finales o partidas. Puedes <b>exportar</b> un estudio y compartirlo, o <b>importar</b> estudios de Lichess (formato PGN).</p>
+ <div class="grid g2" id="slist"></div>`;
+ const box=$('#slist',m);
+ if(!list.length)box.innerHTML='<div class="card muted">Todavía no tienes estudios. Pulsa <b>Nuevo estudio</b> o importa uno.</div>';
+ list.forEach(st=>{const d=document.createElement('div');d.className='card mod';const nm=st.chapters.reduce((a,c)=>a+countNodes(c.root),0);
+  d.innerHTML=`<div class="mic" style="background:#6d4c9f">📓</div><div style="flex:1"><h3>${esc(st.title)}</h3><p>${st.chapters.length} capítulo${st.chapters.length===1?'':'s'} · ${nm} jugadas</p><div class="btnrow" style="gap:6px;margin-top:6px"><button class="btn sm ghost" data-a="exp">⬇️ PGN</button><button class="btn sm ghost" data-a="del">🗑️</button></div></div>`;
+  d.onclick=e=>{const a=e.target.closest('[data-a]');if(a){e.stopPropagation();if(a.dataset.a==='exp'){downloadText(st.title.replace(/[^\w\-]+/g,'_')+'.pgn',studyPGN(st));toast('⬇️ Estudio exportado');}
+    else confirmModal('¿Borrar estudio?',`Se borrará «${esc(st.title)}» de este dispositivo.`,'Borrar','Cancelar',true).then(ok=>{if(ok){DB.studies=DB.studies.filter(x=>x!==st);save();viewStudies((m.innerHTML='',m));}});return;}
+   go('estudio',{id:st.id});};
+  box.appendChild(d);});
+ // implementación simple y robusta del cuadro de texto:
+ $('#snew',m).onclick=async()=>{const t=await askText('Nuevo estudio','Título (por ejemplo: Apertura Italiana)','');if(!t)return;
+  const st={id:sid(),title:t,created:today(),chapters:[{id:sid(),name:'Capítulo 1',fen:null,orient:'w',root:{c:'',ar:[],ch:[]}}]};DB.studies.push(st);save();go('estudio',{id:st.id,mode:'edit'});};
+ $('#simp',m).onclick=()=>importDialog(()=>viewStudies((m.innerHTML='',m)));
+}
+function countNodes(nd){let c=0;for(const x of nd.ch)c+=1+countNodes(x);return c;}
+function askText(title,ph,val,multi){
+ return new Promise(res=>{
+  const id='tx'+Math.random().toString(36).slice(2,6);
+  const field=multi?`<textarea id="${id}" placeholder="${esc(ph)}" style="width:100%;min-height:120px;padding:10px;font-size:1rem;border:2px solid var(--line);border-radius:10px;font-family:inherit">${esc(val||'')}</textarea>`:`<input id="${id}" placeholder="${esc(ph)}" value="${esc(val||'')}" maxlength="80" style="width:100%;padding:10px;font-size:1rem;border:2px solid var(--line);border-radius:10px;font-family:inherit">`;
+  modal({title,html:field,buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:'Aceptar',v:true}]}).then(ok=>res(ok?(window.__txv||'').trim():null));
+  const el=document.getElementById(id);if(el){window.__txv=el.value;el.oninput=()=>{window.__txv=el.value;};setTimeout(()=>el.focus(),60);}
+ });
+}
+function importDialog(done){
+ const id='ip'+Math.random().toString(36).slice(2,6);
+ modal({title:'📥 Importar PGN',html:`<p class="muted" style="margin:0 0 8px">Pega el PGN (por ejemplo de un estudio de Lichess), elige un archivo .pgn o escribe un enlace a un PGN.</p>
+  <textarea id="${id}" placeholder="Pega aquí el PGN…" style="width:100%;min-height:110px;padding:10px;border:2px solid var(--line);border-radius:10px;font-family:monospace;font-size:.85rem"></textarea>
+  <div style="margin:8px 0"><input type="file" id="${id}f" accept=".pgn,.txt,text/plain"></div>
+  <input id="${id}u" placeholder="https://…/estudio.pgn (opcional)" style="width:100%;padding:8px;border:2px solid var(--line);border-radius:10px"><div id="${id}m" style="margin-top:8px;font-weight:700"></div>`,
+  buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:'Importar',v:true}]});
+ const ta=document.getElementById(id),fi=document.getElementById(id+'f'),ui=document.getElementById(id+'u');
+ const bg=ta.closest('.modalbg'),row=bg.querySelector('.modal > .btnrow'),okb=row.lastChild;
+ fi.onchange=()=>{const f=fi.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{ta.value=r.result;};r.readAsText(f);};
+ okb.onclick=async e=>{
+  e.stopImmediatePropagation();const msg=document.getElementById(id+'m');let txt=ta.value;
+  if(!txt.trim()&&ui.value.trim()){msg.textContent='Descargando…';try{const r=await fetch(ui.value.trim());if(!r.ok)throw 0;txt=await r.text();}catch(err){msg.style.color='var(--bad)';msg.textContent='No se pudo descargar ese enlace. Prueba a pegar el texto.';return;}}
+  if(!txt.trim()){msg.style.color='var(--bad)';msg.textContent='Pega un PGN, elige un archivo o escribe un enlace.';return;}
+  const r=studyFromPGN(txt);if(r.error){msg.style.color='var(--bad)';msg.textContent=r.error;return;}
+  DB.studies=DB.studies||[];DB.studies.push(r.study);save();bg._close(true);toast(`📥 Importado: ${esc(r.study.title)} (${r.study.chapters.length} cap.)`+(r.skipped?` · ${r.skipped} con errores omitidos`:''));done&&done();
+ };
+}
+
+// ---------- visor / editor / práctica ----------
+function viewStudy(m,{id,ch:chIdx,mode:mode0}){
+ const tok=VIEW;const st=(DB.studies||[]).find(s=>s.id===id);if(!st){go('estudios');return;}
+ const {board,body,under}=trainerShell(m,'📓 '+esc(st.title),()=>go('estudios'));
+ let ci=Math.max(0,Math.min(chIdx||0,st.chapters.length-1)),mode=mode0||'ver',pidx=[],arrowTool=false,arrowCol='g',pickFrom=null,hintArrow=null,engArrow=null,errs=0,pdone=false,busy=false;
+ const chp=()=>st.chapters[ci];
+ const atIdx=ix=>{let n=chp().root;const out=[];for(const k of ix){n=n.ch[k];if(!n)break;out.push(n);}return out;};
+ const curNode=()=>{const a=atIdx(pidx);return a.length?a[a.length-1]:chp().root;};
+ const curPos=()=>{const p=new E.Pos(chp().fen||undefined);for(const n of atIdx(pidx))p.play(p.fromUci(n.uci));return p;};
+ body.innerHTML=`<div class="seg" id="mseg"><button data-m="ver">👀 Ver</button><button data-m="edit">✏️ Editar</button><button data-m="prac">🎯 Practicar</button></div>
+  <div class="btnrow" id="chips" style="gap:6px"></div>
+  <div id="cmt"></div><div id="tools"></div>
+  <div class="card" style="padding:10px"><div class="movelist tree" id="tree" style="max-height:230px;display:block;line-height:1.9"></div></div>
+  <div class="btnrow" style="gap:6px" id="acts"></div><div id="eng"></div>`;
+ under.innerHTML='<button class="btn ghost sm" id="n0">⏮</button><button class="btn ghost sm" id="n1">◀</button><button class="btn sm" id="n2">▶</button><button class="btn ghost sm" id="n3">⏭</button><button class="btn ghost sm" id="nf" title="Girar tablero">🔄</button>';
+ const kd=e=>{if(!alive(tok)){document.removeEventListener('keydown',kd);return;}if(/INPUT|TEXTAREA/.test((e.target||{}).tagName))return;if(mode==='prac')return;if(e.key==='ArrowRight'){fwd();e.preventDefault();}else if(e.key==='ArrowLeft'){back();e.preventDefault();}};
+ document.addEventListener('keydown',kd);
+ function fwd(){const n=curNode();if(n.ch.length){pidx=[...pidx,0];const pp=curPos();playSound(pp,pp.played[pp.played.length-1]);draw();}}
+ function back(){if(pidx.length){pidx=pidx.slice(0,-1);draw();}}
+ $('#n0',under).onclick=()=>{pidx=[];draw();};$('#n1',under).onclick=back;$('#n2',under).onclick=fwd;$('#n3',under).onclick=()=>{let n=curNode(),ix=[...pidx];while(n.ch.length){ix.push(0);n=n.ch[0];}pidx=ix;draw();};
+ $('#nf',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();};
+ $$('#mseg button',body).forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+ function setMode(mm){mode=mm;arrowTool=false;pickFrom=null;board.pickSq=null;hintArrow=null;engArrow=null;errs=0;pdone=false;if(mm==='prac'){startPractice();}draw();}
+ function userColor(){return board.orient;}
+ function startPractice(){pidx=[];errs=0;pdone=false;busy=false;oppMaybe();}
+ function oppMaybe(){const p=curPos();if(curNode().ch.length===0){finishPractice();return;}if(p.turn!==userColor()){busy=true;setTimeout(()=>{if(!alive(tok)||mode!=='prac')return;pidx=[...pidx,0];busy=false;const pp=curPos();playSound(pp,pp.played[pp.played.length-1]);if(!curNode().ch.length)finishPractice();draw();},750);}}
+ function finishPractice(){if(pdone)return;pdone=true;sound('ok');confetti(24);}
+ board.onMove=mv=>{
+  const p=curPos();
+  if(mode==='edit'){const nd=curNode();const u=E.uci(mv);let k=nd.ch.findIndex(x=>x.uci===u);if(k<0){nd.ch.push(newNode(mv,p.san(mv)));k=nd.ch.length-1;save();}pidx=[...pidx,k];playSound(p,mv);draw();return;}
+  if(mode==='prac'){if(busy||pdone)return;const nd=curNode();const u=E.uci(mv);const k=nd.ch.findIndex(x=>x.uci===u);
+   if(k<0){errs++;sound('bad');board.shake();hintArrow=null;if(errs>=2&&nd.ch[0]){const bm=p.fromUci(nd.ch[0].uci);hintArrow=[bm.from,bm.to,'o'];}board.render();showCmt(`<div class="fb bad">❌ Esa no es la jugada del estudio. ${errs>=2?'Mira la flecha naranja.':'Piénsalo otra vez o pulsa 💡.'}</div>`);return;}
+   errs=0;hintArrow=null;pidx=[...pidx,k];playSound(p,mv);if(!curNode().ch.length){finishPractice();}else oppMaybe();draw();}
+ };
+ function showCmt(h){$('#cmt',body).innerHTML=h;}
+ function drawArrows(){
+  const nd=curNode();const A=[];
+  if(mode!=='prac'||pdone)(nd.ar||[]).forEach(a=>A.push([E.sqIndex(a[0]),E.sqIndex(a[1]),a[2]||'g']));
+  if(hintArrow)A.push(hintArrow);if(engArrow)A.push(engArrow);
+  board.arrows=A;
+ }
+ function treeHTML(parent,idxs,fen,first,onlyIdx){
+  let s='';const p=new E.Pos(fen||undefined);let needNum=first,cur=parent,ci2=idxs,lvl0=true;const curKey=pidx.join('.');
+  while(cur.ch.length){
+   const k0=(lvl0&&onlyIdx!=null)?onlyIdx:0,main=cur.ch[k0];const mv=p.fromUci(main.uci);if(!mv)break;const ix=[...ci2,k0];
+   const fm=+p.fen().split(' ')[5],w=p.turn==='w';const num=w?fm+'. ':needNum?fm+'… ':'';
+   s+=`<span class="tn">${num}</span><span class="mv ${ix.join('.')===curKey?'cur':''}" data-p="${ix.join('.')}">${E.sanES(p.san(mv))}${nagStr(main)}${main.c?' 💬':''}</span> `;needNum=false;
+   if(!(lvl0&&onlyIdx!=null)){for(let k=1;k<cur.ch.length;k++){s+=`<span class="var">( ${treeHTML(cur,ci2,p.fen(),true,k)})</span> `;needNum=true;}}
+   lvl0=false;p.play(mv);cur=main;ci2=ix;
+  }
+  return s;
+ }
+ function draw(){
+  const c=chp();const p=curPos();const nd=curNode();const last=pidx.length?p.played[p.played.length-1]:null;
+  // modos
+  $$('#mseg button',body).forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
+  // capítulos
+  $('#chips',body).innerHTML=st.chapters.map((x,i)=>`<button class="btn sm ${i===ci?'':'ghost'}" data-c="${i}">${esc(x.name)}</button>`).join('')+(mode==='edit'?'<button class="btn sm ghost" id="cadd">➕ Capítulo</button>':'');
+  $$('#chips [data-c]',body).forEach(b=>b.onclick=()=>{ci=+b.dataset.c;pidx=[];board.orient=chp().orient||'w';setMode(mode==='prac'?'prac':mode);});
+  if($('#cadd',body))$('#cadd',body).onclick=addChapter;
+  // tablero
+  board.hl=[];board.interactive=(mode==='edit')||(mode==='prac'&&!pdone&&!busy&&p.turn===userColor());board.movable=p.turn;board.premoveOK=false;board.legalFn=null;
+  board.set(p,{last});drawArrows();board.render();
+  if(mode==='edit'&&arrowTool){board.pickSq=s=>{const nm=E.sqName(s);if(!pickFrom){pickFrom=nm;board.hl=[s];board.render();}else{const a=pickFrom;pickFrom=null;board.hl=[];if(a===nm){board.render();return;}const L=nd.ar=nd.ar||[];const k=L.findIndex(x=>x[0]===a&&x[1]===nm);if(k>=0)L.splice(k,1);else L.push([a,nm,arrowCol]);save();draw();}};}else board.pickSq=null;
+  // comentario
+  if(mode==='edit'){const nags=['!','?','!!','??','!?','?!'];
+   showCmt(`<div class="card" style="padding:10px"><div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:4px">💬 COMENTARIO DE ${pidx.length?'ESTA JUGADA':'LA POSICIÓN INICIAL'}</div><textarea id="ctx" placeholder="Escribe aquí por qué se juega esta jugada…" style="width:100%;min-height:70px;padding:8px;border:2px solid var(--line);border-radius:10px;font-family:inherit;font-size:.95rem">${esc(nd.c||'')}</textarea>
+    <div class="btnrow" style="gap:5px;margin-top:6px">${pidx.length?nags.map(g=>`<button class="btn sm ${(nd.nag||[]).includes(g)?'':'ghost'}" data-nag="${g}" style="min-width:42px">${g}</button>`).join(''):''}</div></div>`);
+   const ct=$('#ctx',body);ct.oninput=()=>{nd.c=ct.value;save();};
+   $$('[data-nag]',body).forEach(b=>b.onclick=()=>{const g=b.dataset.nag;nd.nag=(nd.nag||[]).includes(g)?[]:[g];save();draw();});
+  }else if(mode==='prac'){
+   if(pdone)showCmt(`<div class="fb ok">🎉 <b>¡Capítulo completado!</b> Has repetido toda la línea.</div>`+(nd.c?`<div class="fb info" style="margin-top:6px">${esc(nd.c)}</div>`:''));
+   else if(!pidx.length)showCmt(`<div class="fb info">Juegas con <b>${userColor()==='w'?'blancas':'negras'}</b>. Repite las jugadas del estudio. ${c.root.c?esc(c.root.c):''}</div>`);
+   else showCmt(nd.c?`<div class="fb ok">✅ ${nagStr(nd)} ${esc(nd.c)}</div>`:'<div class="fb ok">✅ ¡Bien!</div>');
+  }else{
+   showCmt(nd.c||c.root.c&&!pidx.length?`<div class="card" style="border-left:6px solid #6d4c9f;padding:12px;line-height:1.45">${esc(pidx.length?nd.c:c.root.c)}</div>`:`<div class="muted" style="font-weight:700;padding:4px">${c.root.ch.length?(pidx.length?'Sin comentario en esta jugada.':'Pulsa ▶ para empezar. Flechas ← → del teclado también sirven.'):'Este capítulo está vacío. Cambia a ✏️ Editar y juega las jugadas en el tablero.'}</div>`);
+  }
+  // herramientas edición
+  const tools=$('#tools',body);
+  if(mode==='edit'){
+   const par=pidx.length?atIdx(pidx.slice(0,-1)).slice(-1)[0]||c.root:null;const kIdx=pidx.length?pidx[pidx.length-1]:0;
+   tools.innerHTML=`<div class="btnrow" style="gap:5px;align-items:center"><button class="btn sm ${arrowTool?'':'ghost'}" id="tar">🏹 Flechas${arrowTool?' (ON)':''}</button>${arrowTool?['g','r','b','o'].map(k=>`<button class="btn sm ${arrowCol===k?'':'ghost'}" data-col="${k}" style="min-width:34px"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${{g:'#15a34a',r:'#dc2626',b:'#2563eb',o:'#f59e0b'}[k]}"></span></button>`).join('')+'<button class="btn sm ghost" id="tcl">🧹</button>':''}${pidx.length&&kIdx>0?'<button class="btn sm ghost" id="tmain">⬆️ Hacer principal</button>':''}${pidx.length?'<button class="btn sm ghost" id="tdel">🗑️ Borrar jugada</button>':''}</div>${arrowTool?'<div class="muted" style="font-size:.85rem;font-weight:700">Toca la casilla de origen y luego la de destino. Si repites la misma flecha, se quita.</div>':''}`;
+   $('#tar',tools).onclick=()=>{arrowTool=!arrowTool;pickFrom=null;draw();};
+   $$('[data-col]',tools).forEach(b=>b.onclick=()=>{arrowCol=b.dataset.col;draw();});
+   if($('#tcl',tools))$('#tcl',tools).onclick=()=>{nd.ar=[];save();draw();};
+   if($('#tmain',tools))$('#tmain',tools).onclick=()=>{const [x]=par.ch.splice(kIdx,1);par.ch.unshift(x);pidx=[...pidx.slice(0,-1),0];save();draw();};
+   if($('#tdel',tools))$('#tdel',tools).onclick=async()=>{if(!(await confirmModal('¿Borrar jugada?','Se borrará esta jugada y todas las siguientes de esa línea.','Borrar','Cancelar',true)))return;par.ch.splice(kIdx,1);pidx=pidx.slice(0,-1);save();draw();};
+  }else if(mode==='prac'){
+   tools.innerHTML='<div class="btnrow" style="gap:6px"><button class="btn sm ghost" id="phint">💡 Pista</button><button class="btn sm ghost" id="prst">↻ Reiniciar</button></div>';
+   $('#phint',tools).onclick=()=>{const nd2=curNode();if(busy||pdone||!nd2.ch[0])return;const bm=curPos().fromUci(nd2.ch[0].uci);hintArrow=[bm.from,bm.to,'o'];draw();};
+   $('#prst',tools).onclick=()=>{startPractice();draw();};
+  }else tools.innerHTML='';
+  // árbol
+  const tr=$('#tree',body);tr.innerHTML=(c.root.ch.length?treeHTML(c.root,[],c.fen,true):'<span class="muted">Sin jugadas todavía.</span>');
+  $$('.mv',tr).forEach(sp=>sp.onclick=()=>{if(mode==='prac')return;pidx=sp.dataset.p.split('.').map(Number);draw();});
+  const cur=$('.mv.cur',tr);if(cur)cur.scrollIntoView({block:'nearest'});
+  // acciones
+  const acts=$('#acts',body);
+  acts.innerHTML=`<button class="btn sm ghost" id="aeng">🖥️ Stockfish</button><button class="btn sm ghost" id="acp">📋 Copiar PGN</button><button class="btn sm ghost" id="adl">⬇️ Exportar</button>${mode==='edit'?'<button class="btn sm ghost" id="aren">✏️ Renombrar</button><button class="btn sm ghost" id="adc">🗑️ Borrar capítulo</button>':''}`;
+  $('#aeng',acts).onclick=engine;$('#acp',acts).onclick=async()=>{toast((await copyText(chapterPGN(st,chp())))?'📋 PGN copiado':'No se pudo copiar');};
+  $('#adl',acts).onclick=()=>{downloadText(st.title.replace(/[^\w\-]+/g,'_')+'.pgn',studyPGN(st));toast('⬇️ Estudio exportado');};
+  if($('#aren',acts)){$('#aren',acts).onclick=async()=>{const t=await askText('Título del estudio','Título',st.title);if(t){st.title=t;}const n=await askText('Nombre del capítulo','Nombre',chp().name);if(n){chp().name=n;}save();draw();};
+   $('#adc',acts).onclick=async()=>{if(st.chapters.length<2){toast('Un estudio necesita al menos un capítulo');return;}if(!(await confirmModal('¿Borrar capítulo?',`Se borrará «${esc(chp().name)}».`,'Borrar','Cancelar',true)))return;st.chapters.splice(ci,1);ci=Math.max(0,ci-1);pidx=[];save();draw();};}
+  $('#n0',under).disabled=!pidx.length||mode==='prac';$('#n1',under).disabled=!pidx.length||mode==='prac';$('#n2',under).disabled=!nd.ch.length||mode==='prac';$('#n3',under).disabled=!nd.ch.length||mode==='prac';
+ }
+ async function addChapter(){
+  const r=await modal({title:'➕ Nuevo capítulo',html:'<p class="muted" style="margin:0 0 8px">¿Desde qué posición empieza?</p>',buttons:[{t:'Cancelar',cls:'ghost',v:null},{t:'Posición actual',cls:'ghost',v:'cur'},{t:'Pegar FEN',cls:'ghost',v:'fen'},{t:'Inicial',v:'ini'}]});
+  if(!r)return;let fen=null;
+  if(r==='cur')fen=curPos().fen();else if(r==='fen'){const f=await askText('Pega el FEN','rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1','');if(!f)return;try{new E.Pos(f);fen=f;}catch(e){toast('FEN no válido');return;}}
+  const nm=await askText('Nombre del capítulo','Capítulo '+(st.chapters.length+1),'Capítulo '+(st.chapters.length+1));if(!nm)return;
+  st.chapters.push({id:sid(),name:nm,fen,orient:board.orient,root:{c:'',ar:[],ch:[]}});ci=st.chapters.length-1;pidx=[];save();setMode('edit');
+ }
+ async function engine(){
+  const el=$('#eng',body);if(!SF.ok){el.innerHTML='<div class="fb bad">Stockfish no está disponible (falta la carpeta <b>stockfish</b> junto al HTML).</div>';return;}
+  const p=curPos();if(!p.legal().length){el.innerHTML='<div class="fb info">La partida terminó en esta posición.</div>';return;}
+  el.innerHTML='<div class="fb info">🖥️ Stockfish está pensando…</div>';const r=await SF.analyse(p.fen(),700);if(!alive(tok))return;
+  if(!r||!r.lines[1]){el.innerHTML='<div class="fb bad">No he podido analizar.</div>';return;}
+  const L=r.lines[1];const cpw=(()=>{const v=L.t==='mate'?(L.v>0?10000-L.v*10:-10000-L.v*10):L.v;return p.turn==='w'?v:-v;})();
+  const bm=p.fromUci(r.best);engArrow=[bm.from,bm.to,'b'];
+  // línea principal (hasta 4 jugadas)
+  const q=new E.Pos(p.fen());const sans=[];for(const u of L.pv.slice(0,5)){const mm=q.fromUci(u);if(!mm)break;sans.push(E.sanES(q.san(mm)));q.play(mm);}
+  el.innerHTML=`<div class="fb info">🖥️ <b>Eval ${evTxt(cpw)}</b> · Mejor jugada: <b>${E.sanES(p.san(bm))}</b> (flecha azul)<br><span class="muted">Línea: ${sans.join(' ')}</span></div>`;drawArrows();board.render();
+ }
+ board.orient=chp().orient||'w';
+ draw();if(mode==='prac')startPractice();
+}
+// ---------- partidas guardadas ----------
+function botOf(g){return g.level&&BOTS[g.level-1]?BOTS[g.level-1]:{emoji:'📥',nombre:g.name||'Partida importada',desc:'',xp:0};}
+function gamePGN(g){
+ const bot=botOf(g);const me=P.name||'Jugador';const wn=g.color==='w'?me:bot.nombre,bn=g.color==='w'?bot.nombre:me;
+ const res=g.res==='?'?'*':(g.res==='d'?'1/2-1/2':((g.res==='w')===(g.color==='w')?'1-0':'0-1'));
+ const p=new E.Pos();let mt='';g.moves.forEach((u,i)=>{const m=p.fromUci(u);if(!m)return;if(i%2===0)mt+=(i/2+1)+'. ';mt+=p.san(m)+' ';p.play(m);});
+ return `[Event "Ajedrez Siurot"]\n[Site "ajedrezsiurot.com"]\n[Date "${g.date.replace(/-/g,'.')}"]\n[White "${wn}"]\n[Black "${bn}"]\n[Result "${res}"]\n\n${(mt+res).replace(/(.{1,90})(\s|$)/g,'$1\n').trim()}\n`;
+}
+function addImportedGame(text,color){
+ const gs=parsePGN(text).filter(g=>!g.error&&!g.fen);if(!gs.length)return null;const g=gs[0];
+ const moves=[];let n=g.root;while(n.ch.length){n=n.ch[0];moves.push(n.uci);}if(!moves.length)return null;
+ const nm=(g.tags.White&&g.tags.Black)?`${g.tags.White} – ${g.tags.Black}`:'Partida importada';
+ const e={id:Date.now(),date:today(),level:0,color:color||'w',res:'?',moves,name:nm,keep:true};P.hist=P.hist||[];P.hist.push(e);save();return e;
+}
+async function importGameDialog(){
+ const t=await askText('📥 Importar partida (PGN)','Pega aquí el PGN de la partida…','',true);if(!t)return null;
+ const c=await modal({title:'¿Con qué color quieres verla?',html:'<p class="muted" style="margin:0">Se analizarán tus jugadas con ese color.</p>',buttons:[{t:'⚪ Blancas',v:'w'},{t:'⚫ Negras',v:'b'}]});if(!c)return null;
+ const e=addImportedGame(t,c);if(!e){toast('No he podido leer esa partida');return null;}return e;
+}
+function pruneHist(){P.hist=P.hist||[];while(P.hist.filter(x=>!x.keep).length>15){const i=P.hist.findIndex(x=>!x.keep);P.hist.splice(i,1);}}
+// estudio a partir de una partida analizada (con las notas del análisis)
+function studyFromAnalysis(g,an,cl){
+ const root={c:'',ar:[],ch:[]};const pos=new E.Pos();let node=root;
+ for(let i=0;i<g.moves.length;i++){
+  const m=pos.fromUci(g.moves[i]);if(!m)break;const o=cl.moves[i];const nd=newNode(m,pos.san(m));
+  const mine=o.mover===g.color;
+  if(o.cls==='brillante')nd.nag=['!!'];else if(o.cls==='gran')nd.nag=['!'];else if(o.cls==='imprecision')nd.nag=['?!'];else if(o.cls==='error'||o.cls==='omision')nd.nag=['?'];else if(o.cls==='grave')nd.nag=['??'];
+  if(!['mejor','excelente','buena','teoria'].includes(o.cls)){nd.c=`${CLS[o.cls].n}. ${stripTags(moveExplain(g,an,cl,i))}`;}
+  nd.ar=[[E.sqName(m.from),E.sqName(m.to),BAD_CLS.includes(o.cls)?'r':'g']];
+  node.ch.push(nd);
+  if(BAD_CLS.includes(o.cls)&&an.best[i]){const bm=pos.fromUci(an.best[i]);if(bm){const v=newNode(bm,pos.san(bm));v.c='Mejor jugada según Stockfish.';v.ar=[[E.sqName(bm.from),E.sqName(bm.to),'g']];node.ch.push(v);}}
+  pos.play(m);node=nd;
+ }
+ const bot=botOf(g);
+ return {id:sid(),title:`Partida vs ${bot.nombre} (${g.date})`,created:today(),chapters:[{id:sid(),name:'Partida analizada',fen:null,orient:g.color,root}]};
 }
 
 </script>
