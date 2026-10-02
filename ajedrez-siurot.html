@@ -442,6 +442,14 @@ nav.tabs{display:none!important}
 .lg-or{display:flex;align-items:center;gap:10px;color:#8a8070;font-weight:800;margin:10px 0 4px}.lg-or:before,.lg-or:after{content:'';flex:1;height:2px;background:#e5dcc6}
 
 .jumpc{display:inline-block;min-width:44px;padding:4px 10px;border-radius:999px;background:#f1eadb;cursor:pointer;font-weight:800}.jumpc:hover,.jumpc:active{background:#f6d77a}
+/* ---------- PC: el tablero es el protagonista (lo más grande posible sin salirse de la pantalla) ---------- */
+@media (min-width:901px){
+ body.intrainer main{max-width:none;padding-left:24px;padding-right:24px}
+ body.intrainer .trainer{grid-template-columns:auto minmax(320px,440px);justify-content:center;gap:24px;
+  --bs:max(300px,min(calc(100vh - var(--hh) - 104px),calc(100vw - 530px)))}
+ body.intrainer .trainer.game{--bs:max(300px,min(calc(100vh - var(--hh) - 168px),calc(100vw - 530px)))}
+ body.intrainer .trainer .panel{max-height:calc(100vh - var(--hh) - 24px);overflow:auto}
+}
 
 </style>
 </head>
@@ -2376,7 +2384,7 @@ function viewPlay(m){
   d.onclick=()=>{if(lk){toast('🔒 Gana al nivel '+(b.n-1)+' para desbloquearlo');return;}playCfg.level=b.n;$$('#bots .bot',m).forEach(x=>x.classList.remove('selected'));d.classList.add('selected');$('#lvn',m).textContent=b.n;};$('#bots',m).appendChild(d);});
   $('#startg',m).onclick=async()=>{
   const cfg=await gameSetup();if(!cfg)return;
-  go('partida',{level:playCfg.level,color:cfg.color==='r'?(Math.random()<.5?'w':'b'):cfg.color,tc:cfg.tc,ev:cfg.ev});
+  go('partida',{level:playCfg.level,color:cfg.color==='r'?(Math.random()<.5?'w':'b'):cfg.color,tc:cfg.tc,ev:cfg.ev,undo:cfg.undo});
  };
  const hs=(P.hist||[]).slice().reverse();
  const cont=P.cur&&P.cur.moves&&P.cur.moves.length?P.cur:null;
@@ -2397,9 +2405,11 @@ function viewPlay(m){
 // ---- configuración de partida: color, tiempo y barra de ventaja ----
 const TC_PRESETS=[[0,0,'Sin tiempo'],[1,0,'1 min'],[3,0,'3 min'],[5,0,'5 min'],[10,0,'10 min'],[15,0,'15 min'],[30,0,'30 min'],[3,2,'3 + 2'],[5,3,'5 + 3'],[10,5,'10 + 5']];
 async function gameSetup(){
- const S=DB.settings;const g=Object.assign({color:'w',m:0,i:0,ev:false},S.gcfg||{});
+ const S=DB.settings;const g=Object.assign({color:'w',m:0,i:0,ev:false,undo:false},S.gcfg||{});
  const chip=(on,attrs,t)=>`<button class="chip" style="min-width:auto;padding:0 12px;${on?'background:var(--acc);border-color:#d99a1c':''}" ${attrs}>${t}</button>`;
  const html=`<div style="text-align:left"><p class="muted" style="margin:0 0 8px">Nivel ${playCfg.level} · ${BOTS[playCfg.level-1].nombre}</p>
+  <b>↩️ ¿Permitir deshacer jugadas?</b><div class="chips" id="gu" style="margin:6px 0 4px">${[[0,'No'],[1,'Sí']].map(([v,t])=>chip(!!g.undo===!!v,`data-u="${v}"`,t)).join('')}</div>
+  <p id="guw" class="muted" style="margin:0 0 12px;font-size:.85rem;font-weight:700"></p>
   <b>Color</b><div class="chips" id="gc" style="margin:6px 0 12px">${[['w','⚪ Blancas'],['b','⚫ Negras'],['r','🎲 Al azar']].map(([v,t])=>chip(g.color===v,`data-c="${v}"`,t)).join('')}</div>
   <b>⏱️ Tiempo por jugador</b><div class="chips" id="gt" style="margin:6px 0">${TC_PRESETS.map(([mm,ii,t])=>chip(g.m===mm&&g.i===ii,`data-m="${mm}" data-i="${ii}"`,t)).join('')}</div>
   <div class="btnrow" style="align-items:center;gap:8px;margin:6px 0 12px"><span class="muted" style="font-weight:800">Personalizado:</span><input id="gm" type="number" min="1" max="90" placeholder="min" style="width:70px;padding:6px;border:2px solid var(--line);border-radius:8px"><span>min +</span><input id="gi" type="number" min="0" max="60" placeholder="seg" style="width:70px;padding:6px;border:2px solid var(--line);border-radius:8px"><span>seg</span></div>
@@ -2408,27 +2418,30 @@ async function gameSetup(){
  const bg=$$('.modalbg').pop();
  const paint=()=>{$$('#gc .chip',bg).forEach(b=>{const on=b.dataset.c===g.color;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});$$('#gt .chip',bg).forEach(b=>{const on=+b.dataset.m===g.m&&+b.dataset.i===g.i;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});};
  $$('#gc .chip',bg).forEach(b=>b.onclick=()=>{g.color=b.dataset.c;paint();});
+ const paintU=()=>{$$('#gu .chip',bg).forEach(b=>{const on=!!+b.dataset.u===!!g.undo;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});$('#guw',bg).innerHTML=g.undo?'⚠️ Partida de práctica: si permites deshacer, <b>no sumarás XP ni ELO</b>.':'La partida cuenta para tu XP y tu ELO. No podrás deshacer.';$('#guw',bg).style.color=g.undo?'#b45309':'';};
+ $$('#gu .chip',bg).forEach(b=>b.onclick=()=>{g.undo=!!+b.dataset.u;paintU();});paintU();
  $$('#gt .chip',bg).forEach(b=>b.onclick=()=>{g.m=+b.dataset.m;g.i=+b.dataset.i;$('#gm',bg).value='';$('#gi',bg).value='';paint();});
  const cust=()=>{const mm=Math.max(0,Math.min(90,Math.floor(+$('#gm',bg).value||0))),ii=Math.max(0,Math.min(60,Math.floor(+$('#gi',bg).value||0)));if(mm>=1||ii>0){g.m=mm||1;g.i=ii;}paint();};
  $('#gm',bg).oninput=cust;$('#gi',bg).oninput=cust;
  $('#gev',bg).onchange=e=>{g.ev=e.target.checked;};
  const ok=await pr;if(!ok)return null;
- S.gcfg={color:g.color,m:g.m,i:g.i,ev:g.ev};save();
- return {color:g.color,tc:g.m>0?{m:g.m,i:g.i}:null,ev:g.ev};
+ S.gcfg={color:g.color,m:g.m,i:g.i,ev:g.ev,undo:!!g.undo};save();
+ return {color:g.color,tc:g.m>0?{m:g.m,i:g.i}:null,ev:g.ev,undo:!!g.undo};
 }
-function viewGame(m,{level,color,resume,tc,ev}){
+function viewGame(m,{level,color,resume,tc,ev,undo}){
  const tok=VIEW;const bot=BOTS[level-1];const pos=new E.Pos();let over=false,thinking=false,undoUsed=false,hints=3,castled=false,gid=0;const sans=[];
  const resumed=!!(resume&&P.cur&&P.cur.level===level&&P.cur.color===color);
- if(resumed)tc=P.cur.tc||null;
+ if(resumed){tc=P.cur.tc||null;undo=!!P.cur.undo;}
+ const prac=!!undo;   // con «deshacer» permitido la partida es de práctica: no suma XP ni ELO
  if(ev===undefined)ev=!!(DB.settings.gcfg&&DB.settings.gcfg.ev);
  let evOn=ev,evSeq=0,lastCp=0;
  const clk={w:tc?tc.m*60000:0,b:tc?tc.m*60000:0};
  if(resumed&&tc&&P.cur.clk){clk.w=P.cur.clk.w;clk.b=P.cur.clk.b;}
  const tcTxt=tc?` · ⏱️ ${tc.m}${tc.i?'+'+tc.i:' min'}`:'';
  const {board,body,under}=trainerShell(m,`Nivel ${level} · ${bot.nombre}`,async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;clearInterval(timer);go('jugar');});
- body.innerHTML=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>${bot.nombre}</b><div class="muted" style="font-size:.85rem">${bot.desc}${tcTxt}</div><div id="st" style="font-weight:800;margin-top:2px"></div></div></div>
+ body.innerHTML=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>${bot.nombre}</b><div class="muted" style="font-size:.85rem">${bot.desc}${tcTxt}</div>${prac?'<div style="font-size:.8rem;font-weight:800;color:#b45309">↩️ Práctica con deshacer · no suma XP ni ELO</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div></div></div>
   <div class="movelist" id="ml"></div><div id="fb"></div>`;
- under.innerHTML=`<button class="btn ghost sm" id="hint"><span>💡 Pista (<b id="hn">3</b>)</span></button><button class="btn ghost sm" id="undo">↶ Deshacer</button><button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="evt" title="Barra de ventaja">📊</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
+ under.innerHTML=`<button class="btn ghost sm" id="hint"><span>💡 Pista (<b id="hn">3</b>)</span></button>${prac?'<button class="btn ghost sm" id="undo">↶ Deshacer</button>':''}<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="evt" title="Barra de ventaja">📊</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
  // tira de jugador (arriba y abajo del tablero) y barra de ventaja
  const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
  const wrap=document.createElement('div');wrap.className='bwrap';bc.insertBefore(wrap,bd);
@@ -2452,7 +2465,7 @@ function viewGame(m,{level,color,resume,tc,ev}){
   if(cp==null){const q=new E.Pos(fen),sc=E.scoreMoves(q,2);if(sc.length){const v=Math.max(-9990,Math.min(9990,sc[0].s));cp=turn==='w'?v:-v;}else cp=q.status()==='mate'?(turn==='w'?-10000:10000):0;}
   if(my!==evSeq||!alive(tok))return;paintEv(cp);
  }
- function saveCur(){P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today(),tc:tc||null,clk:tc?{w:Math.round(clk.w),b:Math.round(clk.b)}:null};save();}
+ function saveCur(){P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today(),tc:tc||null,undo:prac,clk:tc?{w:Math.round(clk.w),b:Math.round(clk.b)}:null};save();}
  function updatePanel(){
   let h='';for(let i=0;i<sans.length;i+=2)h+=`<span class="n">${i/2+1}.</span><span class="${i===sans.length-1?'cur':''}">${E.sanES(sans[i])}</span><span class="${i+1===sans.length-1?'cur':''}">${sans[i+1]?E.sanES(sans[i+1]):''}</span>`;
   const ml=$('#ml',body);ml.innerHTML=h||'<span class="muted" style="grid-column:1/-1">¡Empieza la partida! Juegan blancas.</span>';ml.scrollTop=ml.scrollHeight;
@@ -2464,7 +2477,7 @@ function viewGame(m,{level,color,resume,tc,ev}){
    el.innerHTML=`<span class="pn">${isMe?esc(P.avatar+' '+P.name):bot.emoji+' '+esc(bot.nombre)}</span><span class="cp"><span style="font-family:'Segoe UI Symbol','Noto Sans Symbols 2',sans-serif">${lost[opc]}</span>${d>0?`<span class="adv">+${d}</span>`:''}</span>${tc?`<span class="clk" data-c="${c}"></span>`:''}`;};
   fill(sTop,topC);fill(sBot,botC);paintClk();
   const s=pos.status();$('#st',body).innerHTML=thinking?'Pensando<span class="thinking"><i></i><i></i><i></i></span>':s==='jaque'?'<span style="color:var(--bad)">¡Jaque!</span>':over?'Partida terminada':(pos.turn===color?'Te toca a ti':'');
-  $('#hn',under).textContent=hints;$('#hint',under).disabled=over||hints<=0;$('#undo',under).disabled=over||thinking||!!tc||pos.played.length<(color==='w'?1:2);$('#resign',under).disabled=over;
+  $('#hn',under).textContent=hints;$('#hint',under).disabled=over||hints<=0;if($('#undo',under))$('#undo',under).disabled=over||thinking||pos.played.length<(color==='w'?1:2);$('#resign',under).disabled=over;
  }
  function afterMove(mv,anim,san){
   sans.push(san);const mover=pos.turn==='w'?'b':'w';if(tc&&tc.i&&pos.played.length>2)clk[mover]+=tc.i*1000;
@@ -2484,19 +2497,20 @@ function viewGame(m,{level,color,resume,tc,ev}){
   endGame(res,why);return true;}
  function endGame(res,why){
   over=true;board.interactive=false;board.pickSq=null;clearInterval(timer);updatePanel();P.cur=null;if(evOn)evalNow();
-  const g=P.games[level]=P.games[level]||{w:0,d:0,l:0};g[res]++;track('jugar');
-  const eloD=eloUpdate(ELO_BOT[level],res==='w'?(undoUsed?.75:1):res==='d'?.5:0,32,'game');
+  const g=prac?{w:0,d:0,l:0}:(P.games[level]=P.games[level]||{w:0,d:0,l:0});g[res]++;if(!prac)track('jugar');
+  const eloD=prac?null:eloUpdate(ELO_BOT[level],res==='w'?1:res==='d'?.5:0,32,'game');
   let xp=0,title,icon,txt;
-  if(res==='w'){const first=g.w===1;xp=bot.xp+(first?Math.round(bot.xp/2):0);if(undoUsed)xp=Math.round(xp/2);
-   title='¡Has ganado!';icon='🏆';txt=`${why}. ¡Enhorabuena!`;track('ganar');award('win1');if(level>=3)award('win3');if(level>=5)award('win5');if(level>=6)award('win6');
-   if(level===P.unlocked&&level<maxBot()){P.unlocked=level+1;txt+=`<br><br>🔓 ¡Has desbloqueado el <b>nivel ${level+1}: ${BOTS[level].nombre}</b>!`;}
+  if(res==='w'){const first=g.w===1;xp=bot.xp+(first?Math.round(bot.xp/2):0);
+   title='¡Has ganado!';icon='🏆';txt=`${why}. ¡Enhorabuena!`;if(!prac){track('ganar');award('win1');if(level>=3)award('win3');if(level>=5)award('win5');if(level>=6)award('win6');}
+   if(!prac&&level===P.unlocked&&level<maxBot()){P.unlocked=level+1;txt+=`<br><br>🔓 ¡Has desbloqueado el <b>nivel ${level+1}: ${BOTS[level].nombre}</b>!`;}
    confetti(50);sound('win');}
   else if(res==='d'){xp=Math.round(bot.xp/3);title='Tablas';icon='🤝';txt=why+'. ¡Buen resultado!';sound('ok');}
   else{xp=5;title='Esta vez ganó la máquina';icon='🤖';txt=why+'. ¡Cada derrota enseña algo! Inténtalo de nuevo.';sound('bad');}
   gid=Date.now();P.hist=P.hist||[];P.hist.push({id:gid,date:today(),level,color,res,moves:pos.played.map(x=>E.uci(x)),tc:tc||undefined});pruneHist();
-  save();if(xp)addXP(xp,res==='w'?'Victoria':res==='d'?'Tablas':'Por intentarlo');
-  setFb(`${icon} <span><b>${title}</b><br>${why} ${eloTag(eloD)}</span>`,res==='w'?'ok':res==='d'?'info':'bad');
-  setTimeout(()=>{if(!alive(tok))return;modal({title,html:`<div class="bigicon">${icon}</div><p>${txt}</p><p>${eloTag(eloD)} → <b>${P.elo}</b></p>${undoUsed&&res==='w'?'<p class="muted"><small>Usaste “deshacer”: XP a la mitad.</small></p>':''}`,buttons:[{t:'Menú',cls:'ghost',v:'m'},{t:'🔍 Analizar',cls:'ghost',v:'a'},{t:'Revancha',v:'r'}]}).then(v=>{if(v==='r')go('partida',{level,color,tc,ev:evOn});else if(v==='m')go('jugar');else if(v==='a')go('analisis',{id:gid});});},700);
+  if(prac)xp=0;save();if(xp)addXP(xp,res==='w'?'Victoria':res==='d'?'Tablas':'Por intentarlo');
+  const eloTxt=prac?'<span class="muted">Práctica: sin XP ni ELO</span>':eloTag(eloD);
+  setFb(`${icon} <span><b>${title}</b><br>${why} ${eloTxt}</span>`,res==='w'?'ok':res==='d'?'info':'bad');
+  setTimeout(()=>{if(!alive(tok))return;modal({title,html:`<div class="bigicon">${icon}</div><p>${txt}</p>${prac?'<p class="muted"><b>↩️ Partida de práctica:</b> no suma XP ni ELO.</p>':`<p>${eloTag(eloD)} → <b>${P.elo}</b></p>`}`,buttons:[{t:'Menú',cls:'ghost',v:'m'},{t:'🔍 Analizar',cls:'ghost',v:'a'},{t:'Revancha',v:'r'}]}).then(v=>{if(v==='r')go('partida',{level,color,tc,ev:evOn,undo:prac});else if(v==='m')go('jugar');else if(v==='a')go('analisis',{id:gid});});},700);
  }
  async function botTurn(){
   if(over||pos.turn===color)return;thinking=true;updatePanel();
@@ -2508,7 +2522,7 @@ function viewGame(m,{level,color,resume,tc,ev}){
  board.onMove=(mv,anim)=>{if(over||thinking||pos.turn!==color)return;const san=pos.san(mv);if(mv.flag==='k'||mv.flag==='q'){castled=true;award('enroque');}pos.play(mv);if(!afterMove(mv,anim,san))botTurn();};
  $('#flip',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();updatePanel();if(evOn)paintEv(lastCp);};
  $('#evt',under).onclick=()=>{evOn=!evOn;DB.settings.gcfg=Object.assign({color:'w',m:0,i:0},DB.settings.gcfg||{},{ev:evOn});save();setEvVis();if(evOn)evalNow();};
- $('#undo',under).onclick=()=>{if(thinking||over||tc)return;undoUsed=true;pos.undo();sans.pop();if(pos.turn!==color){pos.undo();sans.pop();}saveCur();board.set(pos,{last:pos.played[pos.played.length-1]||null});board.interactive=true;setFb('↶ Jugada deshecha (si ganas, recibirás la mitad de XP).','info');updatePanel();if(evOn)evalNow();};
+ if($('#undo',under))$('#undo',under).onclick=()=>{if(thinking||over||!prac)return;undoUsed=true;board.premove=null;pos.undo();sans.pop();if(pos.turn!==color){pos.undo();sans.pop();}saveCur();board.set(pos,{last:pos.played[pos.played.length-1]||null});board.interactive=true;setFb('↶ Jugada deshecha.','info');updatePanel();if(evOn)evalNow();};
  $('#hint',under).onclick=async()=>{if(thinking||over||pos.turn!==color||hints<=0)return;hints--;updatePanel();setFb('💡 Pensando una buena jugada…','info');const u=await aiMove(pos.fen(),Math.max(4,level),{time:900,sf:true});if(!alive(tok)||!u)return;const mv=pos.fromUci(u);board.arrows=[[mv.from,mv.to,'o']];board.render();setFb('💡 Prueba la jugada de la flecha naranja.','info');};
  $('#resign',under).onclick=async()=>{if(over)return;if(await confirmModal('¿Rendirte?','La partida contará como derrota.','Me rindo','Seguir jugando',true)){if(alive(tok))endGame('l','Te has rendido');}};
  if(resumed){for(const u of P.cur.moves){const mm=pos.fromUci(u);if(!mm)break;sans.push(pos.san(mm));pos.play(mm);}board.set(pos,{last:pos.played[pos.played.length-1]||null});updatePanel();last=Date.now();if(!checkEnd()){if(evOn&&pos.turn===color)evalNow();if(pos.turn!==color)botTurn();}return;}
@@ -4193,13 +4207,13 @@ async function viewOnGame(m,{gid}){
  if(!G||!onlLogged()){toast('No se puede abrir la partida','bad');return go('online');}
  const uid=myUid(),color=G.w===uid?'w':G.b===uid?'b':null;if(!color){toast('Esta partida no es tuya','bad');return go('online');}
  const oc=color==='w'?'b':'w',oppN=color==='w'?G.bn:G.wn,oppE=color==='w'?G.be:G.we;
- const pos=new E.Pos();let over=false,pending=null,drawAsked=false,flagSent=false;const sans=[];
+ const pos=new E.Pos();let over=false,pending=null,drawAsked=false,flagSent=false,myTk=null,tkSeen=null;const tkDone=new Set();const sans=[];
  ON.inGame=true;presTick();
  const leave=()=>{clearInterval(poll);clearInterval(clkT);if(ON.inGame){ON.inGame=false;presTick();}};
  const ar=G.ar||null;if(ar&&!ON.arena)arenaEnsure(ar).catch(()=>{});
  const {board,body,under}=trainerShell(m,ar?'🏟️ Arena':'🌐 Partida online',async()=>{if(!over&&!(await confirmModal('¿Salir de la sala?','La partida sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir')))return;leave();go('online');});
  body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b>${esc(oppN)}</b><div class="muted" style="font-size:.85rem">ELO ${oppE||800} · ⏱️ ${tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div><div id="st" style="font-weight:800;margin-top:2px"></div></div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
- under.innerHTML=`${ar&&G.fu?'<button class="btn sm" id="fury" style="background:#e8590c;color:#fff;font-weight:900" title="Antes de tu primer movimiento: tu tiempo se divide a la mitad y, si ganas, +1 punto">🔥 Modo furia</button>':''}<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="drw">🤝 Tablas</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
+ under.innerHTML=`${ar&&G.fu?'<button class="btn sm" id="fury" style="background:#e8590c;color:#fff;font-weight:900" title="Antes de tu primer movimiento: tu tiempo se divide a la mitad y, si ganas, +1 punto">🔥 Modo furia</button>':''}<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="tkb" title="Pedir al rival deshacer tu última jugada">↩️ Deshacer</button><button class="btn ghost sm" id="drw">🤝 Pedir tablas</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
  const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
  const sTop=document.createElement('div'),sBot=document.createElement('div');sTop.className=sBot.className='pstrip';bc.insertBefore(sTop,bd);bc.insertBefore(sBot,$('#under',m));
  board.orient=color;board.movable=color;board.interactive=true;board.premoveOK=true;board.set(pos,{last:null});
@@ -4212,7 +4226,7 @@ async function viewOnGame(m,{gid}){
  function panel(){let h='';for(let i=0;i<sans.length;i+=2)h+=`<span class="n">${i/2+1}.</span><span class="${i===sans.length-1?'cur':''}">${E.sanES(sans[i])}</span><span class="${i+1===sans.length-1?'cur':''}">${sans[i+1]?E.sanES(sans[i+1]):''}</span>`;
   const ml=$('#ml',body);ml.innerHTML=h||'<span class="muted" style="grid-column:1/-1">¡Empieza la partida! Juegan blancas.</span>';ml.scrollTop=ml.scrollHeight;
   const s=pos.status();$('#st',body).innerHTML=over?'Partida terminada':s==='jaque'?'<span style="color:var(--bad)">¡Jaque!</span> '+(pos.turn===color?'Te toca a ti':''):(pos.turn===color?'Te toca a ti':'Juega '+esc(oppN));
-  $('#drw',under).disabled=over;$('#resign',under).disabled=over;const fb=$('#fury',under);if(fb)fb.style.display=(over||ownMoves()>0||furyOn(color))?'none':'';paint();}
+  $('#drw',under).disabled=over;$('#tkb',under).disabled=over||!!myTk||ownMoves()<1;$('#resign',under).disabled=over;const fb=$('#fury',under);if(fb)fb.style.display=(over||ownMoves()>0||furyOn(color))?'none':'';paint();}
  const canMate=c=>{let n=0;for(const p of pos.b){if(!p||E.colorOf(p)!==c)continue;const t=p.toLowerCase();if(t==='p'||t==='r'||t==='q')return true;if(t==='n'||t==='b')n++;}return n>=2;};
  const setEnd=async(res,why)=>{if(G.st!=='end'){G.st='end';G.res=res;G.why=why;try{await RT.patch('games/'+gid,{st:'end',res,why,draw:''});}catch(e){}}finish(res,why);};
  function sync(){const ms=(G.moves||'').split(' ').filter(Boolean);let changed=false,lastMv=null;
@@ -4249,12 +4263,29 @@ async function viewOnGame(m,{gid}){
   const upd={moves:G.moves,['clk/'+mover]:Math.round(rem),ts:RT.SV,turn:pos.turn,draw:''};const end=afterLocal(mv,mover);
   if(end){upd.st='end';upd.res=end.res;upd.why=end.why;G.st='end';G.res=end.res;G.why=end.why;}
   panel();writeMove(upd);if(end)finish(end.res,end.why);};
+ /* ---- deshacer jugada: solo si el rival acepta ---- */
+ function applyTakeback(mv){const n=(mv||'').split(' ').filter(Boolean).length;if(n>=plies())return;
+  while(plies()>n){pos.undo();sans.pop();}G.moves=mv;board.premove=null;board.hl=[];board.arrows=[];board.set(pos,{last:pos.played[pos.played.length-1]||null});board.interactive=!over;panel();}
+ async function answerTk(id){sound('ok');
+  const v=await modal({title:'↩️ Deshacer jugada',html:`<p style="text-align:center"><b>${esc(oppN)}</b> pide deshacer su última jugada<br>(por si se equivocó al pulsar).</p>`,buttons:[{t:'No',cls:'ghost',v:false},{t:'Aceptar',v:true}],dismiss:false});
+  if(over)return;let cur=null;try{cur=await RT.get('games/'+gid);}catch(e){}
+  if(!cur||cur.st!=='play'||!cur.tk||cur.tk.id!==id)return;
+  if(!v){RT.patch('games/'+gid,{tk:null,tkr:{id,r:'no'}}).catch(()=>{});return;}
+  const ms=(cur.moves||'').split(' ').filter(Boolean),by=cur.tk.by,L=ms.length,n0=cur.tk.n||0;
+  const byOf=i=>i%2?'b':'w';
+  if(L-n0>1||(L>n0&&byOf(n0)===by)){RT.patch('games/'+gid,{tk:null,tkr:{id,r:'no'}}).catch(()=>{});return toast('Ya no se puede deshacer: la partida ha seguido','bad');}
+  let k=L-1;while(k>=0&&byOf(k)!==by)k--;if(k<0)return;
+  const nm=ms.slice(0,k).join(' ');
+  try{await RT.patch('games/'+gid,{moves:nm,turn:by,ts:RT.SV,draw:'',tk:null,tkr:{id,r:'ok'}});tkDone.add(id);G.ts=RT.srv();G.turn=by;applyTakeback(nm);toast('↩️ Jugada deshecha');}catch(e){toast(FB.msg(e),'bad');}}
  let polling=false;
  async function tick(){if(polling||!alive(tok)){if(!alive(tok))leave();return;}polling=true;
   try{if(pending)await writeMove(pending);
    const g=await RT.get('games/'+gid);
-   if(g&&alive(tok)&&!over){const n=(g.moves||'').split(' ').filter(Boolean).length;if(n>=plies()&&!pending){G=g;sync();}
+   if(g&&g.tk&&tkDone.has(g.tk.id)){polling=false;return;}   // respuesta antigua, anterior a deshacer
+   if(g&&alive(tok)&&!over){const n=(g.moves||'').split(' ').filter(Boolean).length;if(n>=plies()&&!pending){G=g;sync();}else if(n<plies()&&!pending&&g.tkr&&g.tkr.r==='ok'&&!tkDone.has(g.tkr.id)){tkDone.add(g.tkr.id);G=g;applyTakeback(g.moves||'');}
+    if(g.tkr&&myTk&&g.tkr.id===myTk){toast(g.tkr.r==='ok'?'↩️ '+oppN+' acepta: repite tu jugada':'↩️ '+oppN+' no acepta deshacer',g.tkr.r==='ok'?'ok':'bad');myTk=null;panel();}
     if(g.st==='end'){G=g;sync();finish(g.res,g.why);}
+    else if(g.tk&&g.tk.by===oc&&g.tk.id!==tkSeen){tkSeen=g.tk.id;answerTk(g.tk.id);}
     else if(g.draw===oc&&!drawAsked){drawAsked=true;modal({title:'🤝 Tablas',html:`<p style="text-align:center"><b>${esc(oppN)}</b> te ofrece tablas.</p>`,buttons:[{t:'No',cls:'ghost',v:false},{t:'Aceptar',v:true}],dismiss:false}).then(v=>{if(over)return;if(v)setEnd('1/2-1/2','draw');else{RT.patch('games/'+gid,{draw:''}).catch(()=>{});drawAsked=false;}});}
     panel();}}catch(e){}
   polling=false;}
@@ -4264,6 +4295,9 @@ async function viewOnGame(m,{gid}){
    if(!canMate(o))setEnd('1/2-1/2','material');else setEnd(c==='w'?'0-1':'1-0','time');break;}}},200);
  if($('#fury',under))$('#fury',under).onclick=async()=>{if(over||ownMoves()>0||furyOn(color))return;const nc=Math.round(((G.clk&&G.clk[color])||0)/2);G.fury=G.fury||{};G.fury[color]=1;G.clk=G.clk||{};G.clk[color]=nc;panel();sound('ok');toast('🔥 ¡Modo furia! Tu tiempo se divide a la mitad: si ganas, +1 punto');try{await RT.patch('games/'+gid,{['fury/'+color]:1,['clk/'+color]:nc});}catch(e){}};
  $('#flip',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();paint();};
+ $('#tkb',under).onclick=async()=>{if(over||myTk||ownMoves()<1)return;myTk='k'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);panel();
+  try{await RT.patch('games/'+gid,{tk:{by:color,n:plies(),id:myTk}});toast('↩️ Has pedido deshacer a '+oppN);}catch(e){myTk=null;panel();toast(FB.msg(e),'bad');}
+  setTimeout(()=>{if(myTk&&!over){myTk=null;panel();}},45000);};
  $('#drw',under).onclick=async()=>{if(over)return;if(G.draw===oc)return setEnd('1/2-1/2','draw');G.draw=color;try{await RT.patch('games/'+gid,{draw:color});toast('Has ofrecido tablas 🤝');}catch(e){toast(FB.msg(e),'bad');}};
  $('#resign',under).onclick=async()=>{if(over)return;if(await confirmModal('¿Rendirte?','La partida contará como derrota.','Me rindo','Seguir jugando',true))setEnd(color==='w'?'0-1':'1-0','resign');};
  sync();board.interactive=!over&&G.st!=='end';panel();if(G.st==='end')finish(G.res,G.why);
