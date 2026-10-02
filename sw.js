@@ -3,7 +3,7 @@
 //   así cualquier cambio que subas al repositorio llega a la app sin reinstalarla.
 // - Si no hay conexión, se usa la última copia guardada (la app sigue funcionando).
 // - Iconos, Stockfish y fuentes: se sirven de la copia guardada y se actualizan en segundo plano.
-const CACHE = 'siurot-cache-v1';
+const CACHE = 'siurot-cache-v2';
 const PRE = ['./', './ajedrez-siurot.html', './manifest.webmanifest', './icon192.png', './icon512.png', './logo.png'];
 
 self.addEventListener('install', e => {
@@ -29,6 +29,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (/(ajedrez-admin|sw-admin|manifest-admin)/.test(url.pathname)) return; // la app de admin va por su cuenta
   if (url.origin !== location.origin) {
     // fuentes de Google y similares: caché tras la primera vez
     if (/fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) e.respondWith(swr(req));

@@ -5,7 +5,7 @@
  "description": "Administración de Ajedrez Siurot",
  "lang": "es",
  "start_url": "./ajedrez-admin.html",
- "scope": "./",
+ "scope": "./ajedrez-admin.html",
  "display": "standalone",
  "orientation": "any",
  "background_color": "#f4ead4",
