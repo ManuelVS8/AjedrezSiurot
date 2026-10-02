@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ajedrez Siurot · Administración</title><meta name="robots" content="noindex">
+<style>
+:root{--g:#2f7d5b;--gd:#1f5a41;--bg:#f3f6f4;--card:#fff;--tx:#1d2b25;--mu:#66756d;--ln:#dfe7e2;--rd:#c0392b;--yl:#f2b134}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+button,input,select,textarea{font:inherit}
+.top{background:var(--g);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top h1{font-size:1.1rem;margin:0;flex:1}.top .who{font-size:.85rem;opacity:.9}
+nav{display:flex;gap:4px;padding:8px 12px 0;background:var(--g);flex-wrap:wrap}
+nav button{background:transparent;color:#d6efe3;border:0;padding:9px 14px;border-radius:10px 10px 0 0;cursor:pointer;font-weight:700}
+nav button.on{background:var(--bg);color:var(--gd)}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;margin-bottom:14px}
+h2{margin:0 0 10px;font-size:1.15rem}h3{margin:0 0 8px;font-size:1rem}
+.btn{background:var(--g);color:#fff;border:0;border-radius:10px;padding:8px 14px;font-weight:700;cursor:pointer}
+.btn:hover{background:var(--gd)}.btn.ghost{background:#fff;color:var(--gd);border:2px solid var(--g)}
+.btn.red{background:var(--rd)}.btn.sm{padding:4px 9px;font-size:.85rem;border-radius:8px}.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.grow{flex:1}
+input,select,textarea{border:2px solid var(--ln);border-radius:10px;padding:7px 10px;background:#fff;color:var(--tx)}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--g)}textarea{width:100%;min-height:130px}
+table{width:100%;border-collapse:collapse;font-size:.92rem}th,td{padding:6px 8px;border-bottom:1px solid var(--ln);text-align:left}
+th{color:var(--mu);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}td.n,th.n{text-align:right}
+.mono{font-family:ui-monospace,Consolas,monospace;font-weight:800}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:800;background:#e8f1ec;color:var(--gd)}
+.pill.espera{background:#fff3d6;color:#8a5a00}.pill.activo{background:#d9f5e3;color:#14703a}.pill.terminado{background:#e7e7ee;color:#555}
+.muted{color:var(--mu);font-size:.88rem}.err{color:var(--rd);font-weight:700}
+#toasts{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:6px;align-items:center}
+.toast{background:#1d2b25;color:#fff;padding:9px 16px;border-radius:12px;font-weight:700;box-shadow:0 4px 14px #0004}.toast.bad{background:var(--rd)}
+.mbg{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;z-index:50;padding:14px}
+.modal{background:#fff;border-radius:16px;padding:18px;max-width:520px;width:100%;max-height:90vh;overflow:auto}
+.modal h3{font-size:1.15rem}.modal .bt{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+.login{max-width:360px;margin:12vh auto;text-align:center}.login input{width:100%;margin:6px 0}
+.proj{position:fixed;inset:0;background:#10241b;color:#fff;z-index:60;padding:3vh 4vw;overflow:auto}
+.proj h1{margin:0 0 2vh;font-size:3.2vw}.proj table{font-size:2.4vw;color:#fff}.proj td,.proj th{border-color:#ffffff30;padding:1vh 1vw}.proj th{color:#9fd9bb}
+.proj .x{position:fixed;right:20px;top:14px}
+.sheetov{position:fixed;inset:0;background:#fff;z-index:70;overflow:auto;padding:12px}.sheetov .bar{display:flex;gap:8px;margin-bottom:10px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:0;width:190mm;margin:0 auto}
+.cd{border:1px dashed #888;padding:8mm 7mm;height:52mm;display:flex;flex-direction:column;justify-content:center;gap:2mm;page-break-inside:avoid}
+.cd b.t{font-size:11pt;color:#1f5a41}.cd .nm{font-size:13pt;font-weight:800}.cd .cr{font-size:15pt;font-family:ui-monospace,Consolas,monospace;font-weight:800;letter-spacing:.06em}.cd .u{font-size:8.5pt;color:#555}
+@media print{body>*:not(.sheetov){display:none!important}.sheetov{position:static;padding:0}.sheetov .bar{display:none}@page{size:A4;margin:10mm}}
+@media(max-width:640px){.cards{grid-template-columns:1fr}}
+</style></head><body>
+<div id="app"></div><div id="toasts"></div>
+<script>
+/* ===== Firebase por REST (sin SDK, sin dependencias) ===== */
+const FBC={apiKey:"AIzaSyC4YHA4G1LWqs0ASkcD7Nlq89DTh4ZB_Mw",projectId:"ajedrez-siurot",domain:"ajedrez-siurot.app",admin:"manuelvsanchez@gmail.com"};
+const FB=(()=>{
+ const AUTH='https://identitytoolkit.googleapis.com/v1/accounts:',TOK='https://securetoken.googleapis.com/v1/token?key='+FBC.apiKey,
+  FS='https://firestore.googleapis.com/v1/projects/'+FBC.projectId+'/databases/(default)/documents';
+ const K='?key='+FBC.apiKey;
+ function toV(v){if(v===null||v===undefined)return{nullValue:null};if(typeof v==='boolean')return{booleanValue:v};if(typeof v==='number')return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};if(Array.isArray(v))return{arrayValue:{values:v.map(toV)}};if(typeof v==='object')return{mapValue:{fields:enc(v)}};return{stringValue:String(v)};}
+ function enc(o){const f={};for(const k in o)if(o[k]!==undefined)f[k]=toV(o[k]);return f;}
+ function fromV(v){if('nullValue'in v)return null;if('booleanValue'in v)return v.booleanValue;if('integerValue'in v)return Number(v.integerValue);if('doubleValue'in v)return v.doubleValue;if('stringValue'in v)return v.stringValue;if('arrayValue'in v)return(v.arrayValue.values||[]).map(fromV);if('mapValue'in v)return dec({fields:v.mapValue.fields});if('timestampValue'in v)return Date.parse(v.timestampValue);return null;}
+ function dec(d){const o={};if(d.name)o.id=d.name.split('/').pop();const f=d.fields||{};for(const k in f)o[k]=fromV(f[k]);return o;}
+ async function req(url,opt={},tries=1){
+  let last;
+  for(let i=0;i<tries;i++){
+   const ac=new AbortController();const to=setTimeout(()=>ac.abort(),15000);
+   try{const r=await fetch(url,{...opt,signal:ac.signal});clearTimeout(to);
+    let j=null;const tx=await r.text();try{j=tx?JSON.parse(tx):null;}catch(e){}
+    if(!r.ok){const e=new Error((j&&j.error&&(j.error.message||j.error.status))||('HTTP '+r.status));e.status=r.status;e.code=(j&&j.error&&j.error.message)||'';throw e;}
+    return j;}
+   catch(e){clearTimeout(to);last=e;if(e.status)throw e;if(i<tries-1)await new Promise(r=>setTimeout(r,600));}
+  }
+  last.offline=true;throw last;
+ }
+ const post=(u,b)=>req(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)},2);
+ const S={user:null,onChange:null};
+ const save=()=>{if(S.onChange)S.onChange(S.user);};
+ const emailOf=a=>a.includes('@')?a:a+'@'+FBC.domain;
+ function pack(r){return{uid:r.localId,email:r.email,idToken:r.idToken,refresh:r.refreshToken,exp:Date.now()+(+r.expiresIn||3600)*1000};}
+ const api={
+  S,emailOf,
+  signIn:(a,pw)=>post(AUTH+'signInWithPassword'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
+  signUp:(a,pw)=>post(AUTH+'signUp'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
+  delAccount:idToken=>post(AUTH+'delete'+K,{idToken}),
+  setPass:(idToken,pw)=>post(AUTH+'update'+K,{idToken,password:pw,returnSecureToken:true}).then(pack),
+  async login(a,pw){S.user=await api.signIn(a,pw);save();return S.user;},
+  restore(u){S.user=u;},
+  logout(){S.user=null;save();},
+  async tok(){const u=S.user;if(!u)return null;
+   if(u.exp-Date.now()<90000){try{const r=await req(TOK,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(u.refresh)},2);
+    u.idToken=r.id_token;u.refresh=r.refresh_token||u.refresh;u.exp=Date.now()+(+r.expires_in||3600)*1000;save();}catch(e){if(e.status){S.user=null;save();}throw e;}}
+   return u.idToken;},
+  async H(tok){const t=tok===undefined?await api.tok():tok;return t?{Authorization:'Bearer '+t}:{};},
+  async get(path,tok){try{return dec(await req(FS+'/'+path,{headers:await api.H(tok)},2));}catch(e){if(e.status===404)return null;throw e;}},
+  async set(path,obj,mask,tok){const q=mask?'?'+mask.map(k=>'updateMask.fieldPaths='+encodeURIComponent(k)).join('&'):'';
+   return dec(await req(FS+'/'+path+q,{method:'PATCH',headers:{...await api.H(tok),'Content-Type':'application/json'},body:JSON.stringify({fields:enc(obj)})},2));},
+  async del(path,tok){return req(FS+'/'+path,{method:'DELETE',headers:await api.H(tok)},2);},
+  async list(path,tok){const out=[];let pt='';do{const r=await req(FS+'/'+path+'?pageSize=300'+(pt?'&pageToken='+encodeURIComponent(pt):''),{headers:await api.H(tok)},2);(r.documents||[]).forEach(d=>out.push(dec(d)));pt=r.nextPageToken||'';}while(pt);return out;},
+  msg(e){const c=(e&&e.code||e&&e.message||'')+'';
+   if(e&&e.offline)return'Sin conexión con el servidor. Comprueba internet.';
+   if(/INVALID_LOGIN|INVALID_PASSWORD|EMAIL_NOT_FOUND|INVALID_EMAIL/.test(c))return'Usuario o clave incorrectos.';
+   if(/TOO_MANY/.test(c))return'Demasiados intentos. Espera unos minutos.';
+   if(/EMAIL_EXISTS/.test(c))return'Ese usuario ya existe.';
+   if(/PERMISSION|403/.test(c)||e&&e.status===403)return'Sin permiso para hacer eso.';
+   return'Error: '+c.slice(0,80);}
+ };
+ return api;
+})();
+/* claves: 3 números + 3 letras minúsculas (sin caracteres que se confunden) */
+function genClave(){const D='23456789',L='abcdefghjkmnpqrstuvwxyz',r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};let s='';for(let i=0;i<3;i++)s+=D[r(D.length)];for(let i=0;i<3;i++)s+=L[r(L.length)];return s;}
+const claveOK=c=>/^[0-9]{3}[a-z]{3}$/.test(c);
+function slugAlias(nombre){const t=nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').trim().split(/\s+/).filter(Boolean);if(!t.length)return'';return t[0].slice(0,14)+(t.length>1?t[t.length-1].charAt(0):'');}
+
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m,bad){const t=document.createElement('div');t.className='toast'+(bad?' bad':'');t.textContent=m;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),bad?4200:2600);}
+function modal({title='',html='',buttons=[{t:'Aceptar',v:true}]}){return new Promise(res=>{const bg=document.createElement('div');bg.className='mbg';bg.innerHTML=`<div class="modal"><h3>${title}</h3><div>${html}</div><div class="bt">${buttons.map((b,i)=>`<button class="btn ${b.cls||''}" data-i="${i}">${b.t}</button>`).join('')}</div></div>`;document.body.appendChild(bg);
+ const done=v=>{bg.remove();res(v);};$$('button[data-i]',bg).forEach(b=>b.onclick=()=>{const bt=buttons[+b.dataset.i];done(typeof bt.v==='function'?bt.v(bg):bt.v);});const f=$('input,textarea',bg);if(f)f.focus();});}
+const confirmM=(title,html,ok='Aceptar',red)=>modal({title,html,buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:ok,cls:red?'red':'',v:true}]});
+const askM=(title,html,ok='Aceptar')=>modal({title,html,buttons:[{t:'Cancelar',cls:'ghost',v:null},{t:ok,v:bg=>$$('input,textarea,select',bg).map(i=>i.value)}]});
+const fdate=ms=>ms?new Date(ms).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
+const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
+const A={users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'usuarios',sel:new Set(),q:'',grp:'',tid:null,timer:null};
+const TABS=[['usuarios','👥 Usuarios'],['alta','➕ Alta'],['pend','🎟️ Sin estrenar'],['torneos','🏟️ Torneos'],['hof','🏆 Salón de la fama'],['ajustes','⚙️ Ajustes']];
+const nm=u=>u.nombre||u.alias;
+/* ---------- sesión ---------- */
+FB.S.onChange=u=>{try{u?sessionStorage.setItem('adm',JSON.stringify(u)):sessionStorage.removeItem('adm');}catch(e){}};
+async function boot(){let u=null;try{u=JSON.parse(sessionStorage.getItem('adm')||'null');}catch(e){}
+ if(u&&u.email===FBC.admin){FB.restore(u);try{await loadAll();return shell();}catch(e){FB.logout();}}
+ loginView();}
+function loginView(){$('#app').innerHTML=`<div class="card login"><h2>♞ Ajedrez Siurot</h2><p class="muted">Administración</p><input id="em" type="email" placeholder="Correo" value="${FBC.admin}" autocomplete="username"><input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password"><button class="btn" id="go" style="width:100%">Entrar</button><p class="err" id="er"></p></div>`;
+ const go=async()=>{$('#er').textContent='';try{const u=await FB.login($('#em').value.trim().toLowerCase(),$('#pw').value);if(u.email!==FBC.admin){FB.logout();throw {code:'NO_ADMIN'};}await loadAll();shell();}catch(e){$('#er').textContent=e.code==='NO_ADMIN'?'Esta cuenta no es de administración.':FB.msg(e);}};
+ $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go();};$('#pw').focus();}
+async function loadAll(){const[u,t,h,c]=await Promise.all([FB.list('users'),FB.list('torneos'),FB.list('hof'),FB.get('config/main')]);A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;if(c)A.cfg={...A.cfg,...c};}
+function shell(){$('#app').innerHTML=`<div class="top"><h1>♞ Ajedrez Siurot · Administración</h1><span class="who">${esc(FB.S.user.email)}</span><button class="btn ghost sm" id="out">Salir</button></div><nav>${TABS.map(([i,t])=>`<button data-t="${i}">${t}</button>`).join('')}</nav><main id="main"></main>`;
+ $$('nav button').forEach(b=>b.onclick=()=>{A.tab=b.dataset.t;A.tid=null;render();});$('#out').onclick=()=>{FB.logout();loginView();};render();}
+function render(){clearInterval(A.timer);$$('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===A.tab));const m=$('#main');
+ ({usuarios:vUsers,alta:vAlta,pend:vPend,torneos:vTorneos,hof:vHof,ajustes:vAjustes})[A.tab](m);}
+const active=()=>A.users.filter(u=>u.ultimoLogin),pending=()=>A.users.filter(u=>!u.ultimoLogin);
+/* ---------- PDF de claves ---------- */
+function printCards(list){const ov=document.createElement('div');ov.className='sheetov';
+ ov.innerHTML=`<div class="bar"><button class="btn" id="pp">🖨️ Imprimir / Guardar PDF</button><button class="btn ghost" id="px">Cerrar</button><span class="muted">En el cuadro de impresión elige «Guardar como PDF».</span></div><div class="cards">${list.map(u=>`<div class="cd"><b class="t">♞ Ajedrez Siurot</b><div class="nm">${esc(nm(u))}${u.grupo?` · ${esc(u.grupo)}`:''}</div><div>Usuario: <span class="cr">${esc(u.alias)}</span></div><div>Clave: <span class="cr">${esc(u.clave)}</span></div><div class="u">${esc(A.cfg.url)}</div></div>`).join('')}</div>`;
+ document.body.appendChild(ov);$('#px',ov).onclick=()=>ov.remove();$('#pp',ov).onclick=()=>window.print();}
+/* ---------- usuarios ---------- */
+const csvUsers=l=>csv([['Usuario','Nombre','Grupo','Último acceso'],...l.map(u=>[u.alias,u.nombre,u.grupo,fdate(u.ultimoLogin)])]);
+function userTable(list,pend){return `<table><thead><tr><th><input type="checkbox" id="all"></th><th>Usuario</th><th>Nombre</th><th>Grupo</th>${pend?'<th>Clave</th>':'<th>Último acceso</th>'}<th></th></tr></thead><tbody>${list.map(u=>`<tr><td><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}></td><td class="mono">${esc(u.alias)}</td><td>${esc(u.nombre)}</td><td>${esc(u.grupo)}</td>${pend?`<td class="mono">${esc(u.clave)}</td>`:`<td>${fdate(u.ultimoLogin)}</td>`}<td class="n" style="white-space:nowrap">${pend?'':`<button class="btn ghost sm" data-a="rs" data-id="${u.id}" title="Nueva clave">🔑</button> `}<button class="btn ghost sm" data-a="ed" data-id="${u.id}" title="Editar">✏️</button> <button class="btn red sm" data-a="del" data-id="${u.id}" title="Eliminar">🗑</button></td></tr>`).join('')||`<tr><td colspan="6" class="muted">Nada que mostrar.</td></tr>`}</tbody></table>`;}
+function userView(m,list,title,pend){
+ const groups=[...new Set(A.users.map(u=>u.grupo).filter(Boolean))].sort();
+ let l=list.filter(u=>(!A.grp||u.grupo===A.grp)&&(!A.q||(u.alias+' '+u.nombre).toLowerCase().includes(A.q.toLowerCase())));
+ m.innerHTML=`<div class="card"><h2>${title} <span class="pill">${l.length}</span></h2><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Buscar…" value="${esc(A.q)}"><select id="g"><option value="">Todos los grupos</option>${groups.map(g=>`<option ${g===A.grp?'selected':''}>${esc(g)}</option>`).join('')}</select><span class="grow"></span><button class="btn ghost sm" id="pdfs">🖨️ PDF seleccionados</button><button class="btn ghost sm" id="pdfa">🖨️ PDF todos</button><button class="btn ghost sm" id="csv">⬇️ CSV</button></div><div id="tb" style="overflow:auto">${userTable(l,pend)}</div></div>`;
+ $('#q',m).oninput=e=>{A.q=e.target.value;const p=e.target.selectionStart;userView(m,list,title,pend);const q=$('#q',m);q.focus();q.setSelectionRange(p,p);};
+ $('#g',m).onchange=e=>{A.grp=e.target.value;userView(m,list,title,pend);};
+ $('#all',m).onchange=e=>{l.forEach(u=>e.target.checked?A.sel.add(u.id):A.sel.delete(u.id));$$('.ck',m).forEach(c=>c.checked=e.target.checked);};
+ $$('.ck',m).forEach(c=>c.onchange=()=>c.checked?A.sel.add(c.dataset.id):A.sel.delete(c.dataset.id));
+ $('#pdfs',m).onclick=()=>{const s=l.filter(u=>A.sel.has(u.id));s.length?printCards(s):toast('Marca antes algún usuario',1);};
+ $('#pdfa',m).onclick=()=>l.length?printCards(l):0;
+ $('#csv',m).onclick=()=>download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');
+ $$('[data-a]',m).forEach(b=>b.onclick=()=>userAct(b.dataset.a,A.users.find(u=>u.id===b.dataset.id)));}
+const vUsers=m=>userView(m,active(),'Usuarios activos',false);
+const vPend=m=>userView(m,pending(),'Códigos sin estrenar (aún no han entrado)',true);
+async function userAct(a,u){
+ if(a==='del'){if(!await confirmM('Eliminar usuario',`¿Eliminar a <b>${esc(nm(u))}</b> (${esc(u.alias)})? Se borra su cuenta y su puntuación del salón de la fama.`,'Eliminar',true))return;
+  try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
+   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}
+   A.users=A.users.filter(x=>x.id!==u.id);A.hof=A.hof.filter(x=>x.id!==u.id);toast('Usuario eliminado');render();}catch(e){toast(FB.msg(e),1);}}
+ if(a==='rs'){if(!await confirmM('Nueva clave',`Se generará una clave nueva para <b>${esc(nm(u))}</b>.`,'Generar'))return;
+  try{const nc=genClave();const s=await FB.signIn(u.alias,u.clave);await FB.setPass(s.idToken,nc);await FB.set('users/'+u.id,{clave:nc},['clave']);u.clave=nc;toast('Nueva clave: '+nc);
+   await modal({title:'Nueva clave',html:`<p>Usuario: <span class="mono">${esc(u.alias)}</span><br>Clave: <span class="mono" style="font-size:1.4rem">${nc}</span></p>`,buttons:[{t:'Imprimir tarjeta',cls:'ghost',v:()=>{printCards([u]);return 1;}},{t:'Cerrar',v:1}]});}catch(e){toast(FB.msg(e),1);}}
+ if(a==='ed'){const r=await askM('Editar',`<p>Nombre<br><input value="${esc(u.nombre)}" style="width:100%"></p><p>Grupo<br><input value="${esc(u.grupo)}" style="width:100%"></p>`,'Guardar');if(!r)return;
+  try{await FB.set('users/'+u.id,{nombre:r[0].trim(),grupo:r[1].trim()},['nombre','grupo']);u.nombre=r[0].trim();u.grupo=r[1].trim();toast('Guardado');render();}catch(e){toast(FB.msg(e),1);}}}
+/* ---------- alta ---------- */
+function vAlta(m){m.innerHTML=`<div class="card"><h2>➕ Alta individual</h2><div class="row"><input id="n1" placeholder="Nombre e inicial (ej. Lucía M.)"><input id="g1" placeholder="Grupo (ej. 4ºA)" style="width:130px"><button class="btn" id="b1">Crear</button></div></div>
+ <div class="card"><h2>👥 Alta por grupo</h2><p class="muted">Un alumno por línea, sin apellidos completos: <b>Nombre e inicial</b>. El usuario será nombre + inicial (ej. «Lucía M.» → <span class="mono">luciam</span>).</p><textarea id="ta" placeholder="Lucía M.&#10;Pablo R.&#10;Ana G."></textarea><div class="row" style="margin-top:8px"><input id="g2" placeholder="Grupo (ej. 4ºA)" style="width:130px"><button class="btn" id="b2">Crear usuarios</button></div></div><div id="res"></div>`;
+ $('#b1',m).onclick=()=>createUsers([$('#n1',m).value],$('#g1',m).value.trim(),m);
+ $('#b2',m).onclick=()=>createUsers($('#ta',m).value.split('\n'),$('#g2',m).value.trim(),m);}
+async function createUsers(names,grupo,m){names=names.map(s=>s.trim()).filter(Boolean);if(!names.length)return toast('Escribe algún nombre',1);
+ const used=new Set(A.users.map(u=>u.alias));const out=[],fail=[];$$('button',m).forEach(b=>b.disabled=true);
+ const prog=$('#res',m);
+ for(let i=0;i<names.length;i++){prog.innerHTML=`<div class="card">Creando ${i+1} de ${names.length}…</div>`;
+  const nombre=names[i];const base=slugAlias(nombre);if(!base){fail.push([nombre,'Nombre no válido']);continue;}
+  let ok=false,n=0;while(!ok&&n<30){const alias=n?base+(n+1):base;n++;if(used.has(alias))continue;const clave=genClave();
+   try{const s=await FB.signUp(alias,clave);const u={alias,nombre,grupo,clave,ultimoLogin:null,alta:Date.now()};await FB.set('users/'+s.uid,u);used.add(alias);const nu={id:s.uid,...u};A.users.push(nu);out.push(nu);ok=true;}
+   catch(e){if(/EMAIL_EXISTS/.test(e.code||'')){used.add(alias);continue;}fail.push([nombre,FB.msg(e)]);break;}}
+  if(!ok&&!fail.find(f=>f[0]===nombre))fail.push([nombre,'No se encontró usuario libre']);}
+ $$('button',m).forEach(b=>b.disabled=false);
+ prog.innerHTML=`<div class="card"><h2>Creados: ${out.length}${fail.length?` · <span class="err">fallos: ${fail.length}</span>`:''}</h2>${fail.map(f=>`<p class="err">${esc(f[0])}: ${esc(f[1])}</p>`).join('')}${out.length?`<div class="row" style="margin-bottom:8px"><button class="btn" id="pc">🖨️ PDF con usuarios y claves</button></div><table><thead><tr><th>Nombre</th><th>Usuario</th><th>Clave</th></tr></thead><tbody>${out.map(u=>`<tr><td>${esc(u.nombre)}</td><td class="mono">${esc(u.alias)}</td><td class="mono">${esc(u.clave)}</td></tr>`).join('')}</tbody></table>`:''}</div>`;
+ A.users.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));if($('#pc',m))$('#pc',m).onclick=()=>printCards(out);}
+/* ---------- torneos ---------- */
+const EST={espera:'⏳ En espera',activo:'🟢 Activo',terminado:'✔️ Terminado'};
+function vTorneos(m){if(A.tid)return vTorneo(m,A.torneos.find(t=>t.id===A.tid));
+ const abiertos=A.torneos.filter(t=>t.estado!=='terminado'),fin=A.torneos.filter(t=>t.estado==='terminado');
+ const row=t=>`<tr data-id="${t.id}" style="cursor:pointer"><td><b>${esc(t.nombre)}</b></td><td>${fdate(t.inicio)}</td><td>${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min</td><td><span class="pill ${t.estado}">${EST[t.estado]}</span></td><td>${t.podio&&t.podio[0]?'🥇 '+esc(t.podio[0].nombre):''}</td></tr>`;
+ m.innerHTML=`<div class="card"><h2>🏟️ Programar torneo (arena)</h2><div class="row"><input id="tn" placeholder="Nombre (ej. Arena del recreo)" class="grow"><input id="td" type="datetime-local"><input id="tr" value="3+0" style="width:70px" title="Ritmo"><input id="tm" type="number" value="20" min="5" max="120" style="width:80px" title="Duración (min)"><button class="btn" id="tc">Crear</button></div><p class="muted" style="margin:8px 0 0">Mientras esté «en espera» o «activo», aparece en la pantalla principal de la app del alumnado.</p></div>
+ <div class="card"><h2>Pendientes y activos</h2><table><tbody>${abiertos.map(row).join('')||'<tr><td class="muted">No hay torneos programados.</td></tr>'}</tbody></table></div>
+ <div class="card"><h2>Historial</h2><table><tbody>${fin.map(row).join('')||'<tr><td class="muted">Aún no hay torneos terminados.</td></tr>'}</tbody></table></div>`;
+ const d=new Date(Date.now()+864e5);d.setHours(11,0,0,0);$('#td',m).value=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+ $$('tr[data-id]',m).forEach(r=>r.onclick=()=>{A.tid=r.dataset.id;render();});
+ $('#tc',m).onclick=async()=>{const nombre=$('#tn',m).value.trim();if(!nombre)return toast('Pon un nombre',1);const t={nombre,inicio:new Date($('#td',m).value).getTime()||Date.now(),ritmo:$('#tr',m).value.trim()||'3+0',duracion:+$('#tm',m).value||20,estado:'espera',creado:Date.now()};
+  try{const r=await FB.set('torneos/'+(Date.now().toString(36)+Math.random().toString(36).slice(2,5)),t);A.torneos.unshift(r);toast('Torneo creado');render();}catch(e){toast(FB.msg(e),1);}};}
+async function vTorneo(m,t){if(!t){A.tid=null;return render();}
+ let js=[];const load=async()=>{try{js=(await FB.list(`torneos/${t.id}/jugadores`)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));}catch(e){toast(FB.msg(e),1);}};
+ const draw=()=>{const ab=t.estado!=='terminado';
+  m.innerHTML=`<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" id="bk">← Torneos</button></div><div class="card"><div class="row"><h2 class="grow" style="margin:0">${esc(t.nombre)} <span class="pill ${t.estado}">${EST[t.estado]}</span></h2>
+   ${t.estado==='espera'?'<button class="btn" id="act">▶ Activar</button>':''}${t.estado==='activo'?'<button class="btn" id="fin">⏹ Terminar y sumar al HoF</button>':''}<button class="btn ghost" id="pj">📺 Proyector</button><button class="btn ghost" id="cs">⬇️ CSV</button>${ab?'<button class="btn ghost" id="ed">✏️</button>':''}<button class="btn red" id="rm">🗑</button></div>
+   <p class="muted" style="margin:6px 0 0">${fdate(t.inicio)} · ${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min · ${js.length} inscritos${t.estado==='espera'?' (los alumnos se apuntan desde la app)':''}</p></div>
+  <div class="card"><div class="row" style="margin-bottom:8px"><h3 class="grow" style="margin:0">Clasificación</h3>${ab?'<button class="btn ghost sm" id="add">➕ Añadir jugador</button>':''}</div><div style="overflow:auto"><table><thead><tr><th>#</th><th>Usuario</th><th>Nombre</th><th>Grupo</th><th class="n">Puntos</th><th class="n">Partidas</th><th></th></tr></thead><tbody>${js.map((j,i)=>`<tr style="${j.fuera?'opacity:.45':''}"><td>${i+1}</td><td class="mono">${esc(j.alias)}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n">${ab?`<input type="number" class="pt" data-id="${j.id}" value="${j.puntos||0}" min="0" style="width:70px">`:j.puntos||0}</td><td class="n">${ab?`<input type="number" class="pa" data-id="${j.id}" value="${j.partidas||0}" min="0" style="width:70px">`:j.partidas||0}</td><td class="n" style="white-space:nowrap">${ab?`<button class="btn ghost sm" data-f="${j.id}">${j.fuera?'Readmitir':'Descalificar'}</button> <button class="btn red sm" data-x="${j.id}">✕</button>`:j.fuera?'Descalificado':''}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Nadie se ha apuntado todavía.</td></tr>'}</tbody></table></div></div>`;
+  $('#bk',m).onclick=()=>{A.tid=null;render();};
+  const up=async(j,patch)=>{try{await FB.set(`torneos/${t.id}/jugadores/${j.id}`,patch,Object.keys(patch));Object.assign(j,patch);}catch(e){toast(FB.msg(e),1);}};
+  $$('.pt',m).forEach(i=>i.onchange=async()=>{await up(js.find(j=>j.id===i.dataset.id),{puntos:Math.max(0,+i.value||0)});js.sort((a,b)=>(b.puntos||0)-(a.puntos||0));draw();});
+  $$('.pa',m).forEach(i=>i.onchange=()=>up(js.find(j=>j.id===i.dataset.id),{partidas:Math.max(0,+i.value||0)}));
+  $$('[data-f]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.f);await up(j,{fuera:!j.fuera});draw();});
+  $$('[data-x]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.x);if(!await confirmM('Quitar jugador',`¿Quitar a ${esc(j.nombre)} del torneo?`,'Quitar',true))return;try{await FB.del(`torneos/${t.id}/jugadores/${j.id}`);js=js.filter(x=>x!==j);draw();}catch(e){toast(FB.msg(e),1);}});
+  if($('#act',m))$('#act',m).onclick=async()=>{try{await FB.set('torneos/'+t.id,{estado:'activo',inicioReal:Date.now()},['estado','inicioReal']);t.estado='activo';toast('Torneo activo');draw();}catch(e){toast(FB.msg(e),1);}};
+  if($('#fin',m))$('#fin',m).onclick=()=>finish(t,js,draw);
+  $('#pj',m).onclick=()=>projector(t,()=>js,load);
+  $('#cs',m).onclick=()=>download(`torneo-${t.nombre.replace(/\W+/g,'_')}.csv`,csv([['Puesto','Usuario','Nombre','Grupo','Puntos','Partidas'],...js.map((j,i)=>[i+1,j.alias,j.nombre,j.grupo,j.puntos||0,j.partidas||0])]),'text/csv');
+  if($('#ed',m))$('#ed',m).onclick=async()=>{const r=await askM('Editar torneo',`<p>Nombre<br><input value="${esc(t.nombre)}" style="width:100%"></p><p>Ritmo<br><input value="${esc(t.ritmo||'3+0')}"></p><p>Duración (min)<br><input type="number" value="${t.duracion||20}"></p>`,'Guardar');if(!r)return;
+   const p={nombre:r[0].trim()||t.nombre,ritmo:r[1].trim()||'3+0',duracion:+r[2]||20};try{await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);draw();}catch(e){toast(FB.msg(e),1);}};
+  $('#rm',m).onclick=async()=>{if(!await confirmM('Eliminar torneo',`¿Eliminar «${esc(t.nombre)}» y todos sus resultados? ${t.estado==='terminado'?'Los puntos ya sumados al salón de la fama NO se restan.':''}`,'Eliminar',true))return;
+   try{for(const j of js)await FB.del(`torneos/${t.id}/jugadores/${j.id}`);await FB.del('torneos/'+t.id);A.torneos=A.torneos.filter(x=>x!==t);A.tid=null;toast('Torneo eliminado');render();}catch(e){toast(FB.msg(e),1);}};
+  if($('#add',m))$('#add',m).onclick=async()=>{const have=new Set(js.map(j=>j.id));const c=active().filter(u=>!have.has(u.id));if(!c.length)return toast('No hay más usuarios activos',1);
+   const r=await askM('Añadir jugador',`<select style="width:100%">${c.map(u=>`<option value="${u.id}">${esc(nm(u))} (${esc(u.alias)}) ${esc(u.grupo)}</option>`).join('')}</select>`,'Añadir');if(!r)return;
+   const u=A.users.find(x=>x.id===r[0]);const j={alias:u.alias,nombre:nm(u),grupo:u.grupo||'',puntos:0,partidas:0,fuera:false};try{await FB.set(`torneos/${t.id}/jugadores/${u.id}`,j);js.push({id:u.id,...j});draw();}catch(e){toast(FB.msg(e),1);}};};
+ await load();draw();
+ if(t.estado!=='terminado')A.timer=setInterval(async()=>{if(document.activeElement&&document.activeElement.tagName==='INPUT')return;if($('.mbg'))return;await load();draw();},15000);}
+async function finish(t,js,draw){const ok=js.filter(j=>!j.fuera);if(!await confirmM('Terminar torneo',`Se cerrará «${esc(t.nombre)}» y los puntos de ${ok.length} jugadores se sumarán al salón de la fama. No se puede deshacer.`,'Terminar'))return;
+ try{const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
+  for(const j of ok){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
+  const p={estado:'terminado',fin:Date.now(),podio};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);toast('Torneo terminado ✔️');draw();}catch(e){toast(FB.msg(e),1);}}
+function projector(t,get,load){const ov=document.createElement('div');ov.className='proj';document.body.appendChild(ov);
+ const paint=()=>{const l=get().filter(j=>!j.fuera).slice(0,12);ov.innerHTML=`<button class="btn x" id="px">✕ Cerrar</button><h1>🏆 ${esc(t.nombre)}</h1><table><thead><tr><th>#</th><th>Jugador</th><th>Grupo</th><th class="n">Puntos</th></tr></thead><tbody>${l.map((j,i)=>`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n"><b>${j.puntos||0}</b></td></tr>`).join('')}</tbody></table>`;$('#px',ov).onclick=()=>{clearInterval(iv);ov.remove();};};
+ paint();const iv=setInterval(async()=>{await load();paint();},10000);}
+/* ---------- HoF ---------- */
+function vHof(m){const l=[...A.hof].sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
+ m.innerHTML=`<div class="card"><h2>🏆 Salón de la fama · Top 10</h2><p class="muted">Suma de los puntos de todos los torneos terminados.</p><table><thead><tr><th>#</th><th>Nombre</th><th>Grupo</th><th class="n">Puntos</th><th class="n">Torneos</th><th class="n">Mejor torneo</th></tr></thead><tbody>${l.map((h,i)=>`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td><b>${esc(h.nombre)}</b> <span class="muted">${esc(h.alias)}</span></td><td>${esc(h.grupo)}</td><td class="n"><b>${h.puntos||0}</b></td><td class="n">${h.torneos||0}</td><td class="n">${h.mejor||0}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">Todavía no hay datos: termina algún torneo.</td></tr>'}</tbody></table></div>
+ <div class="card"><h2>Nuevo curso</h2><p class="muted">Restaurar vacía el salón de la fama. Antes se descarga una copia de seguridad (JSON) por si hace falta.</p><div class="row"><button class="btn ghost" id="bk">⬇️ Descargar copia</button><button class="btn red" id="rs">♻️ Restaurar salón de la fama</button></div></div>`;
+ const backup=()=>download('salon-fama-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(A.hof,null,1),'application/json');
+ $('#bk',m).onclick=backup;
+ $('#rs',m).onclick=async()=>{const r=await askM('Restaurar salón de la fama',`<p>Se borrarán los puntos acumulados de <b>${A.hof.length}</b> jugadores. Se descargará antes una copia.</p><p>Escribe <b>RESTAURAR</b> para confirmar:</p><input style="width:100%">`,'Restaurar');if(!r||r[0].trim().toUpperCase()!=='RESTAURAR')return r?toast('No coincide: no se ha borrado nada',1):0;
+  try{backup();for(const h of A.hof)await FB.del('hof/'+h.id);A.hof=[];toast('Salón de la fama restaurado');render();}catch(e){toast(FB.msg(e),1);}};}
+/* ---------- ajustes ---------- */
+function vAjustes(m){const groups=[...new Set(A.users.map(u=>u.grupo).filter(Boolean))].sort();
+ m.innerHTML=`<div class="card"><h2>📣 Aviso en la pantalla principal</h2><p class="muted">Se muestra a todo el alumnado (déjalo vacío para quitarlo).</p><input id="av" class="grow" style="width:100%" maxlength="140" placeholder="Hoy torneo en el recreo a las 11:30" value="${esc(A.cfg.aviso)}"><p class="muted" style="margin:10px 0 4px">Dirección de la app (aparece en las tarjetas de claves)</p><input id="ur" style="width:100%" value="${esc(A.cfg.url)}"><div class="row" style="margin-top:10px"><button class="btn" id="sv">Guardar</button></div></div>
+ <div class="card"><h2>⬆️ Subir de curso</h2><p class="muted">Cambia el nombre de grupo de golpe (ej. 4ºA → 5ºA). Deja en blanco los que no cambien.</p>${groups.length?`<table>${groups.map(g=>`<tr><td>${esc(g)} <span class="muted">(${A.users.filter(u=>u.grupo===g).length})</span></td><td>→</td><td><input class="ng" data-g="${esc(g)}" placeholder="Nuevo grupo"></td></tr>`).join('')}</table><div class="row" style="margin-top:8px"><button class="btn" id="up">Aplicar cambios</button></div>`:'<p class="muted">Aún no hay grupos.</p>'}</div>
+ <div class="card"><h2>📤 Exportar</h2><div class="row"><button class="btn ghost" id="cu">⬇️ Usuarios (CSV)</button></div></div>
+ <div class="card"><h2>🔒 Protección de datos</h2><p class="muted" style="margin:0">Solo se guardan un usuario (nombre + inicial), el grupo y la fecha del último acceso. Sin apellidos completos, sin correos ni datos personales. Servidor en la UE (Firestore eur3). Al eliminar un usuario se borra su cuenta y su puntuación.</p></div>`;
+ $('#sv',m).onclick=async()=>{const c={aviso:$('#av',m).value.trim(),url:$('#ur',m).value.trim()||'https://ajedrezsiurot.com/'};try{await FB.set('config/main',c);Object.assign(A.cfg,c);toast('Guardado');}catch(e){toast(FB.msg(e),1);}};
+ $('#cu',m).onclick=()=>download('usuarios-ajedrez.csv',csvUsers(A.users),'text/csv');
+ if($('#up',m))$('#up',m).onclick=async()=>{const map={};$$('.ng',m).forEach(i=>{if(i.value.trim())map[i.dataset.g]=i.value.trim();});const ks=Object.keys(map);if(!ks.length)return toast('No hay cambios',1);
+  if(!await confirmM('Subir de curso',ks.map(k=>`${esc(k)} → ${esc(map[k])}`).join('<br>'),'Aplicar'))return;
+  try{const orig=A.users.map(u=>[u,u.grupo]);for(const [u,g] of orig)if(map[g]){await FB.set('users/'+u.id,{grupo:map[g]},['grupo']);u.grupo=map[g];}toast('Grupos actualizados');render();}catch(e){toast(FB.msg(e),1);}};}
+boot();
+</script></body></html>
