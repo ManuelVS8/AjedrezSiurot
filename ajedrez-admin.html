@@ -73,6 +73,7 @@ const FB=(()=>{
  const api={
   S,emailOf,req,
   signIn:(a,pw)=>post(AUTH+'signInWithPassword'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
+  signAnon:()=>post(AUTH+'signUp'+K,{returnSecureToken:true}).then(pack),
   signUp:(a,pw)=>post(AUTH+'signUp'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
   delAccount:idToken=>post(AUTH+'delete'+K,{idToken}),
   setPass:(idToken,pw)=>post(AUTH+'update'+K,{idToken,password:pw,returnSecureToken:true}).then(pack),
@@ -154,14 +155,14 @@ function userTable(list,grouped){
  const row=u=>`<tr><td><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}></td><td class="mono">${esc(u.alias)}</td><td>${esc(u.nombre)}</td><td>${esc(u.grupo)}</td><td class="mono">${esc(u.clave)}</td><td>${stOf(u)}<div class="muted" style="font-size:.78rem">${u.ultimoLogin?fdate(u.ultimoLogin):''}</div></td><td class="n" style="white-space:nowrap"><button class="btn ghost sm" data-a="rs" data-id="${u.id}" title="Nueva clave">🔑</button> <button class="btn ghost sm" data-a="ed" data-id="${u.id}" title="Editar">✏️</button> <button class="btn red sm" data-a="del" data-id="${u.id}" title="Eliminar">🗑</button></td></tr>`;
  let body='';
  if(grouped){const gs={};list.forEach(u=>(gs[u.grupo||'(sin grupo)']=gs[u.grupo||'(sin grupo)']||[]).push(u));
-  body=Object.keys(gs).sort((a,b)=>a.localeCompare(b,'es')).map(g=>`<tr class="gh"><td colspan="7"><b>${esc(g)}</b> <span class="pill">${gs[g].length}</span> <button class="btn ghost sm" data-pg="${esc(g)}">🖨️ PDF del grupo</button></td></tr>`+gs[g].map(row).join('')).join('');}
+  body=Object.keys(gs).sort((a,b)=>a.localeCompare(b,'es')).map(g=>`<tr class="gh"><td colspan="7"><b>${esc(g)}</b> <span class="pill">${gs[g].length}</span> <button class="btn ghost sm" data-pg="${esc(g)}">🖨️ PDF del grupo</button> <button class="btn red sm" data-bg="${esc(g)}">🗑 Borrar grupo</button></td></tr>`+gs[g].map(row).join('')).join('');}
  else body=list.map(row).join('');
  return `<table><thead><tr><th><input type="checkbox" id="all"></th><th>Usuario</th><th>Nombre</th><th>Grupo</th><th>Clave</th><th>Estado</th><th></th></tr></thead><tbody>${body||'<tr><td colspan="7" class="muted">Nada que mostrar.</td></tr>'}</tbody></table>`;}
 function userView(m){
  const groups=[...new Set(A.users.map(u=>u.grupo).filter(Boolean))].sort();
  const l=A.users.filter(u=>(!A.grp||u.grupo===A.grp)&&(!A.est||(A.est==='act'?!!u.ultimoLogin:!u.ultimoLogin))&&(!A.q||(u.alias+' '+u.nombre).toLowerCase().includes(A.q.toLowerCase())));
  const na=A.users.filter(u=>u.ultimoLogin).length;
- m.innerHTML=`<div class="card"><h2>👥 Alumnado registrado <span class="pill">${A.users.length}</span> <span class="muted" style="font-size:.85rem">· ${na} activos · ${A.users.length-na} sin estrenar</span></h2><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Buscar…" value="${esc(A.q)}"><select id="g"><option value="">Todos los grupos</option>${groups.map(g=>`<option ${g===A.grp?'selected':''}>${esc(g)}</option>`).join('')}</select><select id="es"><option value="">Todos</option><option value="act" ${A.est==='act'?'selected':''}>Solo activos</option><option value="pen" ${A.est==='pen'?'selected':''}>Solo sin estrenar</option></select><span class="grow"></span><button class="btn ghost sm" id="pdfs">🖨️ PDF seleccionados</button><button class="btn ghost sm" id="pdfa">🖨️ PDF de la lista</button><button class="btn ghost sm" id="csv">⬇️ CSV</button></div><div id="tb" style="overflow:auto">${userTable(l,!A.grp)}</div></div>`;
+ m.innerHTML=`<div class="card"><h2>👥 Alumnado registrado <span class="pill">${A.users.length}</span> <span class="muted" style="font-size:.85rem">· ${na} activos · ${A.users.length-na} sin estrenar</span></h2><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Buscar…" value="${esc(A.q)}"><select id="g"><option value="">Todos los grupos</option>${groups.map(g=>`<option ${g===A.grp?'selected':''}>${esc(g)}</option>`).join('')}</select><select id="es"><option value="">Todos</option><option value="act" ${A.est==='act'?'selected':''}>Solo activos</option><option value="pen" ${A.est==='pen'?'selected':''}>Solo sin estrenar</option></select><span class="grow"></span><button class="btn ghost sm" id="pdfs">🖨️ PDF seleccionados</button><button class="btn ghost sm" id="pdfa">🖨️ PDF de la lista</button><button class="btn ghost sm" id="csv">⬇️ CSV</button><button class="btn red sm" id="bgd">🗑 Borrar grupo…</button></div><div id="tb" style="overflow:auto">${userTable(l,!A.grp)}</div></div>`;
  $('#q',m).oninput=e=>{A.q=e.target.value;const p=e.target.selectionStart;userView(m);const q=$('#q',m);q.focus();q.setSelectionRange(p,p);};
  $('#g',m).onchange=e=>{A.grp=e.target.value;userView(m);};$('#es',m).onchange=e=>{A.est=e.target.value;userView(m);};
  $('#all',m).onchange=e=>{l.forEach(u=>e.target.checked?A.sel.add(u.id):A.sel.delete(u.id));$$('.ck',m).forEach(c=>c.checked=e.target.checked);};
@@ -169,9 +170,24 @@ function userView(m){
  $('#pdfs',m).onclick=()=>{const s=l.filter(u=>A.sel.has(u.id));s.length?printCards(s):toast('Marca antes algún usuario',1);};
  $('#pdfa',m).onclick=()=>l.length?printCards(l):0;
  $$('[data-pg]',m).forEach(b=>b.onclick=()=>printCards(l.filter(u=>(u.grupo||'(sin grupo)')===b.dataset.pg)));
+ $$('[data-bg]',m).forEach(b=>b.onclick=()=>bulkDel(b.dataset.bg));$('#bgd',m).onclick=()=>bulkDel(A.grp||'');
  $('#csv',m).onclick=()=>download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');
  $$('[data-a]',m).forEach(b=>b.onclick=()=>userAct(b.dataset.a,A.users.find(u=>u.id===b.dataset.id)));}
 const vUsers=m=>userView(m);
+async function bulkDel(g){
+ const groups=[...new Set(A.users.map(u=>u.grupo||'(sin grupo)'))].sort((a,b)=>a.localeCompare(b,'es'));
+ if(!g){const r=await askM('🗑 Borrar un grupo entero',`<p>Elige el grupo que quieres borrar:</p><select style="width:100%">${groups.map(x=>`<option value="${esc(x)}">${esc(x)} (${A.users.filter(u=>(u.grupo||'(sin grupo)')===x).length})</option>`).join('')}</select>`,'Continuar');if(!r)return;g=r[0];}
+ const list=A.users.filter(u=>(u.grupo||'(sin grupo)')===g);if(!list.length)return toast('Ese grupo está vacío',1);
+ if(!await confirmM('⚠️ Aviso 1 de 2',`Vas a eliminar a <b>${list.length} usuarios</b> del grupo <b>${esc(g)}</b>.<br><br>Se borran sus cuentas, sus claves y su puntuación del salón de la fama.`,'Entiendo, continuar',true))return;
+ const r2=await askM('🛑 Aviso 2 de 2 · Última oportunidad',`<p><b>Esta acción NO se puede deshacer.</b> Se borrarán ${list.length} usuarios de «${esc(g)}».</p><p>Para confirmar, escribe <b>BORRAR</b>:</p><input style="width:100%" autocomplete="off">`,'Borrar grupo');
+ if(!r2||r2[0].trim().toUpperCase()!=='BORRAR')return r2?toast('No has escrito BORRAR: no se ha borrado nada',1):0;
+ let n=0,fail=0;
+ for(const u of list){toast(`Borrando ${++n} de ${list.length}…`);
+  try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
+   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}
+   A.users=A.users.filter(x=>x.id!==u.id);A.hof=A.hof.filter(x=>x.id!==u.id);A.sel.delete(u.id);}catch(e){fail++;}}
+ if(A.grp===g)A.grp='';
+ toast(fail?`Borrados ${list.length-fail}; fallaron ${fail}`:`Grupo «${g}» eliminado (${list.length})`,!!fail);render();}
 async function userAct(a,u){
  if(a==='del'){if(!await confirmM('Eliminar usuario',`¿Eliminar a <b>${esc(nm(u))}</b> (${esc(u.alias)})? Se borra su cuenta y su puntuación del salón de la fama.`,'Eliminar',true))return;
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
@@ -204,30 +220,32 @@ const EST={espera:'⏳ En espera',activo:'🟢 Activo',terminado:'✔️ Termina
 function vTorneos(m){if(A.tid)return vTorneo(m,A.torneos.find(t=>t.id===A.tid));
  const abiertos=A.torneos.filter(t=>t.estado!=='terminado'),fin=A.torneos.filter(t=>t.estado==='terminado');
  const row=t=>`<tr data-id="${t.id}" style="cursor:pointer"><td><b>${esc(t.nombre)}</b></td><td>${fdate(t.inicio)}</td><td>${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min</td><td><span class="pill ${t.estado}">${EST[t.estado]}</span></td><td>${t.podio&&t.podio[0]?'🥇 '+esc(t.podio[0].nombre):''}</td><td class="n"><button class="btn red sm" data-del="${t.id}" title="Eliminar torneo">🗑 Eliminar</button></td></tr>`;
- m.innerHTML=`<div class="card"><h2>🏟️ Programar torneo (arena)</h2><div class="row"><input id="tn" placeholder="Nombre (ej. Arena del recreo)" class="grow"><input id="td" type="datetime-local"><input id="tr" value="3+0" style="width:70px" title="Ritmo"><input id="tm" type="number" value="20" min="5" max="120" style="width:80px" title="Duración (min)"><button class="btn" id="tc">Crear</button></div><p class="muted" style="margin:8px 0 0">Mientras esté «en espera» o «activo», aparece en la pantalla principal de la app del alumnado.</p></div>
+ m.innerHTML=`<div class="card"><h2>🏟️ Programar torneo (arena)</h2><div class="row"><input id="tn" placeholder="Nombre (ej. Arena del recreo)" class="grow"><input id="td" type="datetime-local"><input id="tr" value="3+0" style="width:70px" title="Ritmo"><input id="tm" type="number" value="20" min="5" max="120" style="width:80px" title="Duración (min)"><label style="white-space:nowrap"><input type="checkbox" id="tf" checked> 🔥 Modo furia</label><button class="btn" id="tc">Crear</button></div><p class="muted" style="margin:8px 0 0">Mientras esté «en espera» o «activo», aparece en la pantalla principal de la app del alumnado.</p></div>
  <div class="card"><h2>Pendientes y activos</h2><table><tbody>${abiertos.map(row).join('')||'<tr><td class="muted">No hay torneos programados.</td></tr>'}</tbody></table></div>
  <div class="card"><h2>Historial</h2><table><tbody>${fin.map(row).join('')||'<tr><td class="muted">Aún no hay torneos terminados.</td></tr>'}</tbody></table></div>`;
  const d=new Date(Date.now()+864e5);d.setHours(11,0,0,0);$('#td',m).value=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
  $$('tr[data-id]',m).forEach(r=>r.onclick=()=>{A.tid=r.dataset.id;render();});
  $$('[data-del]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const t=A.torneos.find(x=>x.id===b.dataset.del);if(!await confirmM('Eliminar torneo',`¿Eliminar «${esc(t.nombre)}» y todos sus resultados?${t.estado==='terminado'?' Los puntos ya sumados al salón de la fama NO se restan.':''}`,'Eliminar',true))return;
   try{let js=[];try{js=await FB.list(`torneos/${t.id}/jugadores`);}catch(e){}for(const j of js)await FB.del(`torneos/${t.id}/jugadores/${j.id}`);await FB.del('torneos/'+t.id);A.torneos=A.torneos.filter(x=>x!==t);toast('Torneo eliminado');render();}catch(er){toast(FB.msg(er),1);}});
- $('#tc',m).onclick=async()=>{const nombre=$('#tn',m).value.trim();if(!nombre)return toast('Pon un nombre',1);const t={nombre,inicio:new Date($('#td',m).value).getTime()||Date.now(),ritmo:$('#tr',m).value.trim()||'3+0',duracion:+$('#tm',m).value||20,estado:'espera',creado:Date.now()};
+ $('#tc',m).onclick=async()=>{const nombre=$('#tn',m).value.trim();if(!nombre)return toast('Pon un nombre',1);const t={nombre,inicio:new Date($('#td',m).value).getTime()||Date.now(),ritmo:$('#tr',m).value.trim()||'3+0',duracion:+$('#tm',m).value||20,furia:$('#tf',m).checked,estado:'espera',creado:Date.now()};
   try{const r=await FB.set('torneos/'+(Date.now().toString(36)+Math.random().toString(36).slice(2,5)),t);A.torneos.unshift(r);toast('Torneo creado');render();}catch(e){toast(FB.msg(e),1);}};}
 async function vTorneo(m,t){if(!t){A.tid=null;return render();}
- let js=[];const load=async()=>{try{js=await FB.list(`torneos/${t.id}/jugadores`);
-   if(t.estado==='activo'){let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}const now=Date.now();
-    for(const [uid,p] of Object.entries(lv)){let j=js.find(x=>x.id===uid);if(!j){j={id:uid};js.push(j);}Object.assign(j,{alias:p.a||j.alias,nombre:p.n||j.nombre,grupo:p.g||j.grupo||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera,live:true,est:p.busy&&now-(p.bt||0)<48e4?'♟ jugando':p.wait?'🔎 buscando':now-(p.hb||0)<2e4?'libre':'💤'});}}
-   js.sort((a,b)=>(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));}catch(e){toast(FB.msg(e),1);}};
+ let js=[],rq=[],rkp={};const load=async()=>{try{js=await FB.list(`torneos/${t.id}/jugadores`);if(t.estado==='activo'){try{const r=await RT.get(`arena/${t.id}/req`)||{};rq=Object.entries(r).filter(([id,x])=>x&&x.s==='pend').map(([id,x])=>({id,n:x.n}));}catch(e){}}
+   if(t.estado==='activo'){let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}const now=Date.now();rkp=Object.fromEntries(arenaRank(Object.entries(lv).filter(([i,p])=>p).map(([i,p])=>({id:i,...p}))).map((r,i)=>[r.id,i]));
+    for(const [uid,p] of Object.entries(lv)){let j=js.find(x=>x.id===uid);if(!j){j={id:uid};js.push(j);}Object.assign(j,{guest:!!p.guest,alias:p.a||j.alias,nombre:p.n||j.nombre,grupo:p.g||j.grupo||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera,live:true,est:p.busy&&now-(p.bt||0)<48e4?'♟ jugando':p.wait?'🔎 buscando':now-(p.hb||0)<2e4?'libre':'💤'});}}
+   js.sort((a,b)=>(b.puntos||0)-(a.puntos||0)||(rkp[a.id]??1e6)-(rkp[b.id]??1e6)||(b.partidas||0)-(a.partidas||0));}catch(e){toast(FB.msg(e),1);}};
  const draw=()=>{const ab=t.estado!=='terminado';
   m.innerHTML=`<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" id="bk">← Torneos</button></div><div class="card"><div class="row"><h2 class="grow" style="margin:0">${esc(t.nombre)} <span class="pill ${t.estado}">${EST[t.estado]}</span></h2>
    ${t.estado==='espera'?'<button class="btn" id="act">▶ Activar</button>':''}${t.estado==='activo'?'<button class="btn" id="fin">⏹ Terminar ahora</button>':''}<button class="btn ghost" id="pj">📺 Proyector</button><button class="btn ghost" id="cs">⬇️ CSV</button>${ab?'<button class="btn ghost" id="ed">✏️</button>':''}<button class="btn red" id="rm">🗑</button></div>
    <p class="muted" style="margin:6px 0 0">${fdate(t.inicio)} · ${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min · ${js.length} jugadores${t.estado==='espera'?' · <b>Empieza solo a la hora indicada</b> (con esta página abierta) o pulsa Activar':''}${t.estado==='activo'?` · termina a las ${fdate(t.fin)} · <b>los puntos se calculan solos</b> y al acabar pasan al salón de la fama`:''}</p></div>
-  <div class="card"><div class="row" style="margin-bottom:8px"><h3 class="grow" style="margin:0">Clasificación</h3>${ab?'<button class="btn ghost sm" id="add">➕ Añadir jugador</button>':''}</div><div style="overflow:auto"><table><thead><tr><th>#</th><th>Usuario</th><th>Nombre</th><th>Grupo</th><th class="n">Puntos</th><th class="n">Partidas</th><th></th></tr></thead><tbody>${js.map((j,i)=>`<tr style="${j.fuera?'opacity:.45':''}"><td>${i+1}</td><td class="mono">${esc(j.alias)}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n">${ab&&!j.live?`<input type="number" class="pt" data-id="${j.id}" value="${j.puntos||0}" min="0" style="width:70px">`:`<b>${j.puntos||0}</b>`}</td><td class="n">${ab&&!j.live?`<input type="number" class="pa" data-id="${j.id}" value="${j.partidas||0}" min="0" style="width:70px">`:j.partidas||0}${j.est?` <span class="muted">${j.est}</span>`:''}</td><td class="n" style="white-space:nowrap">${ab?`<button class="btn ghost sm" data-f="${j.id}">${j.fuera?'Readmitir':'Descalificar'}</button> <button class="btn red sm" data-x="${j.id}">✕</button>`:j.fuera?'Descalificado':''}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Nadie se ha apuntado todavía.</td></tr>'}</tbody></table></div></div>`;
+  ${rq.length?`<div class="card" style="border:2px solid #f2b134;background:#fff8e6"><h3 style="margin:0 0 8px">🙋 Solicitudes de entrada (${rq.length})</h3>${rq.map(r=>`<div class="row" style="margin:4px 0"><b class="grow">${esc(r.n)}</b><button class="btn sm" data-ok="${r.id}">✔ Dar paso</button><button class="btn red sm" data-no="${r.id}">✕ Rechazar</button></div>`).join('')}<p class="muted" style="margin:6px 0 0">Los invitados no entran en el salón de la fama y sus datos se borran al terminar el torneo.</p></div>`:''}<div class="card"><div class="row" style="margin-bottom:8px"><h3 class="grow" style="margin:0">Clasificación</h3>${ab?'<button class="btn ghost sm" id="add">➕ Añadir jugador</button>':''}</div><div style="overflow:auto"><table><thead><tr><th>#</th><th>Usuario</th><th>Nombre</th><th>Grupo</th><th class="n">Puntos</th><th class="n">Partidas</th><th></th></tr></thead><tbody>${js.map((j,i)=>`<tr style="${j.fuera?'opacity:.45':''}"><td>${i+1}</td><td class="mono">${esc(j.alias)}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n">${ab&&!j.live?`<input type="number" class="pt" data-id="${j.id}" value="${j.puntos||0}" min="0" style="width:70px">`:`<b>${j.puntos||0}</b>`}</td><td class="n">${ab&&!j.live?`<input type="number" class="pa" data-id="${j.id}" value="${j.partidas||0}" min="0" style="width:70px">`:j.partidas||0}${j.est?` <span class="muted">${j.est}</span>`:''}</td><td class="n" style="white-space:nowrap">${ab?`<button class="btn ghost sm" data-f="${j.id}">${j.fuera?'Readmitir':'Descalificar'}</button> <button class="btn red sm" data-x="${j.id}">✕</button>`:j.fuera?'Descalificado':''}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Nadie se ha apuntado todavía.</td></tr>'}</tbody></table></div></div>`;
   $('#bk',m).onclick=()=>{A.tid=null;render();};
+  $$('[data-ok]',m).forEach(b=>b.onclick=async()=>{try{await RT.put(`arena/${t.id}/permit/${b.dataset.ok}`,true);await RT.patch(`arena/${t.id}/req/${b.dataset.ok}`,{s:'ok'});rq=rq.filter(r=>r.id!==b.dataset.ok);toast('Entrada concedida');draw();}catch(e){toast(FB.msg(e),1);}});
+  $$('[data-no]',m).forEach(b=>b.onclick=async()=>{try{await RT.patch(`arena/${t.id}/req/${b.dataset.no}`,{s:'no'});rq=rq.filter(r=>r.id!==b.dataset.no);draw();}catch(e){toast(FB.msg(e),1);}});
   const up=async(j,patch)=>{try{await FB.set(`torneos/${t.id}/jugadores/${j.id}`,patch,Object.keys(patch));Object.assign(j,patch);}catch(e){toast(FB.msg(e),1);}};
   $$('.pt',m).forEach(i=>i.onchange=async()=>{await up(js.find(j=>j.id===i.dataset.id),{puntos:Math.max(0,+i.value||0)});js.sort((a,b)=>(b.puntos||0)-(a.puntos||0));draw();});
   $$('.pa',m).forEach(i=>i.onchange=()=>up(js.find(j=>j.id===i.dataset.id),{partidas:Math.max(0,+i.value||0)}));
-  $$('[data-f]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.f);const fu=!j.fuera;try{await FB.set(`torneos/${t.id}/jugadores/${j.id}`,{alias:j.alias||'',nombre:j.nombre||'',grupo:j.grupo||'',puntos:j.puntos||0,partidas:j.partidas||0,fuera:fu});if(t.estado==='activo')await RT.patch(`arena/${t.id}/p/${j.id}`,{fuera:fu,wait:null}).catch(()=>{});j.fuera=fu;}catch(e){toast(FB.msg(e),1);}draw();});
+  $$('[data-f]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.f);const fu=!j.fuera;try{if(!j.guest)await FB.set(`torneos/${t.id}/jugadores/${j.id}`,{alias:j.alias||'',nombre:j.nombre||'',grupo:j.grupo||'',puntos:j.puntos||0,partidas:j.partidas||0,fuera:fu});if(t.estado==='activo')await RT.patch(`arena/${t.id}/p/${j.id}`,{fuera:fu,wait:null}).catch(()=>{});j.fuera=fu;}catch(e){toast(FB.msg(e),1);}draw();});
   $$('[data-x]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.x);if(!await confirmM('Quitar jugador',`¿Quitar a ${esc(j.nombre)} del torneo?`,'Quitar',true))return;try{await FB.del(`torneos/${t.id}/jugadores/${j.id}`);js=js.filter(x=>x!==j);draw();}catch(e){toast(FB.msg(e),1);}});
   if($('#act',m))$('#act',m).onclick=async()=>{try{await activar(t);toast('Torneo activo');await load();draw();}catch(e){toast(FB.msg(e),1);}};
   if($('#fin',m))$('#fin',m).onclick=()=>finish(t,js,async()=>{await load();draw();});
@@ -245,14 +263,20 @@ async function vTorneo(m,t){if(!t){A.tid=null;return render();}
 async function finish(t,js,draw){if(!await confirmM('Terminar torneo',`Se cerrará «${esc(t.nombre)}» y los puntos se sumarán al salón de la fama. No se puede deshacer.`,'Terminar'))return;
  try{await finishTorneo(t);toast('Torneo terminado ✔️');draw?draw():render();}catch(e){toast(FB.msg(e),1);}}
 async function activar(t){const now=Date.now(),p={estado:'activo',inicioReal:now,fin:now+(t.duracion||20)*60000};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);}
+/* orden final: puntos; si hay empate, resultados directos entre los empatados (emparejamientos); luego victorias y menos partidas */
+function arenaRank(rows){const by={};rows.forEach(r=>(by[r.pts||0]=by[r.pts||0]||[]).push(r));
+ return Object.keys(by).map(Number).sort((a,b)=>b-a).flatMap(k=>{const g=by[k];if(g.length>1){const ids=new Set(g.map(x=>x.id));g.forEach(x=>{x.h2h=0;Object.entries(x.vs||{}).forEach(([o,v])=>{if(ids.has(o))x.h2h+=v;});});}
+  return g.sort((a,b)=>(b.h2h||0)-(a.h2h||0)||(b.w||0)-(a.w||0)||(a.pa||0)-(b.pa||0)||String(a.n).localeCompare(String(b.n),'es'));});}
 async function finishTorneo(t){
  let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}
- for(const [uid,p] of Object.entries(lv))await FB.set(`torneos/${t.id}/jugadores/${uid}`,{alias:p.a||'',nombre:p.n||'',grupo:p.g||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera});
- const js=(await FB.list(`torneos/${t.id}/jugadores`)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));
+ for(const [uid,p] of Object.entries(lv))if(!p.guest)await FB.set(`torneos/${t.id}/jugadores/${uid}`,{alias:p.a||'',nombre:p.n||'',grupo:p.g||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera});
+ const rk=arenaRank(Object.entries(lv).filter(([id,p])=>p&&!p.fuera).map(([id,p])=>({id,...p}))),pos=Object.fromEntries(rk.map((r,i)=>[r.id,i]));
+ const js=(await FB.list(`torneos/${t.id}/jugadores`)).sort((a,b)=>(pos[a.id]??1e6)-(pos[b.id]??1e6)||(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));
  const ok=js.filter(j=>!j.fuera&&((j.partidas||0)>0||(j.puntos||0)>0));
  const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
+ const clasif=rk.filter(r=>(r.pa||0)>0||(r.pts||0)>0).slice(0,60).map(r=>({n:r.n,g:r.g||'',p:r.pts||0,w:r.w||0,d:r.d||0,l:r.l||0}));
  for(const j of ok){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
- const p={estado:'terminado',fin:Date.now(),podio};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);
+ const p={estado:'terminado',fin:Date.now(),podio,clasif};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);
  try{await RT.del('arena/'+t.id);}catch(e){}setTimeout(()=>RT.del('arena/'+t.id).catch(()=>{}),9000);}
 let autoBusy=false;
 async function autoTick(){if(autoBusy||!FB.S.user)return;autoBusy=true;
@@ -260,12 +284,18 @@ async function autoTick(){if(autoBusy||!FB.S.user)return;autoBusy=true;
   const now=Date.now();
   for(const t of A.torneos){
    if(t.estado==='espera'&&t.inicio&&t.inicio<=now){await activar(t);toast('🟢 «'+t.nombre+'» ha empezado');}
-   else if(t.estado==='activo'&&t.fin&&now>t.fin+15000){let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}
-    const busy=Object.values(lv).some(p=>p.busy&&now-(p.bt||0)<48e4&&now-(p.hb||0)<3e4);
-    if(!busy||now>t.fin+48e4){await finishTorneo(t);toast('🏁 «'+t.nombre+'» terminado: puntos sumados al salón de la fama');}}}
+   else if(t.estado==='activo'&&t.fin&&now>t.fin+12000){{await finishTorneo(t);toast('🏁 «'+t.nombre+'» terminado: puntos sumados al salón de la fama');}}}
   if(!document.querySelector('.mbg')&&!document.querySelector('.proj')&&!document.querySelector('.sheetov')&&(A.tab==='torneos'&&!A.tid||A.tab==='hof'))render();
  }catch(e){}autoBusy=false;}
 setInterval(autoTick,20000);
+const seenReq=new Set();let reqN=0;
+function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();o.stop(c.currentTime+.18);}catch(e){}}
+async function pollReq(){if(!FB.S.user)return;let n=0,fresh=null;
+ try{for(const t of A.torneos.filter(x=>x.estado==='activo')){const r=await RT.get(`arena/${t.id}/req`)||{};for(const [id,x] of Object.entries(r)){if(x&&x.s==='pend'){n++;if(!seenReq.has(id)){seenReq.add(id);fresh=x.n;}}}}}catch(e){return;}
+ if(fresh){beep();toast('🙋 '+fresh+' pide entrar al torneo');}
+ if(n!==reqN){reqN=n;const b=document.querySelector('nav [data-t=torneos]');if(b)b.innerHTML='🏟️ Torneos'+(n?` <span class="pill" style="background:#c0392b;color:#fff">${n}</span>`:'');}
+ if(fresh&&A.tab==='torneos'&&A.tid&&!document.querySelector('.mbg')&&!document.querySelector('input:focus'))render();}
+setInterval(pollReq,5000);
 function projector(t,get,load){const ov=document.createElement('div');ov.className='proj';document.body.appendChild(ov);
  const paint=()=>{const l=get().filter(j=>!j.fuera).slice(0,12);ov.innerHTML=`<button class="btn x" id="px">✕ Cerrar</button><h1>🏆 ${esc(t.nombre)}</h1><table><thead><tr><th>#</th><th>Jugador</th><th>Grupo</th><th class="n">Puntos</th></tr></thead><tbody>${l.map((j,i)=>`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n"><b>${j.puntos||0}</b></td></tr>`).join('')}</tbody></table>`;$('#px',ov).onclick=()=>{clearInterval(iv);ov.remove();};};
  paint();const iv=setInterval(async()=>{await load();paint();},10000);}
