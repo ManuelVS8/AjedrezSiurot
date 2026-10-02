@@ -301,7 +301,8 @@ input.txt:focus{outline:none;border-color:var(--pri)}
 }
 
 /* ---------- Menú hamburguesa (móvil) ---------- */
-.burger{display:none}
+.burger{display:grid}
+nav.tabs{display:none!important}
 .drawerbg{position:fixed;inset:0;background:rgba(20,28,36,.5);z-index:120;animation:fade .2s}
 .drawer{position:absolute;left:0;top:0;bottom:0;width:min(82vw,300px);background:var(--card);padding:14px;box-shadow:8px 0 30px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:6px;animation:slidein .22s}
 @keyframes slidein{from{transform:translateX(-100%)}}
@@ -415,6 +416,19 @@ input.txt:focus{outline:none;border-color:var(--pri)}
 
 .warnbox{background:#fff4d6;border:2px solid #f0b429;color:#5c4400;border-radius:12px;padding:10px 12px;font-weight:700;font-size:.9rem;margin:10px 0;line-height:1.35}
 @media(min-width:700px) and (max-width:1180px){nav.tabs button{padding:8px 9px;gap:4px;font-size:.92rem}}
+
+.hello2{background:linear-gradient(135deg,#2f7d5b,#1f5c43);color:#fff;border-radius:20px;padding:16px 20px;margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:relative;overflow:hidden;box-shadow:0 4px 0 #174632}
+.hello2 .bgk{position:absolute;right:-6px;bottom:-34px;font-size:9rem;opacity:.12;line-height:1}
+.hello2 .hl{flex:1;min-width:200px;position:relative}.hello2 h2{margin:0;font-size:1.6rem}.hello2 p{margin:2px 0 0;opacity:.92;font-weight:800}
+.hello2 .hchips{display:flex;gap:8px;flex-wrap:wrap;position:relative}
+.hchip{background:#ffffff26;border:2px solid #ffffff40;border-radius:999px;padding:5px 12px;font-weight:900;white-space:nowrap}
+#tcard{margin-top:22px}#tcard:empty{display:none}
+#tcard .tcard{background:linear-gradient(135deg,#fff3c4,#ffd36b)!important;border:3px solid #e8a317!important;animation:tglow 2.2s ease-in-out infinite;margin-bottom:14px!important}
+#tcard .tcard.activo{background:linear-gradient(135deg,#d9f5e3,#8fe3b0)!important;border-color:#1f9a57!important}
+@keyframes tglow{0%,100%{box-shadow:0 0 0 0 #f2b13480,0 4px 0 #c88a0f}50%{box-shadow:0 0 0 9px #f2b13400,0 4px 0 #c88a0f}}
+.welcome .entry{margin:6px 0 10px}.btn.big{font-size:1.1rem;padding:14px 22px}
+.onl .pl{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line)}.onl .pl:last-child{border:0}
+.dot{width:11px;height:11px;border-radius:50%;background:#27ae60;flex:none}.dot.busy{background:#f2b134}
 
 </style>
 </head>
@@ -1418,7 +1432,7 @@ const FB=(()=>{
  const emailOf=a=>a.includes('@')?a:a+'@'+FBC.domain;
  function pack(r){return{uid:r.localId,email:r.email,idToken:r.idToken,refresh:r.refreshToken,exp:Date.now()+(+r.expiresIn||3600)*1000};}
  const api={
-  S,emailOf,
+  S,emailOf,req,
   signIn:(a,pw)=>post(AUTH+'signInWithPassword'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
   signUp:(a,pw)=>post(AUTH+'signUp'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
   delAccount:idToken=>post(AUTH+'delete'+K,{idToken}),
@@ -1445,6 +1459,18 @@ const FB=(()=>{
    return'Error: '+c.slice(0,80);}
  };
  return api;
+})();
+/* Realtime Database por REST (presencia, retos y partidas) */
+const RT=(()=>{const B='https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/';
+ const url=async p=>{const t=await FB.tok();return B+p+'.json?auth='+encodeURIComponent(t||'');};
+ const SV={'.sv':'timestamp'};
+ return{SV,off:0,srv(){return Date.now()+RT.off;},
+  async get(p){return FB.req(await url(p),{},2);},
+  async put(p,v){return FB.req(await url(p),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
+  async patch(p,v){return FB.req(await url(p),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
+  async post(p,v){return FB.req(await url(p),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
+  async del(p){return FB.req(await url(p),{method:'DELETE'},2);},
+  async sync(p){const r=await RT.put(p,SV);if(typeof r==='number')RT.off=r-Date.now();return r;}};
 })();
 /* claves: 3 números + 3 letras minúsculas (sin caracteres que se confunden) */
 function genClave(){const D='23456789',L='abcdefghjkmnpqrstuvwxyz',r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};let s='';for(let i=0;i<3;i++)s+=D[r(D.length)];for(let i=0;i<3;i++)s+=L[r(L.length)];return s;}
@@ -1760,14 +1786,14 @@ function playSound(pos,m){if(pos.inCheck())sound('check');else if(m.captured)sou
 
 // ================= Navegación =================
 let VIEW=0;let currentTab='inicio',currentArg=null,CUR_BOARD=null;
-const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['torneos','🏟️','Torneos'],['progreso','📈','Progreso']];
+const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['torneos','🏟️','Torneos'],['progreso','📈','Progreso']];
 function go(tab,arg){
  VIEW++;currentTab=tab;currentArg=arg;CUR_BOARD=null;window.scrollTo(0,0);stopSpeech();document.body.classList.remove('intrainer');fitHeader();
  $$('.modalbg').forEach(bg=>bg._close?bg._close(null):bg.remove());closeMenu();
- const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',escaner:'ejercicios',errores:'ejercicios',tarea:'aula'};
+ const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',escaner:'ejercicios',errores:'ejercicios',tarea:'aula',ogame:'online',arena:'torneos'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
 }
 function alive(tok){return tok===VIEW;}
 function renderHeader(){
@@ -1823,25 +1849,21 @@ function missionsHTML(){
 }
 function viewHome(m){
  const nl=nextLesson();const hour=new Date().getHours();const hi=hour<14?'¡Buenos días':hour<21?'¡Buenas tardes':'¡Buenas noches';
+ const rk=RANKS[rankIdx(P.xp)];const mdone=(ensureDaily(),P.daily.ms.filter(x=>x.done).length);
  m.innerHTML=`<div class="card brand"><img src="${LOGO_URL}" alt="Ajedrez Siurot"><div><h1>Ajedrez Siurot</h1><p>CEIP Manuel Siurot · La Palma del Condado</p></div></div>
+ <div class="hello2"><div class="bgk">♞</div><div class="hl"><h2>${hi}, ${esc(P.name)}! ${P.avatar}</h2><p>${rk.icono} ${rk.nombre}</p></div><div class="hchips"><span class="hchip">⭐ ${P.xp} XP</span><span class="hchip">♟ ELO ${P.elo||800}</span><span class="hchip">🔥 ${P.days.streak||0}</span></div></div>
  <div id="tcard"></div>
- <div class="hero">
-  <div class="card hello"><div class="bgk">♞</div><h2>${hi}, ${esc(P.name)}! ${P.avatar}</h2>
-   <p>Cada día un poco mejor. ${nl?`Tu siguiente lección: <b>${nl.l.titulo}</b> (${nl.mod.nombre}).`:'¡Has completado todas las lecciones! 🏆 Ahora a por los ejercicios y la máquina.'}</p>
-   <div class="btnrow" style="margin-top:14px">${nl?`<button class="btn acc" id="cont">▶ Continuar aprendiendo</button>`:''}<button class="btn ghost" id="quickpz">🧩 Ejercicio rápido</button></div></div>
-  <div class="card"><div class="sectitle" style="margin-top:0"><h2 style="font-size:1.2rem">🎯 Misiones de hoy</h2></div>${missionsHTML()}</div>
- </div>
  <div class="quick">
   <button class="qbtn" data-go="diario" style="border-color:#f2b134;background:#fff8e6"><div class="qi">📆</div><b>Reto diario</b><span>${(P.retos||{})[today()]?'Hecho hoy: '+retoEmoji(P.retos[today()].res):'¡5 ejercicios nuevos hoy!'}</span></button>
-  <button class="qbtn" data-go="aprender"><div class="qi">📚</div><b>Aprender</b><span>Piezas, mates, aperturas…</span></button>
+  <button class="qbtn" data-go="aprender"><div class="qi">📚</div><b>Aprender</b><span>${nl?'Siguiente: '+esc(nl.l.titulo):'¡Todo completado! 🏆'}</span></button>
   <button class="qbtn" data-go="ejercicios"><div class="qi">🧩</div><b>Táctica por temas</b><span>Ejercicios sin límite</span></button>
   <button class="qbtn" data-go="jugar"><div class="qi">🤖</div><b>Jugar</b><span>Contra la máquina</span></button>
+  <button class="qbtn" data-go="online" style="border-color:#2563eb;background:#eef4ff"><div class="qi">🌐</div><b>Jugar online</b><span>Retos y compañeros conectados</span></button>
   <button class="qbtn" data-go="contrarreloj"><div class="qi">⚡</div><b>Contrarreloj</b><span>Récord: ${Math.max(P.rushBest||0,P.rushBestMix||0)}</span></button>
-  <button class="qbtn" data-go="progreso"><div class="qi">🏅</div><b>Insignias</b><span>${Object.keys(P.badges).length}/${BADGES.length} conseguidas</span></button>
+  <button class="qbtn" id="qmis"><div class="qi">🎯</div><b>Misiones de hoy</b><span>${mdone}/3 hechas${mdone===3?' ✅':''}</span></button>
  </div>`;
  $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));
- if(nl)$('#cont',m).onclick=()=>go('leccion',{mod:nl.mod.id,l:nl.l.id});
- $('#quickpz',m).onclick=()=>go('tema','mezcla');
+ $('#qmis',m).onclick=()=>modal({title:'🎯 Misiones de hoy',html:missionsHTML(),buttons:[{t:'Cerrar',cls:'ghost'}]});
  homeOnline(m,VIEW);
 }
 
@@ -2531,7 +2553,7 @@ function eloLevel(e){return e<600?'Aprendiz':e<900?'Principiante':e<1200?'Aficio
 function eloCard(){
  const h=(P.eloHist&&P.eloHist.length>1?P.eloHist:[P.elo||800,P.elo||800]);const mn=Math.min(...h),mx=Math.max(...h),rg=Math.max(40,mx-mn);
  const pts=h.map((v,i)=>`${(i/(h.length-1)*300).toFixed(1)},${(56-(v-mn)/rg*50).toFixed(1)}`).join(' ');
- const by=P.eloBy||{};const nm={ej:'🧩 Ejercicios',reto:'📆 Retos',game:'🤖 Partidas',rush:'⚡ Contrarreloj'};
+ const by=P.eloBy||{};const nm={online:'🌐 Online',ej:'🧩 Ejercicios',reto:'📆 Retos',game:'🤖 Partidas',rush:'⚡ Contrarreloj'};
  return `<div style="display:flex;flex-wrap:wrap;gap:18px;align-items:center"><div style="text-align:center;min-width:150px"><div class="muted" style="font-weight:800;font-size:.8rem">TU ELO</div><div style="font-size:3rem;font-weight:900;line-height:1.1">${P.elo||800}</div><div style="font-weight:800">${eloLevel(P.elo||800)}</div><div class="muted" style="font-size:.8rem;font-weight:700">Máximo: ${P.eloMax||P.elo||800}</div></div>
   <div style="flex:1;min-width:240px"><svg viewBox="0 0 300 62" preserveAspectRatio="none" style="width:100%;height:80px;background:#fff;border:2px solid var(--line);border-radius:12px"><polyline points="${pts}" fill="none" stroke="var(--pri)" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" transform="translate(0,3)"/></svg>
   <div class="btnrow" style="margin-top:8px;gap:6px">${Object.keys(nm).map(k=>{const b=by[k]||{n:0,d:0};return `<span class="pill">${nm[k]}: ${b.d>0?'+':''}${b.d}</span>`;}).join('')}</div></div></div>
@@ -2569,15 +2591,16 @@ function viewProgress(m){
 function showProfiles(first){
  const ps=Object.values(DB.profiles);
  const m=$('main');VIEW++;$('header').classList.toggle('hidden',!P);
- m.innerHTML=`<div class="welcome"><div class="bigk">♞</div><h1 style="font-size:2rem">Ajedrez Siurot</h1><p class="muted" style="font-weight:700">¿Quién va a jugar?</p>
+ m.innerHTML=`<div class="welcome"><div class="bigk">♞</div><h1 style="font-size:2rem">Ajedrez Siurot</h1><p class="muted" style="font-weight:700">¿Cómo quieres entrar?</p>
+  <div class="entry"><button class="btn acc big" id="schoolin">🏫 ${onlLogged()?'Continuar como '+esc(ONL.acc.nombre):'Entrar con mi usuario del cole'}</button><div class="muted" style="font-weight:800;margin:12px 0 4px">o juega como invitado</div></div>
   <div class="profiles">${ps.map(p=>`<div class="prof" data-id="${p.id}"><button class="del" data-del="${p.id}" title="Borrar">✕</button><div class="pa">${p.avatar}</div><b>${esc(p.name)}</b><small>${RANKS[rankIdx(p.xp)].icono} ${RANKS[rankIdx(p.xp)].nombre} · ${p.xp} XP · ♟ ${p.elo||800}</small></div>`).join('')}
-   <div class="prof" id="newp" style="border-style:dashed"><div class="pa">➕</div><b>Nuevo jugador</b><small>Crea tu perfil</small></div></div>
+   <div class="prof" id="newp" style="border-style:dashed"><div class="pa">➕</div><b>Nuevo jugador</b><small>Invitado: sin cuenta del cole</small></div></div>
   ${P?'<button class="btn ghost" id="cancelp">Volver</button>':''}</div>`;
  $$('.prof[data-id]',m).forEach(el=>el.onclick=e=>{if(e.target.dataset.del)return;selectProfile(el.dataset.id);});
  $$('[data-del]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const p=DB.profiles[b.dataset.del];if(await confirmModal('¿Borrar jugador?',`Se borrará todo el progreso de <b>${esc(p.name)}</b>. No se puede deshacer.`,'Borrar','Cancelar',true)){delete DB.profiles[p.id];if(DB.current===p.id){DB.current=null;P=null;}save();showProfiles();}});
  $('#newp',m).onclick=newProfileModal;
+ $('#schoolin',m).onclick=()=>onlLoginProfile();
  if(P)$('#cancelp',m).onclick=()=>go('inicio');
- if(!ps.length&&first)newProfileModal();
 }
 function newProfileModal(){
  let av=AVATARS[Math.floor(Math.random()*AVATARS.length)];
@@ -2632,11 +2655,12 @@ function openMenu(){
  if($('.drawerbg')){closeMenu();return;}
  const bg=document.createElement('div');bg.className='drawerbg';
  const cur=({modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios'})[currentTab]||currentTab;
- bg.innerHTML=`<div class="drawer"><div class="dh"><b>♞ Ajedrez Siurot</b><button class="iconbtn sm" id="dclose" aria-label="Cerrar">✕</button></div>${TABS.map(([id,ic,t])=>`<button class="ditem ${cur===id?'on':''}" data-tab="${id}"><span>${ic}</span>${t}</button>`).join('')}<hr><button class="ditem" id="dset"><span>⚙️</span>Ajustes</button><button class="ditem" id="dprof"><span>👥</span>Cambiar jugador</button></div>`;
+ bg.innerHTML=`<div class="drawer"><div class="dh"><b>♞ Ajedrez Siurot</b><button class="iconbtn sm" id="dclose" aria-label="Cerrar">✕</button></div>${TABS.map(([id,ic,t])=>`<button class="ditem ${cur===id?'on':''}" data-tab="${id}"><span>${ic}</span>${t}</button>`).join('')}<hr><button class="ditem" id="dacc"><span>🏫</span>${onlLogged()?esc(ONL.acc.nombre)+' · Salir':'Entrar con usuario del cole'}</button><button class="ditem" id="dset"><span>⚙️</span>Ajustes</button><button class="ditem" id="dprof"><span>👥</span>Cambiar jugador</button></div>`;
  document.body.appendChild(bg);
  bg.addEventListener('pointerdown',e=>{if(e.target===bg)closeMenu();});
  $('#dclose',bg).onclick=closeMenu;
- $$('.ditem[data-tab]',bg).forEach(b=>b.onclick=async()=>{const t=b.dataset.tab;closeMenu();if($('#back')&&currentTab==='partida'&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;go(t);});
+ $$('.ditem[data-tab]',bg).forEach(b=>b.onclick=async()=>{const t=b.dataset.tab;closeMenu();if($('#back')&&currentTab==='partida'&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;if((currentTab==='ogame')&&!(await confirmModal('¿Salir de la partida?','La partida online sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir jugando')))return;go(t);});
+ $('#dacc',bg).onclick=async()=>{closeMenu();if(onlLogged()){await onlLogout();if(currentTab==='torneos'||currentTab==='online')go(currentTab);}else await onlLoginProfile();};
  $('#dset',bg).onclick=()=>{closeMenu();showSettings();};$('#dprof',bg).onclick=()=>{closeMenu();showProfiles();};
 }
 async function hideSplash(){
@@ -3941,11 +3965,13 @@ async function onlLogin(){
      if(!d){FB.logout();throw {code:'BAJA'};}
      ONL.acc={uid:s.uid,alias:d.alias,nombre:d.nombre||d.alias,grupo:d.grupo||''};localStorage.setItem('siurot_acc',JSON.stringify(ONL.acc));
      FB.set('users/'+s.uid,{ultimoLogin:Date.now()},['ultimoLogin']).catch(()=>{});
-     root._close?root._close(true):root.remove();toast('¡Hola, '+esc(ONL.acc.nombre)+'! 👋','ok');res(true);if(currentTab==='torneos')go('torneos');}
+     root._close?root._close(true):root.remove();toast('¡Hola, '+esc(ONL.acc.nombre)+'! 👋','ok');onlStart();res(true);}
     catch(e){btn.disabled=false;btn.textContent='Entrar';le.textContent=e.code==='BAJA'?'Este usuario ya no existe.':FB.msg(e);}};
    btn.onclick=e=>{e.stopPropagation();enter();};$('#lp',root).onkeydown=e=>{if(e.key==='Enter')enter();};$('#lu',root).focus();},30);
   bg.then(()=>res(false));});}
-function onlLogout(){FB.logout();toast('Sesión cerrada');}
+async function onlLogout(){try{if(FB.S.user)await RT.del('presence/'+myUid());}catch(e){}onlStop();FB.logout();toast('Sesión cerrada');}
+async function onlLoginProfile(){if(!onlLogged()&&!(await onlLogin()))return;const acc=ONL.acc;let p=Object.values(DB.profiles).find(x=>x.cuenta===acc.alias);
+ if(!p){p=newProfile(acc.nombre,AVATARS[Math.floor(Math.random()*AVATARS.length)]);p.cuenta=acc.alias;DB.profiles[p.id]=p;save();}selectProfile(p.id);}
 async function onlJoin(t){if(!onlLogged())return toast('Primero entra con tu usuario','bad');
  try{const ex=await FB.get(`torneos/${t.id}/jugadores/${ONL.acc.uid}`);if(ex)return toast('Ya estás apuntado ✔️');
   await FB.set(`torneos/${t.id}/jugadores/${ONL.acc.uid}`,{alias:ONL.acc.alias,nombre:ONL.acc.nombre,grupo:ONL.acc.grupo,puntos:0,partidas:0,fuera:false});toast('¡Apuntado a '+esc(t.nombre)+'! 🏟️','ok');return true;}
@@ -3954,8 +3980,8 @@ async function onlJoin(t){if(!onlLogged())return toast('Primero entra con tu usu
 async function homeOnline(m,tok){const box=$('#tcard',m);if(!box)return;
  try{const d=await onlPublic();if(!alive(tok)||!box.isConnected)return;
   const av=d.cfg.aviso?`<div class="card" style="background:#fff8e6;border-color:#f2b134;margin-bottom:12px">📣 <b>${esc(d.cfg.aviso)}</b></div>`:'';
-  const tc=d.torneos.map(t=>`<div class="card tcard ${t.estado}" data-go="torneos" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:12px;border:2px solid ${t.estado==='activo'?'#27ae60':'#f2b134'}"><div style="font-size:2rem">🏟️</div><div style="flex:1"><h3 style="margin:0">${esc(t.nombre)}</h3><div class="muted" style="font-weight:700">${t.estado==='activo'?'🟢 ¡Ya está en marcha!':'⏳ En espera · '+onlFecha(t.inicio)} · ${esc(t.ritmo||'3+0')}</div></div><button class="btn acc">${t.estado==='activo'?'Entrar':'Ver'}</button></div>`).join('');
-  box.innerHTML=av+tc;$$('[data-go]',box).forEach(b=>b.onclick=()=>go('torneos'));}catch(e){}}
+  const tc=d.torneos.map(t=>`<div class="card tcard ${t.estado}" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:12px;border:2px solid ${t.estado==='activo'?'#27ae60':'#f2b134'}"><div style="font-size:2rem">🏟️</div><div style="flex:1"><h3 style="margin:0">${esc(t.nombre)}</h3><div class="muted" style="font-weight:700">${t.estado==='activo'?'🟢 ¡Ya está en marcha!':'⏳ En espera · '+onlFecha(t.inicio)} · ${esc(t.ritmo||'3+0')}</div></div><button class="btn acc">${t.estado==='activo'?'Entrar':'Ver'}</button></div>`).join('');
+  box.innerHTML=av+tc;$$('.tcard',box).forEach((b,i)=>b.onclick=()=>{const t=d.torneos[i];t.estado==='activo'&&onlLogged()?go('arena',{tid:t.id}):go('torneos');});}catch(e){}}
 /* pantalla Torneos */
 function viewTorneos(m){const tok=VIEW;let timer=null;
  const draw=async(force)=>{if(!alive(tok))return clearInterval(timer);
@@ -3968,18 +3994,254 @@ function viewTorneos(m){const tok=VIEW;let timer=null;
    js.sort((a,b)=>(b.puntos||0)-(a.puntos||0));mine=js.some(j=>j.id===me?.uid);return{t,js,mine};}));
   if(!alive(tok))return;
   const tn=rows.map(({t,js,mine})=>`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">🏟️ ${esc(t.nombre)}</h3><span class="pill">${t.estado==='activo'?'🟢 Activo':'⏳ En espera'}</span></div><div class="muted" style="font-weight:700;margin:4px 0 10px">${onlFecha(t.inicio)} · Arena ${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min</div>
-   ${me?(mine?'<div class="pill" style="background:#d9f5e3;color:#14703a">✔️ Estás apuntado</div>':`<button class="btn acc" data-j="${t.id}">Apuntarme</button>`):''}
-   ${me&&js.length?`<table style="width:100%;margin-top:12px;border-collapse:collapse"><tbody>${js.filter(j=>!j.fuera).slice(0,10).map((j,i)=>`<tr style="${j.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:3px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td class="muted">${esc(j.grupo||'')}</td><td style="text-align:right;padding-right:6px"><b>${j.puntos||0}</b> pts</td></tr>`).join('')}</tbody></table><div class="muted" style="margin-top:6px">${js.length} apuntados</div>`:''}</div>`).join('')||`<div class="card"><p class="muted" style="margin:0">Ahora mismo no hay torneos programados. ¡Vuelve pronto!</p></div>`;
+   ${t.estado==='activo'?(me?`<button class="btn acc big" data-ar="${t.id}">▶ Entrar al torneo</button><span class="pill" style="margin-left:8px">⏱️ ${fmtLeft((t.fin||0)-RT.srv())}</span>`:'<p class="muted" style="margin:0">Entra con tu usuario para jugar.</p>'):me?(mine?'<div class="pill" style="background:#d9f5e3;color:#14703a">✔️ Estás apuntado</div>':`<button class="btn acc" data-j="${t.id}">Apuntarme</button>`):''}
+   ${me&&js.length&&t.estado!=='activo'?`<table style="width:100%;margin-top:12px;border-collapse:collapse"><tbody>${js.filter(j=>!j.fuera).slice(0,10).map((j,i)=>`<tr style="${j.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:3px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td class="muted">${esc(j.grupo||'')}</td><td style="text-align:right;padding-right:6px"><b>${j.puntos||0}</b> pts</td></tr>`).join('')}</tbody></table><div class="muted" style="margin-top:6px">${js.length} apuntados</div>`:''}</div>`).join('')||`<div class="card"><p class="muted" style="margin:0">Ahora mismo no hay torneos programados. ¡Vuelve pronto!</p></div>`;
   const hof=`<div class="card"><h3>🏆 Salón de la fama · Top 10</h3>${d.hof.length?`<table style="width:100%;border-collapse:collapse">${d.hof.map((h,i)=>`<tr style="${me&&h.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(h.nombre)}</td><td class="muted">${esc(h.grupo||'')}</td><td style="text-align:right;padding-right:6px"><b>${h.puntos||0}</b> pts</td></tr>`).join('')}</table>`:'<p class="muted" style="margin:0">Aún no hay campeones: ¡puedes ser el primero!</p>'}</div>`;
   m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2><button class="btn ghost sm" id="rf">↻ Actualizar</button></div>${d.cfg.aviso?`<div class="card" style="background:#fff8e6;border-color:#f2b134">📣 <b>${esc(d.cfg.aviso)}</b></div>`:''}${acc}${tn}${hof}`;
   $('#rf',m).onclick=()=>draw(true);
   if($('#li',m))$('#li',m).onclick=async()=>{if(await onlLogin())draw(true);};
-  if($('#lo',m))$('#lo',m).onclick=()=>{onlLogout();draw();};
+  if($('#lo',m))$('#lo',m).onclick=async()=>{await onlLogout();draw();};
   if($('#ck',m))$('#ck',m).onclick=async()=>{const r=await askText('🔑 Nueva clave','3 números y 3 letras (ej. 482kmt)','');if(!r)return;const c=r.trim().toLowerCase();if(!claveOK(c))return toast('Debe ser 3 números y 3 letras, como 482kmt','bad');
    try{const s=await FB.setPass(await FB.tok(),c);Object.assign(FB.S.user,{idToken:s.idToken,refresh:s.refresh,exp:s.exp});FB.S.onChange(FB.S.user);await FB.set('users/'+ONL.acc.uid,{clave:c},['clave']);toast('Clave cambiada ✔️','ok');}catch(e){toast(FB.msg(e),'bad');}};
+  $$('[data-ar]',m).forEach(b=>b.onclick=()=>go('arena',{tid:b.dataset.ar}));
   $$('[data-j]',m).forEach(b=>b.onclick=async()=>{b.disabled=true;if(await onlJoin(d.torneos.find(t=>t.id===b.dataset.j)))draw(true);else b.disabled=false;});};
  m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2></div><div class="card muted">Cargando…</div>`;
  draw();timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw(true);},20000);}
+/* ===== Jugar online: presencia, retos, emparejamiento y partida (Realtime Database por REST) ===== */
+const ON={arena:null,pres:null,inb:null,search:null,wait:null,inGame:false,tc:'3+0',busy:false};
+const ON_TC=['3+0','5+0','10+0','3+2','10+5'];
+const tcObj=k=>{const[m,i]=String(k||'3+0').split('+').map(Number);return{m:m||3,i:i||0};};
+const tcTxtO=k=>{const t=tcObj(k);return t.m+(t.i?'+'+t.i:' min');};
+const myUid=()=>ONL.acc&&ONL.acc.uid;
+const myElo=()=>(typeof P!=='undefined'&&P&&P.elo)||800;
+async function presTick(){if(!onlLogged()||document.hidden)return;
+ try{const r=await RT.put('presence/'+myUid(),{n:ONL.acc.nombre,g:ONL.acc.grupo||'',e:myElo(),s:ON.inGame?'jugando':'libre',t:RT.SV});if(r&&typeof r.t==='number')RT.off=r.t-Date.now();}catch(e){}}
+function onlStart(){if(!onlLogged()||ON.pres)return;presTick();ON.pres=setInterval(presTick,20000);ON.inb=setInterval(inboxTick,3500);}
+function onlStop(){arenaLeave(true);clearInterval(ON.pres);clearInterval(ON.inb);ON.pres=ON.inb=null;if(ON.search)ON.search.stop();}
+async function inboxTick(){if(document.hidden||!onlLogged()||ON.busy)return;ON.busy=true;
+ try{const m=await RT.get('inbox/'+myUid());if(m)for(const id of Object.keys(m)){const x=m[id];RT.del(`inbox/${myUid()}/${id}`).catch(()=>{});if(x&&typeof x==='object')await onMsg(x);}}catch(e){}
+ ON.busy=false;}
+function openWait(html,onCancel){const p=modal({title:'🌐 Online',html:`<p style="text-align:center;font-weight:800">${html}</p><div style="text-align:center"><span class="thinking"><i></i><i></i><i></i></span></div>`,buttons:[{t:'Cancelar',cls:'ghost',v:false}],dismiss:false});
+ const bg=$$('.modalbg').pop();let done=false;p.then(v=>{if(!done){done=true;onCancel&&onCancel();}});
+ return{close(){if(done)return;done=true;bg&&bg._close&&bg._close(null);}};}
+async function onMsg(x){
+ if(x.t&&typeof x.t==='number'&&RT.srv()-x.t>90000)return;
+ if(x.k==='game'){if(ON.wait){ON.wait.close();ON.wait=null;}return enterGame(x.gid);}
+ if(x.k==='no'||x.k==='busy'){if(ON.wait){ON.wait.close();ON.wait=null;}return toast(x.k==='busy'?`${esc(x.fn||'Tu rival')} está ocupado ahora`:`${esc(x.fn||'Tu rival')} no puede jugar ahora`,'bad');}
+ if(x.k==='reto'){
+  if(ON.inGame||ON.reto||ON.search||currentTab==='ogame'){RT.post('inbox/'+x.from,{k:'busy',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});return;}
+  ON.reto=true;sound('ok');
+  const v=await modal({title:'⚔️ ¡Te han retado!',html:`<p style="text-align:center"><b>${esc(x.fn)}</b> (ELO ${x.fe||'?'}) te reta a una partida de <b>${tcTxtO(x.tc)}</b>.</p>`,buttons:[{t:'No, gracias',cls:'ghost',v:false},{t:'¡Aceptar!',v:true}],dismiss:false});
+  ON.reto=false;
+  if(!v)return RT.post('inbox/'+x.from,{k:'no',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});
+  const wMe=Math.random()<.5;await createGame(wMe?{id:myUid(),n:ONL.acc.nombre,e:myElo()}:{id:x.from,n:x.fn,e:x.fe},wMe?{id:x.from,n:x.fn,e:x.fe}:{id:myUid(),n:ONL.acc.nombre,e:myElo()},x.tc,x.from);}
+}
+async function createGame(W,B,tc,notifyId){
+ const t=tcObj(tc),gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+ try{await RT.put('games/'+gid,{w:W.id,b:B.id,wn:W.n,bn:B.n,we:W.e||800,be:B.e||800,tc,tb:t.m*60000,ti:t.i*1000,moves:'',clk:{w:t.m*60000,b:t.m*60000},ts:RT.SV,turn:'w',st:'play',draw:'',res:'',why:''});
+  if(notifyId)await RT.post('inbox/'+notifyId,{k:'game',gid,from:myUid(),t:RT.SV});enterGame(gid);}
+ catch(e){toast(FB.msg(e),'bad');}}
+function enterGame(gid){if(ON.search){ON.search.stop();}if(ON.wait){ON.wait.close();ON.wait=null;}try{localStorage.setItem('siurot_og',gid);}catch(e){}go('ogame',{gid});}
+async function sendReto(opp){if(ON.wait||ON.search)return;
+ try{const r=await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc:ON.tc,t:RT.SV});
+  const mid=r&&r.name;let to=null;
+  ON.wait=openWait(`Esperando a <b>${esc(opp.n)}</b>…<br><span class="muted">${tcTxtO(ON.tc)}</span>`,()=>{clearTimeout(to);ON.wait=null;if(mid)RT.del(`inbox/${opp.id}/${mid}`).catch(()=>{});});
+  to=setTimeout(()=>{if(ON.wait){ON.wait.close();toast('No ha contestado','bad');}},60000);}
+ catch(e){toast(FB.msg(e),'bad');}}
+async function quickMatch(){if(ON.search||ON.wait)return;const uid=myUid(),tc=ON.tc;
+ const w=openWait(`🔎 Buscando rival de <b>${tcTxtO(tc)}</b>…`,()=>S.stop());
+ const S={dead:false,stop(){if(S.dead)return;S.dead=true;clearInterval(S.iv);ON.search=null;RT.del('seeks/'+uid).catch(()=>{});w.close();}};ON.search=S;
+ try{await RT.put('seeks/'+uid,{n:ONL.acc.nombre,e:myElo(),tc,t:RT.SV});}catch(e){S.stop();return toast(FB.msg(e),'bad');}
+ let n=0;const t0=Date.now();
+ S.iv=setInterval(async()=>{if(S.dead)return;n++;
+  if(Date.now()-t0>120000){S.stop();return toast('Ahora mismo no hay rivales. Prueba a retar a alguien conectado.','bad',4200);}
+  if(n%3===0)RT.patch('seeks/'+uid,{t:RT.SV}).catch(()=>{});
+  try{const all=await RT.get('seeks')||{};if(S.dead)return;const now=RT.srv();
+   const o=Object.entries(all).find(([id,s])=>id!==uid&&s&&s.tc===tc&&now-(s.t||0)<18000);
+   if(o&&uid<o[0]){S.dead=true;clearInterval(S.iv);ON.search=null;RT.del('seeks/'+uid).catch(()=>{});w.close();
+    const wMe=Math.random()<.5,me={id:uid,n:ONL.acc.nombre,e:myElo()},op={id:o[0],n:o[1].n,e:o[1].e};await createGame(wMe?me:op,wMe?op:me,tc,o[0]);}}catch(e){}},2000);}
+/* ---------- sala ---------- */
+function viewOnline(m){const tok=VIEW;let timer=null;
+ const draw=async()=>{if(!alive(tok))return clearInterval(timer);
+  if(!onlLogged()){m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2></div><div class="card" style="text-align:center"><div style="font-size:3rem">🌐</div><p>Juega contra tus compañeros que estén conectados.<br>Entra con el <b>usuario y la clave</b> del cole.</p><button class="btn acc big" id="li">🔑 Entrar</button></div>`;
+   $('#li',m).onclick=async()=>{if(await onlLogin()){onlStart();draw();}};return;}
+  onlStart();
+  let pres={},og=null;try{pres=await RT.get('presence')||{};}catch(e){}
+  const gid=(()=>{try{return localStorage.getItem('siurot_og');}catch(e){return null;}})();
+  if(gid){try{const g=await RT.get('games/'+gid);if(g&&g.st==='play'&&(g.w===myUid()||g.b===myUid()))og=gid;else localStorage.removeItem('siurot_og');}catch(e){}}
+  if(!alive(tok))return;
+  const now=RT.srv(),me=myUid();
+  const list=Object.entries(pres).filter(([id,p])=>id!==me&&p&&now-(p.t||0)<55000).map(([id,p])=>({id,...p})).sort((a,b)=>(a.s==='jugando')-(b.s==='jugando')||String(a.n).localeCompare(b.n,'es'));
+  m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2><span class="pill">🟢 ${list.length+1} conectados</span></div><div class="onl">
+  ${og?`<div class="card" style="background:#fff3c4;border-color:#e8a317"><b>♟ Tienes una partida en curso</b><div class="btnrow" style="margin-top:8px"><button class="btn acc" id="back2g">Volver a la partida</button></div></div>`:''}
+  <div class="card"><div class="muted" style="font-weight:800;margin-bottom:6px">Ritmo de la partida</div><div class="btnrow" style="gap:6px;margin-bottom:12px">${ON_TC.map(k=>`<button class="btn sm ${k===ON.tc?'':'ghost'}" data-tc="${k}">${tcTxtO(k)}</button>`).join('')}</div>
+   <button class="btn acc big" id="qm" style="width:100%">⚔️ Jugar online</button><p class="muted" style="margin:8px 0 0;font-size:.85rem">Te empareja con otro jugador que busque el mismo ritmo.</p></div>
+  <div class="card"><h3 style="margin:0 0 6px">👥 Conectados ahora</h3>${list.length?list.map(p=>`<div class="pl"><span class="dot ${p.s==='jugando'?'busy':''}"></span><div style="flex:1"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span><div class="muted" style="font-size:.8rem">♟ ${p.e||800} · ${p.s==='jugando'?'jugando':'libre'}</div></div><button class="btn sm ${p.s==='jugando'?'ghost':''}" data-r="${p.id}" ${p.s==='jugando'?'disabled':''}>⚔️ Retar</button></div>`).join(''):'<p class="muted" style="margin:0">No hay nadie más conectado ahora. Cuando entren tus compañeros aparecerán aquí.</p>'}</div></div>`;
+  $$('[data-tc]',m).forEach(b=>b.onclick=()=>{ON.tc=b.dataset.tc;draw();});
+  $('#qm',m).onclick=quickMatch;
+  if($('#back2g',m))$('#back2g',m).onclick=()=>go('ogame',{gid:og});
+  $$('[data-r]',m).forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.r);if(p)sendReto({id:p.id,n:p.n});});};
+ m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2></div><div class="card muted">Cargando…</div>`;
+ draw();timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw();},8000);}
+/* ---------- partida ---------- */
+async function viewOnGame(m,{gid}){
+ const tok=VIEW;let G=null;try{G=await RT.get('games/'+gid);}catch(e){}
+ if(!alive(tok))return;
+ if(!G||!onlLogged()){toast('No se puede abrir la partida','bad');return go('online');}
+ const uid=myUid(),color=G.w===uid?'w':G.b===uid?'b':null;if(!color){toast('Esta partida no es tuya','bad');return go('online');}
+ const oc=color==='w'?'b':'w',oppN=color==='w'?G.bn:G.wn,oppE=color==='w'?G.be:G.we;
+ const pos=new E.Pos();let over=false,pending=null,drawAsked=false,flagSent=false;const sans=[];
+ ON.inGame=true;presTick();
+ const leave=()=>{clearInterval(poll);clearInterval(clkT);if(ON.inGame){ON.inGame=false;presTick();}};
+ const ar=G.ar||null;if(ar&&!ON.arena)arenaEnsure(ar).catch(()=>{});
+ const {board,body,under}=trainerShell(m,ar?'🏟️ Arena':'🌐 Partida online',async()=>{if(!over&&!(await confirmModal('¿Salir de la sala?','La partida sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir')))return;leave();go('online');});
+ body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b>${esc(oppN)}</b><div class="muted" style="font-size:.85rem">ELO ${oppE||800} · ⏱️ ${tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div><div id="st" style="font-weight:800;margin-top:2px"></div></div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
+ under.innerHTML=`<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="drw">🤝 Tablas</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
+ const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
+ const sTop=document.createElement('div'),sBot=document.createElement('div');sTop.className=sBot.className='pstrip';bc.insertBefore(sTop,bd);bc.insertBefore(sBot,$('#under',m));
+ board.orient=color;board.movable=color;board.interactive=true;board.premoveOK=false;board.set(pos,{last:null});
+ const fmtT=ms=>{ms=Math.max(0,ms);if(ms<20000)return(ms/1000).toFixed(1);const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+ const plies=()=>pos.played.length;
+ const remain=c=>{const base=(G.clk&&G.clk[c])||0;const tick=!over&&G.st!=='end'&&plies()>=2&&pos.turn===c;return base-(tick?Math.max(0,RT.srv()-(G.ts||0)):0);};
+ const names={w:G.wn,b:G.bn},elos={w:G.we,b:G.be};
+ function paint(){const topC=board.orient==='w'?'b':'w',botC=topC==='w'?'b':'w';
+  [[sTop,topC],[sBot,botC]].forEach(([el,c])=>{const r=remain(c);el.innerHTML=`<span class="pn">${c===color?esc(P.avatar+' '+names[c]):'🧑‍🎓 '+esc(names[c])} <span class="muted">(${elos[c]||800})</span></span><span class="cp"></span><span class="clk ${r<15000?'low':''} ${!over&&plies()>=2&&pos.turn===c?'on':''}">${fmtT(r)}</span>`;});}
+ function panel(){let h='';for(let i=0;i<sans.length;i+=2)h+=`<span class="n">${i/2+1}.</span><span class="${i===sans.length-1?'cur':''}">${E.sanES(sans[i])}</span><span class="${i+1===sans.length-1?'cur':''}">${sans[i+1]?E.sanES(sans[i+1]):''}</span>`;
+  const ml=$('#ml',body);ml.innerHTML=h||'<span class="muted" style="grid-column:1/-1">¡Empieza la partida! Juegan blancas.</span>';ml.scrollTop=ml.scrollHeight;
+  const s=pos.status();$('#st',body).innerHTML=over?'Partida terminada':s==='jaque'?'<span style="color:var(--bad)">¡Jaque!</span> '+(pos.turn===color?'Te toca a ti':''):(pos.turn===color?'Te toca a ti':'Juega '+esc(oppN));
+  $('#drw',under).disabled=over;$('#resign',under).disabled=over;paint();}
+ const canMate=c=>{let n=0;for(const p of pos.b){if(!p||E.colorOf(p)!==c)continue;const t=p.toLowerCase();if(t==='p'||t==='r'||t==='q')return true;if(t==='n'||t==='b')n++;}return n>=2;};
+ const setEnd=async(res,why)=>{if(G.st!=='end'){G.st='end';G.res=res;G.why=why;try{await RT.patch('games/'+gid,{st:'end',res,why,draw:''});}catch(e){}}finish(res,why);};
+ function sync(){const ms=(G.moves||'').split(' ').filter(Boolean);let changed=false,lastMv=null;
+  if(ms.length<plies())return false;
+  for(let i=plies();i<ms.length;i++){const mv=pos.fromUci(ms[i]);if(!mv)break;sans.push(pos.san(mv));pos.play(mv);lastMv=mv;changed=true;}
+  if(changed){board.hl=[];board.arrows=[];board.set(pos,{last:lastMv,anim:true});playSound(pos,lastMv);}
+  board.interactive=!over&&pos.turn===color;return changed;}
+ function finish(res,why){if(over)return;over=true;board.interactive=false;board.pickSq=null;clearInterval(clkT);clearInterval(poll);panel();
+  try{localStorage.removeItem('siurot_og');}catch(e){}
+  const sc=res==='1/2-1/2'?.5:((res==='1-0')===(color==='w')?1:0);
+  const why2={mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición',time:'Se acabó el tiempo',resign:'Abandono',draw:'Tablas acordadas'}[why]||why||'';
+  const d=eloUpdate(oppE||800,sc,24,'online');const xp=sc===1?20:sc===.5?8:5;addXP(xp,sc===1?'Victoria online':sc===.5?'Tablas online':'Partida online');
+  const arP=ar?recordArena(ar,gid,sc,color==='w'?G.b:G.w):null;
+  if(sc===1){confetti(50);sound('win');}else sound(sc===.5?'ok':'bad');
+  ON.inGame=false;presTick();
+  const icon=sc===1?'🏆':sc===.5?'🤝':'💪',title=sc===1?'¡Has ganado!':sc===.5?'Tablas':'Has perdido';
+  setTimeout(async()=>{if(!alive(tok))return;const ai=arP?await arP:null;if(!alive(tok))return;
+   if(ar){const left=(ON.arena&&ON.arena.T.fin||0)-RT.srv();
+    const v=await modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p><p style="font-size:1.2rem"><b>${ai&&!ai.dup?'+'+ai.val+' puntos'+(ai.dbl?' 🔥 (¡doble!)':''):''}</b></p>`,buttons:[{t:'Salir del torneo',cls:'ghost',v:'s'},{t:left>ARENA_MIN_LEFT?'▶ Seguir jugando':'Ver clasificación',v:'c'}],dismiss:false});
+    if(v==='s'){arenaLeave();go('torneos');}else{if(left>ARENA_MIN_LEFT&&ON.arena){await arenaSearch(true);}go('arena',{tid:ar});}return;}
+   modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p>`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'🔁 Revancha',v:'r'}],dismiss:false}).then(v=>{if(v==='r'){ON.tc=G.tc;go('online');setTimeout(()=>sendReto({id:color==='w'?G.b:G.w,n:oppN}),400);}else go('online');});},600);}
+ function afterLocal(mv,mover){const s=pos.status();let end=null;
+  if(s&&s!=='jaque'){end={res:s==='mate'?(mover==='w'?'1-0':'0-1'):'1/2-1/2',why:s};}
+  return end;}
+ async function writeMove(upd){pending=upd;try{await RT.patch('games/'+gid,upd);pending=null;}catch(e){}}
+ board.onMove=(mv,anim)=>{if(over||pos.turn!==color)return;
+  const mover=pos.turn,pl=plies(),tick=pl>=2,el=tick?Math.max(0,RT.srv()-(G.ts||0)):0;let rem=((G.clk&&G.clk[mover])||0)-el;
+  if(rem<=0)return;if(G.ti&&pl>=2)rem+=G.ti;
+  const u=E.uci(mv),san=pos.san(mv);pos.play(mv);sans.push(san);
+  G.moves=G.moves?G.moves+' '+u:u;G.clk=G.clk||{};G.clk[mover]=Math.round(rem);G.ts=RT.srv();G.turn=pos.turn;G.draw='';
+  board.hl=[];board.arrows=[];board.set(pos,{last:mv,anim});playSound(pos,mv);
+  const upd={moves:G.moves,['clk/'+mover]:Math.round(rem),ts:RT.SV,turn:pos.turn,draw:''};const end=afterLocal(mv,mover);
+  if(end){upd.st='end';upd.res=end.res;upd.why=end.why;G.st='end';G.res=end.res;G.why=end.why;}
+  board.interactive=false;panel();writeMove(upd);if(end)finish(end.res,end.why);};
+ let polling=false;
+ async function tick(){if(polling||!alive(tok)){if(!alive(tok))leave();return;}polling=true;
+  try{if(pending)await writeMove(pending);
+   const g=await RT.get('games/'+gid);
+   if(g&&alive(tok)&&!over){const n=(g.moves||'').split(' ').filter(Boolean).length;if(n>=plies()&&!pending){G=g;sync();}
+    if(g.st==='end'){G=g;sync();finish(g.res,g.why);}
+    else if(g.draw===oc&&!drawAsked){drawAsked=true;modal({title:'🤝 Tablas',html:`<p style="text-align:center"><b>${esc(oppN)}</b> te ofrece tablas.</p>`,buttons:[{t:'No',cls:'ghost',v:false},{t:'Aceptar',v:true}],dismiss:false}).then(v=>{if(over)return;if(v)setEnd('1/2-1/2','draw');else{RT.patch('games/'+gid,{draw:''}).catch(()=>{});drawAsked=false;}});}
+    panel();}}catch(e){}
+  polling=false;}
+ const poll=setInterval(tick,1000);
+ const clkT=setInterval(()=>{if(!alive(tok)){leave();return;}paint();if(over||flagSent)return;
+  for(const c of['w','b']){if(plies()>=2&&pos.turn===c&&remain(c)<=0){flagSent=true;const o=c==='w'?'b':'w';
+   if(!canMate(o))setEnd('1/2-1/2','material');else setEnd(c==='w'?'0-1':'1-0','time');break;}}},200);
+ $('#flip',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();paint();};
+ $('#drw',under).onclick=async()=>{if(over)return;if(G.draw===oc)return setEnd('1/2-1/2','draw');G.draw=color;try{await RT.patch('games/'+gid,{draw:color});toast('Has ofrecido tablas 🤝');}catch(e){toast(FB.msg(e),'bad');}};
+ $('#resign',under).onclick=async()=>{if(over)return;if(await confirmModal('¿Rendirte?','La partida contará como derrota.','Me rindo','Seguir jugando',true))setEnd(color==='w'?'0-1':'1-0','resign');};
+ sync();board.interactive=!over&&pos.turn===color&&G.st!=='end';panel();if(G.st==='end')finish(G.res,G.why);
+}
+if(typeof window!=='undefined')window.addEventListener('pagehide',()=>{if(onlLogged()&&FB.S.user){try{fetch('https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/presence/'+myUid()+'.json?auth='+encodeURIComponent(FB.S.user.idToken),{method:'DELETE',keepalive:true});}catch(e){}}});
+setTimeout(()=>{if(onlLogged())onlStart();},1500);
+
+/* ================= ARENA (torneo automático) ================= */
+const ARENA_WAIT_MS=10000,ARENA_ELO=100,ARENA_MIN_LEFT=20000;
+const arenaVal=(sc,streak)=>{const d=streak>=2;return sc===1?(d?4:2):sc===.5?(d?2:1):0;};
+const fmtLeft=ms=>{ms=Math.max(0,ms);const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+async function arenaEnsure(tid){if(ON.arena&&ON.arena.tid===tid)return ON.arena;
+ const T=await FB.get('torneos/'+tid);if(!T||T.estado!=='activo'){toast('Este torneo no está activo','bad');return null;}
+ return arenaJoin(T);}
+async function arenaJoin(T){
+ if(ON.arena)arenaLeave(true);
+ const uid=myUid(),path=`arena/${T.id}/p/${uid}`;
+ const me=await RT.get(path);
+ const base={n:ONL.acc.nombre,g:ONL.acc.grupo||'',a:ONL.acc.alias,e:myElo(),hb:RT.SV};
+ if(!me)await RT.put(path,{...base,pts:0,pa:0,w:0,d:0,l:0,streak:0,wait:null,busy:null});else await RT.patch(path,base);
+ FB.get(`torneos/${T.id}/jugadores/${uid}`).then(x=>{if(!x)onlJoin(T);}).catch(()=>{});
+ const A={tid:T.id,T,snap:{},entered:null,onSnap:null,busy2:false};ON.arena=A;
+ A.hbT=setInterval(()=>{if(ON.arena===A&&!document.hidden&&A.T.estado==='activo')RT.patch(`arena/${A.tid}/p/${uid}`,{hb:RT.SV,e:myElo()}).catch(()=>{});},5000);
+ A.loopT=setInterval(arenaTick,2500);
+ A.tT=setInterval(async()=>{try{const t=await FB.get('torneos/'+A.tid);if(t){A.T=t;if(t.estado!=='activo'){clearInterval(A.hbT);clearInterval(A.loopT);if(A.onSnap)A.onSnap();}}}catch(e){}},15000);
+ arenaTick();return A;}
+function arenaLeave(silent){const A=ON.arena;if(!A)return;clearInterval(A.hbT);clearInterval(A.loopT);clearInterval(A.tT);ON.arena=null;
+ if(onlLogged())RT.patch(`arena/${A.tid}/p/${myUid()}`,{wait:null}).catch(()=>{});if(!silent)toast('Has salido de la búsqueda');}
+async function arenaSearch(on){const A=ON.arena;if(!A)return;
+ if(on&&A.T.fin&&A.T.fin-RT.srv()<ARENA_MIN_LEFT)return toast('Ya no quedan partidas por empezar','bad');
+ try{await RT.patch(`arena/${A.tid}/p/${myUid()}`,{wait:on?RT.SV:null,hb:RT.SV});if(A.snap[myUid()])A.snap[myUid()].wait=on?RT.srv():null;if(A.onSnap)A.onSnap();}catch(e){toast(FB.msg(e),'bad');}}
+async function arenaTick(){const A=ON.arena;if(!A||A.busy2||document.hidden||!onlLogged()||A.T.estado!=='activo')return;A.busy2=true;
+ try{const all=await RT.get(`arena/${A.tid}/p`)||{};if(ON.arena!==A)return;A.snap=all;const uid=myUid(),me=all[uid]||{},now=RT.srv();
+  if(me.fuera){A.out=true;}
+  else if(me.busy&&me.busy!==A.entered&&now-(me.bt||0)<480000){A.entered=me.busy;const g=await RT.get('games/'+me.busy);if(g&&g.st==='play'){if(ON.wait){ON.wait.close();ON.wait=null;}enterGame(me.busy);return;}}
+  else if(me.wait)await arenaPair(A,all,now);
+  if(A.onSnap)A.onSnap();}catch(e){}
+ finally{A.busy2=false;}}
+async function arenaPair(A,all,now){
+ if(A.T.fin&&A.T.fin-now<ARENA_MIN_LEFT)return;
+ const free=Object.entries(all).filter(([id,p])=>p&&p.wait&&!p.fuera&&now-(p.hb||0)<20000&&(!p.busy||now-(p.bt||0)>=480000)).map(([id,p])=>({id,e:p.e||800,w:now-p.wait,last:p.last||'',n:p.n,g:p.g}));
+ if(free.length<2)return;
+ if(free.map(x=>x.id).sort()[0]!==myUid())return;           // solo el «director» (menor uid) empareja
+ free.sort((a,b)=>b.w-a.w);const used=new Set(),pairs=[];
+ for(const a of free){if(used.has(a.id))continue;let best=null,bs=1e9;
+  for(const b of free){if(b.id===a.id||used.has(b.id))continue;const d=Math.abs(a.e-b.e),ok=d<=ARENA_ELO||Math.max(a.w,b.w)>=ARENA_WAIT_MS;if(!ok)continue;
+   const sc=d+((a.last===b.id||b.last===a.id)?1000:0);if(sc<bs){bs=sc;best=b;}}
+  if(best){used.add(a.id);used.add(best.id);pairs.push([a,best]);}}
+ for(const [a,b] of pairs){const wA=Math.random()<.5,W=wA?a:b,B=wA?b:a,t=tcObj(A.T.ritmo||'3+0'),gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  try{await RT.put('games/'+gid,{w:W.id,b:B.id,wn:W.n,bn:B.n,we:W.e,be:B.e,tc:A.T.ritmo||'3+0',tb:t.m*60000,ti:t.i*1000,moves:'',clk:{w:t.m*60000,b:t.m*60000},ts:RT.SV,turn:'w',st:'play',draw:'',res:'',why:'',ar:A.tid});
+   await Promise.all([a,b].map(x=>RT.patch(`arena/${A.tid}/p/${x.id}`,{busy:gid,bt:RT.SV,wait:null})));}catch(e){}}}
+async function recordArena(tid,gid,sc,oppId){
+ const path=`arena/${tid}/p/${myUid()}`;let me={};try{me=await RT.get(path)||{};}catch(e){}
+ if(me.lg===gid)return{val:0,streak:me.streak||0,dup:true};
+ const val=arenaVal(sc,me.streak||0),streak=sc===1?(me.streak||0)+1:0;
+ try{await RT.patch(path,{pts:(me.pts||0)+val,pa:(me.pa||0)+1,w:(me.w||0)+(sc===1?1:0),d:(me.d||0)+(sc===.5?1:0),l:(me.l||0)+(sc===0?1:0),streak,lg:gid,last:oppId,busy:null,bt:null,hb:RT.SV,e:myElo()});}catch(e){}
+ return{val,streak,dbl:(me.streak||0)>=2};}
+/* pantalla del arena */
+async function viewArena(m,{tid}){const tok=VIEW;
+ m.innerHTML=`<div class="sectitle"><h2>🏟️ Arena</h2></div><div class="card muted">Entrando al torneo…</div>`;
+ if(!onlLogged()){toast('Entra primero con tu usuario','bad');return go('torneos');}
+ let A;try{A=await arenaEnsure(tid);}catch(e){toast(FB.msg(e),'bad');return go('torneos');}
+ if(!A||!alive(tok))return go('torneos');
+ const uid=myUid();let tmr=null;
+ const draw=()=>{if(!alive(tok)){clearInterval(tmr);if(ON.arena===A)A.onSnap=null;return;}
+  const T=A.T,now=RT.srv(),left=(T.fin||0)-now,all=A.snap||{},me=all[uid]||{};
+  const rows=Object.entries(all).filter(([id,p])=>p&&!p.fuera&&now-(p.hb||0)<60000||(p&&(p.pts||0)>0&&!p.fuera)).map(([id,p])=>({id,...p})).sort((a,b)=>(b.pts||0)-(a.pts||0)||(a.pa||0)-(b.pa||0));
+  const stOf=p=>p.busy&&now-(p.bt||0)<480000?'♟ jugando':p.wait?'🔎 buscando':now-(p.hb||0)<20000?'libre':'💤';
+  const ended=T.estado!=='activo',timeUp=left<=0;
+  const searching=!!me.wait;
+  const btn=ended?'':me.fuera?'<p class="err" style="font-weight:800">Has sido descalificado por el profe.</p>':me.busy&&now-(me.bt||0)<480000?'<button class="btn acc big" id="goplay" style="width:100%">♟ Volver a tu partida</button>':searching?'<button class="btn ghost big" id="stop" style="width:100%">✖ Dejar de buscar</button><p class="muted" style="margin:6px 0 0;text-align:center"><span class="thinking"><i></i><i></i><i></i></span> Buscando rival de ELO parecido…</p>':timeUp?'<p style="font-weight:800;text-align:center">⏱️ ¡Tiempo! Ya no empiezan partidas nuevas.</p>':'<button class="btn acc big" id="srch" style="width:100%">🔎 Buscar partida</button>';
+  const top=rows.slice(0,10),mine=rows.findIndex(r=>r.id===uid);
+  m.innerHTML=`<div class="sectitle"><h2>🏟️ ${esc(T.nombre)}</h2><span class="pill" id="cd">${ended?'Terminado':timeUp?'⏱️ ¡Tiempo!':'⏱️ '+fmtLeft(left)}</span></div>
+  <div class="card" style="background:linear-gradient(135deg,#d9f5e3,#fffdf8)"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div style="font-size:2.2rem">🏆</div><div style="flex:1"><div class="muted" style="font-weight:800">Tus puntos</div><div style="font-size:2rem;font-weight:900">${me.pts||0}${(me.streak||0)>=2?' <span title="Racha: puntos dobles">🔥×2</span>':(me.streak||0)===1?' <small class="muted">🔥</small>':''}</div></div><div class="muted" style="font-weight:700;text-align:right">${me.pa||0} partidas<br>${me.w||0}G · ${me.d||0}T · ${me.l||0}P</div></div>${btn}
+  ${ended?'<p class="muted" style="margin:8px 0 0">El profe ha cerrado el torneo. ¡Mira el salón de la fama en Torneos!</p>':''}</div>
+  <div class="card"><h3 style="margin:0 0 6px">📊 Clasificación en directo <span class="muted" style="font-weight:700">(${rows.length} jugadores)</span></h3><table style="width:100%;border-collapse:collapse">${top.map((r,i)=>`<tr style="${r.id===uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(r.n)} <span class="muted">${esc(r.g||'')}</span>${(r.streak||0)>=2?' 🔥':''}</td><td class="muted" style="font-size:.8rem">${stOf(r)}</td><td style="text-align:right;padding-right:6px"><b>${r.pts||0}</b></td></tr>`).join('')||'<tr><td class="muted">Todavía no hay jugadores.</td></tr>'}${mine>=10?`<tr style="background:#e8f6ee;font-weight:800"><td style="padding:4px 6px">${mine+1}</td><td>${esc(me.n)}</td><td></td><td style="text-align:right;padding-right:6px"><b>${me.pts||0}</b></td></tr>`:''}</table>
+  <p class="muted" style="font-size:.82rem;margin:8px 0 0">Victoria 2 · Tablas 1 · Derrota 0. Con 2 victorias seguidas, ¡puntos dobles!</p></div>
+  <div class="btnrow"><button class="btn ghost sm" id="leave">← Salir del torneo</button></div>`;
+  if($('#srch',m))$('#srch',m).onclick=()=>arenaSearch(true);
+  if($('#stop',m))$('#stop',m).onclick=()=>arenaSearch(false);
+  if($('#goplay',m))$('#goplay',m).onclick=()=>{const g=me.busy;enterGame(g);};
+  $('#leave',m).onclick=()=>{arenaLeave();go('torneos');};};
+ A.onSnap=draw;draw();
+ tmr=setInterval(()=>{if(!alive(tok)){clearInterval(tmr);return;}const cd=$('#cd',m);if(cd&&A.T.estado==='activo'){const left=(A.T.fin||0)-RT.srv();cd.textContent=left<=0?'⏱️ ¡Tiempo!':'⏱️ '+fmtLeft(left);}},1000);}
 // ================= PWA: instalación y actualizaciones =================
 const IS_STANDALONE=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
 const IS_IOS=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream;

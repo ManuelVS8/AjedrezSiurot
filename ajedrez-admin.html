@@ -24,7 +24,7 @@ th{color:var(--mu);font-size:.78rem;text-transform:uppercase;letter-spacing:.03e
 .mono{font-family:ui-monospace,Consolas,monospace;font-weight:800}
 .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:800;background:#e8f1ec;color:var(--gd)}
 .pill.espera{background:#fff3d6;color:#8a5a00}.pill.activo{background:#d9f5e3;color:#14703a}.pill.terminado{background:#e7e7ee;color:#555}
-.muted{color:var(--mu);font-size:.88rem}.err{color:var(--rd);font-weight:700}
+.gh td{background:#eef5f1;padding:8px}.muted{color:var(--mu);font-size:.88rem}.err{color:var(--rd);font-weight:700}
 #toasts{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:6px;align-items:center}
 .toast{background:#1d2b25;color:#fff;padding:9px 16px;border-radius:12px;font-weight:700;box-shadow:0 4px 14px #0004}.toast.bad{background:var(--rd)}
 .mbg{position:fixed;inset:0;background:#0007;display:flex;align-items:center;justify-content:center;z-index:50;padding:14px}
@@ -71,7 +71,7 @@ const FB=(()=>{
  const emailOf=a=>a.includes('@')?a:a+'@'+FBC.domain;
  function pack(r){return{uid:r.localId,email:r.email,idToken:r.idToken,refresh:r.refreshToken,exp:Date.now()+(+r.expiresIn||3600)*1000};}
  const api={
-  S,emailOf,
+  S,emailOf,req,
   signIn:(a,pw)=>post(AUTH+'signInWithPassword'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
   signUp:(a,pw)=>post(AUTH+'signUp'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
   delAccount:idToken=>post(AUTH+'delete'+K,{idToken}),
@@ -99,6 +99,18 @@ const FB=(()=>{
  };
  return api;
 })();
+/* Realtime Database por REST (presencia, retos y partidas) */
+const RT=(()=>{const B='https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/';
+ const url=async p=>{const t=await FB.tok();return B+p+'.json?auth='+encodeURIComponent(t||'');};
+ const SV={'.sv':'timestamp'};
+ return{SV,off:0,srv(){return Date.now()+RT.off;},
+  async get(p){return FB.req(await url(p),{},2);},
+  async put(p,v){return FB.req(await url(p),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
+  async patch(p,v){return FB.req(await url(p),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
+  async post(p,v){return FB.req(await url(p),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
+  async del(p){return FB.req(await url(p),{method:'DELETE'},2);},
+  async sync(p){const r=await RT.put(p,SV);if(typeof r==='number')RT.off=r-Date.now();return r;}};
+})();
 /* claves: 3 números + 3 letras minúsculas (sin caracteres que se confunden) */
 function genClave(){const D='23456789',L='abcdefghjkmnpqrstuvwxyz',r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};let s='';for(let i=0;i<3;i++)s+=D[r(D.length)];for(let i=0;i<3;i++)s+=L[r(L.length)];return s;}
 const claveOK=c=>/^[0-9]{3}[a-z]{3}$/.test(c);
@@ -114,8 +126,8 @@ const askM=(title,html,ok='Aceptar')=>modal({title,html,buttons:[{t:'Cancelar',c
 const fdate=ms=>ms?new Date(ms).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
-const A={users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'usuarios',sel:new Set(),q:'',grp:'',tid:null,timer:null};
-const TABS=[['usuarios','👥 Usuarios'],['alta','➕ Alta'],['pend','🎟️ Sin estrenar'],['torneos','🏟️ Torneos'],['hof','🏆 Salón de la fama'],['ajustes','⚙️ Ajustes']];
+const A={users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'usuarios',sel:new Set(),q:'',grp:'',est:'',tid:null,timer:null};
+const TABS=[['usuarios','👥 Usuarios'],['alta','➕ Alta'],['torneos','🏟️ Torneos'],['hof','🏆 Salón de la fama'],['ajustes','⚙️ Ajustes']];
 const nm=u=>u.nombre||u.alias;
 /* ---------- sesión ---------- */
 FB.S.onChange=u=>{try{u?sessionStorage.setItem('adm',JSON.stringify(u)):sessionStorage.removeItem('adm');}catch(e){}};
@@ -129,29 +141,37 @@ async function loadAll(){const[u,t,h,c]=await Promise.all([FB.list('users'),FB.l
 function shell(){$('#app').innerHTML=`<div class="top"><h1>♞ Ajedrez Siurot · Administración</h1><span class="who">${esc(FB.S.user.email)}</span><button class="btn ghost sm" id="out">Salir</button></div><nav>${TABS.map(([i,t])=>`<button data-t="${i}">${t}</button>`).join('')}</nav><main id="main"></main>`;
  $$('nav button').forEach(b=>b.onclick=()=>{A.tab=b.dataset.t;A.tid=null;render();});$('#out').onclick=()=>{FB.logout();loginView();};render();}
 function render(){clearInterval(A.timer);$$('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===A.tab));const m=$('#main');
- ({usuarios:vUsers,alta:vAlta,pend:vPend,torneos:vTorneos,hof:vHof,ajustes:vAjustes})[A.tab](m);}
-const active=()=>A.users.filter(u=>u.ultimoLogin),pending=()=>A.users.filter(u=>!u.ultimoLogin);
+ ({usuarios:vUsers,alta:vAlta,torneos:vTorneos,hof:vHof,ajustes:vAjustes})[A.tab](m);}
+const active=()=>A.users.filter(u=>u.ultimoLogin);
 /* ---------- PDF de claves ---------- */
 function printCards(list){const ov=document.createElement('div');ov.className='sheetov';
  ov.innerHTML=`<div class="bar"><button class="btn" id="pp">🖨️ Imprimir / Guardar PDF</button><button class="btn ghost" id="px">Cerrar</button><span class="muted">En el cuadro de impresión elige «Guardar como PDF».</span></div><div class="cards">${list.map(u=>`<div class="cd"><b class="t">♞ Ajedrez Siurot</b><div class="nm">${esc(nm(u))}${u.grupo?` · ${esc(u.grupo)}`:''}</div><div>Usuario: <span class="cr">${esc(u.alias)}</span></div><div>Clave: <span class="cr">${esc(u.clave)}</span></div><div class="u">${esc(A.cfg.url)}</div></div>`).join('')}</div>`;
  document.body.appendChild(ov);$('#px',ov).onclick=()=>ov.remove();$('#pp',ov).onclick=()=>window.print();}
 /* ---------- usuarios ---------- */
-const csvUsers=l=>csv([['Usuario','Nombre','Grupo','Último acceso'],...l.map(u=>[u.alias,u.nombre,u.grupo,fdate(u.ultimoLogin)])]);
-function userTable(list,pend){return `<table><thead><tr><th><input type="checkbox" id="all"></th><th>Usuario</th><th>Nombre</th><th>Grupo</th>${pend?'<th>Clave</th>':'<th>Último acceso</th>'}<th></th></tr></thead><tbody>${list.map(u=>`<tr><td><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}></td><td class="mono">${esc(u.alias)}</td><td>${esc(u.nombre)}</td><td>${esc(u.grupo)}</td>${pend?`<td class="mono">${esc(u.clave)}</td>`:`<td>${fdate(u.ultimoLogin)}</td>`}<td class="n" style="white-space:nowrap">${pend?'':`<button class="btn ghost sm" data-a="rs" data-id="${u.id}" title="Nueva clave">🔑</button> `}<button class="btn ghost sm" data-a="ed" data-id="${u.id}" title="Editar">✏️</button> <button class="btn red sm" data-a="del" data-id="${u.id}" title="Eliminar">🗑</button></td></tr>`).join('')||`<tr><td colspan="6" class="muted">Nada que mostrar.</td></tr>`}</tbody></table>`;}
-function userView(m,list,title,pend){
+const csvUsers=l=>csv([['Usuario','Nombre','Grupo','Clave','Estado','Último acceso'],...l.map(u=>[u.alias,u.nombre,u.grupo,u.clave,u.ultimoLogin?'activo':'sin estrenar',fdate(u.ultimoLogin)])]);
+const stOf=u=>u.ultimoLogin?'<span class="pill">✔ activo</span>':'<span class="pill espera">🎟 sin estrenar</span>';
+function userTable(list,grouped){
+ const row=u=>`<tr><td><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}></td><td class="mono">${esc(u.alias)}</td><td>${esc(u.nombre)}</td><td>${esc(u.grupo)}</td><td class="mono">${esc(u.clave)}</td><td>${stOf(u)}<div class="muted" style="font-size:.78rem">${u.ultimoLogin?fdate(u.ultimoLogin):''}</div></td><td class="n" style="white-space:nowrap"><button class="btn ghost sm" data-a="rs" data-id="${u.id}" title="Nueva clave">🔑</button> <button class="btn ghost sm" data-a="ed" data-id="${u.id}" title="Editar">✏️</button> <button class="btn red sm" data-a="del" data-id="${u.id}" title="Eliminar">🗑</button></td></tr>`;
+ let body='';
+ if(grouped){const gs={};list.forEach(u=>(gs[u.grupo||'(sin grupo)']=gs[u.grupo||'(sin grupo)']||[]).push(u));
+  body=Object.keys(gs).sort((a,b)=>a.localeCompare(b,'es')).map(g=>`<tr class="gh"><td colspan="7"><b>${esc(g)}</b> <span class="pill">${gs[g].length}</span> <button class="btn ghost sm" data-pg="${esc(g)}">🖨️ PDF del grupo</button></td></tr>`+gs[g].map(row).join('')).join('');}
+ else body=list.map(row).join('');
+ return `<table><thead><tr><th><input type="checkbox" id="all"></th><th>Usuario</th><th>Nombre</th><th>Grupo</th><th>Clave</th><th>Estado</th><th></th></tr></thead><tbody>${body||'<tr><td colspan="7" class="muted">Nada que mostrar.</td></tr>'}</tbody></table>`;}
+function userView(m){
  const groups=[...new Set(A.users.map(u=>u.grupo).filter(Boolean))].sort();
- let l=list.filter(u=>(!A.grp||u.grupo===A.grp)&&(!A.q||(u.alias+' '+u.nombre).toLowerCase().includes(A.q.toLowerCase())));
- m.innerHTML=`<div class="card"><h2>${title} <span class="pill">${l.length}</span></h2><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Buscar…" value="${esc(A.q)}"><select id="g"><option value="">Todos los grupos</option>${groups.map(g=>`<option ${g===A.grp?'selected':''}>${esc(g)}</option>`).join('')}</select><span class="grow"></span><button class="btn ghost sm" id="pdfs">🖨️ PDF seleccionados</button><button class="btn ghost sm" id="pdfa">🖨️ PDF todos</button><button class="btn ghost sm" id="csv">⬇️ CSV</button></div><div id="tb" style="overflow:auto">${userTable(l,pend)}</div></div>`;
- $('#q',m).oninput=e=>{A.q=e.target.value;const p=e.target.selectionStart;userView(m,list,title,pend);const q=$('#q',m);q.focus();q.setSelectionRange(p,p);};
- $('#g',m).onchange=e=>{A.grp=e.target.value;userView(m,list,title,pend);};
+ const l=A.users.filter(u=>(!A.grp||u.grupo===A.grp)&&(!A.est||(A.est==='act'?!!u.ultimoLogin:!u.ultimoLogin))&&(!A.q||(u.alias+' '+u.nombre).toLowerCase().includes(A.q.toLowerCase())));
+ const na=A.users.filter(u=>u.ultimoLogin).length;
+ m.innerHTML=`<div class="card"><h2>👥 Alumnado registrado <span class="pill">${A.users.length}</span> <span class="muted" style="font-size:.85rem">· ${na} activos · ${A.users.length-na} sin estrenar</span></h2><div class="row" style="margin-bottom:10px"><input id="q" placeholder="Buscar…" value="${esc(A.q)}"><select id="g"><option value="">Todos los grupos</option>${groups.map(g=>`<option ${g===A.grp?'selected':''}>${esc(g)}</option>`).join('')}</select><select id="es"><option value="">Todos</option><option value="act" ${A.est==='act'?'selected':''}>Solo activos</option><option value="pen" ${A.est==='pen'?'selected':''}>Solo sin estrenar</option></select><span class="grow"></span><button class="btn ghost sm" id="pdfs">🖨️ PDF seleccionados</button><button class="btn ghost sm" id="pdfa">🖨️ PDF de la lista</button><button class="btn ghost sm" id="csv">⬇️ CSV</button></div><div id="tb" style="overflow:auto">${userTable(l,!A.grp)}</div></div>`;
+ $('#q',m).oninput=e=>{A.q=e.target.value;const p=e.target.selectionStart;userView(m);const q=$('#q',m);q.focus();q.setSelectionRange(p,p);};
+ $('#g',m).onchange=e=>{A.grp=e.target.value;userView(m);};$('#es',m).onchange=e=>{A.est=e.target.value;userView(m);};
  $('#all',m).onchange=e=>{l.forEach(u=>e.target.checked?A.sel.add(u.id):A.sel.delete(u.id));$$('.ck',m).forEach(c=>c.checked=e.target.checked);};
  $$('.ck',m).forEach(c=>c.onchange=()=>c.checked?A.sel.add(c.dataset.id):A.sel.delete(c.dataset.id));
  $('#pdfs',m).onclick=()=>{const s=l.filter(u=>A.sel.has(u.id));s.length?printCards(s):toast('Marca antes algún usuario',1);};
  $('#pdfa',m).onclick=()=>l.length?printCards(l):0;
+ $$('[data-pg]',m).forEach(b=>b.onclick=()=>printCards(l.filter(u=>(u.grupo||'(sin grupo)')===b.dataset.pg)));
  $('#csv',m).onclick=()=>download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');
  $$('[data-a]',m).forEach(b=>b.onclick=()=>userAct(b.dataset.a,A.users.find(u=>u.id===b.dataset.id)));}
-const vUsers=m=>userView(m,active(),'Usuarios activos',false);
-const vPend=m=>userView(m,pending(),'Códigos sin estrenar (aún no han entrado)',true);
+const vUsers=m=>userView(m);
 async function userAct(a,u){
  if(a==='del'){if(!await confirmM('Eliminar usuario',`¿Eliminar a <b>${esc(nm(u))}</b> (${esc(u.alias)})? Se borra su cuenta y su puntuación del salón de la fama.`,'Eliminar',true))return;
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
@@ -183,29 +203,34 @@ async function createUsers(names,grupo,m){names=names.map(s=>s.trim()).filter(Bo
 const EST={espera:'⏳ En espera',activo:'🟢 Activo',terminado:'✔️ Terminado'};
 function vTorneos(m){if(A.tid)return vTorneo(m,A.torneos.find(t=>t.id===A.tid));
  const abiertos=A.torneos.filter(t=>t.estado!=='terminado'),fin=A.torneos.filter(t=>t.estado==='terminado');
- const row=t=>`<tr data-id="${t.id}" style="cursor:pointer"><td><b>${esc(t.nombre)}</b></td><td>${fdate(t.inicio)}</td><td>${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min</td><td><span class="pill ${t.estado}">${EST[t.estado]}</span></td><td>${t.podio&&t.podio[0]?'🥇 '+esc(t.podio[0].nombre):''}</td></tr>`;
+ const row=t=>`<tr data-id="${t.id}" style="cursor:pointer"><td><b>${esc(t.nombre)}</b></td><td>${fdate(t.inicio)}</td><td>${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min</td><td><span class="pill ${t.estado}">${EST[t.estado]}</span></td><td>${t.podio&&t.podio[0]?'🥇 '+esc(t.podio[0].nombre):''}</td><td class="n"><button class="btn red sm" data-del="${t.id}" title="Eliminar torneo">🗑 Eliminar</button></td></tr>`;
  m.innerHTML=`<div class="card"><h2>🏟️ Programar torneo (arena)</h2><div class="row"><input id="tn" placeholder="Nombre (ej. Arena del recreo)" class="grow"><input id="td" type="datetime-local"><input id="tr" value="3+0" style="width:70px" title="Ritmo"><input id="tm" type="number" value="20" min="5" max="120" style="width:80px" title="Duración (min)"><button class="btn" id="tc">Crear</button></div><p class="muted" style="margin:8px 0 0">Mientras esté «en espera» o «activo», aparece en la pantalla principal de la app del alumnado.</p></div>
  <div class="card"><h2>Pendientes y activos</h2><table><tbody>${abiertos.map(row).join('')||'<tr><td class="muted">No hay torneos programados.</td></tr>'}</tbody></table></div>
  <div class="card"><h2>Historial</h2><table><tbody>${fin.map(row).join('')||'<tr><td class="muted">Aún no hay torneos terminados.</td></tr>'}</tbody></table></div>`;
  const d=new Date(Date.now()+864e5);d.setHours(11,0,0,0);$('#td',m).value=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
  $$('tr[data-id]',m).forEach(r=>r.onclick=()=>{A.tid=r.dataset.id;render();});
+ $$('[data-del]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const t=A.torneos.find(x=>x.id===b.dataset.del);if(!await confirmM('Eliminar torneo',`¿Eliminar «${esc(t.nombre)}» y todos sus resultados?${t.estado==='terminado'?' Los puntos ya sumados al salón de la fama NO se restan.':''}`,'Eliminar',true))return;
+  try{let js=[];try{js=await FB.list(`torneos/${t.id}/jugadores`);}catch(e){}for(const j of js)await FB.del(`torneos/${t.id}/jugadores/${j.id}`);await FB.del('torneos/'+t.id);A.torneos=A.torneos.filter(x=>x!==t);toast('Torneo eliminado');render();}catch(er){toast(FB.msg(er),1);}});
  $('#tc',m).onclick=async()=>{const nombre=$('#tn',m).value.trim();if(!nombre)return toast('Pon un nombre',1);const t={nombre,inicio:new Date($('#td',m).value).getTime()||Date.now(),ritmo:$('#tr',m).value.trim()||'3+0',duracion:+$('#tm',m).value||20,estado:'espera',creado:Date.now()};
   try{const r=await FB.set('torneos/'+(Date.now().toString(36)+Math.random().toString(36).slice(2,5)),t);A.torneos.unshift(r);toast('Torneo creado');render();}catch(e){toast(FB.msg(e),1);}};}
 async function vTorneo(m,t){if(!t){A.tid=null;return render();}
- let js=[];const load=async()=>{try{js=(await FB.list(`torneos/${t.id}/jugadores`)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));}catch(e){toast(FB.msg(e),1);}};
+ let js=[];const load=async()=>{try{js=await FB.list(`torneos/${t.id}/jugadores`);
+   if(t.estado==='activo'){let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}const now=Date.now();
+    for(const [uid,p] of Object.entries(lv)){let j=js.find(x=>x.id===uid);if(!j){j={id:uid};js.push(j);}Object.assign(j,{alias:p.a||j.alias,nombre:p.n||j.nombre,grupo:p.g||j.grupo||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera,live:true,est:p.busy&&now-(p.bt||0)<48e4?'♟ jugando':p.wait?'🔎 buscando':now-(p.hb||0)<2e4?'libre':'💤'});}}
+   js.sort((a,b)=>(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));}catch(e){toast(FB.msg(e),1);}};
  const draw=()=>{const ab=t.estado!=='terminado';
   m.innerHTML=`<div class="row" style="margin-bottom:10px"><button class="btn ghost sm" id="bk">← Torneos</button></div><div class="card"><div class="row"><h2 class="grow" style="margin:0">${esc(t.nombre)} <span class="pill ${t.estado}">${EST[t.estado]}</span></h2>
-   ${t.estado==='espera'?'<button class="btn" id="act">▶ Activar</button>':''}${t.estado==='activo'?'<button class="btn" id="fin">⏹ Terminar y sumar al HoF</button>':''}<button class="btn ghost" id="pj">📺 Proyector</button><button class="btn ghost" id="cs">⬇️ CSV</button>${ab?'<button class="btn ghost" id="ed">✏️</button>':''}<button class="btn red" id="rm">🗑</button></div>
-   <p class="muted" style="margin:6px 0 0">${fdate(t.inicio)} · ${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min · ${js.length} inscritos${t.estado==='espera'?' (los alumnos se apuntan desde la app)':''}</p></div>
-  <div class="card"><div class="row" style="margin-bottom:8px"><h3 class="grow" style="margin:0">Clasificación</h3>${ab?'<button class="btn ghost sm" id="add">➕ Añadir jugador</button>':''}</div><div style="overflow:auto"><table><thead><tr><th>#</th><th>Usuario</th><th>Nombre</th><th>Grupo</th><th class="n">Puntos</th><th class="n">Partidas</th><th></th></tr></thead><tbody>${js.map((j,i)=>`<tr style="${j.fuera?'opacity:.45':''}"><td>${i+1}</td><td class="mono">${esc(j.alias)}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n">${ab?`<input type="number" class="pt" data-id="${j.id}" value="${j.puntos||0}" min="0" style="width:70px">`:j.puntos||0}</td><td class="n">${ab?`<input type="number" class="pa" data-id="${j.id}" value="${j.partidas||0}" min="0" style="width:70px">`:j.partidas||0}</td><td class="n" style="white-space:nowrap">${ab?`<button class="btn ghost sm" data-f="${j.id}">${j.fuera?'Readmitir':'Descalificar'}</button> <button class="btn red sm" data-x="${j.id}">✕</button>`:j.fuera?'Descalificado':''}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Nadie se ha apuntado todavía.</td></tr>'}</tbody></table></div></div>`;
+   ${t.estado==='espera'?'<button class="btn" id="act">▶ Activar</button>':''}${t.estado==='activo'?'<button class="btn" id="fin">⏹ Terminar ahora</button>':''}<button class="btn ghost" id="pj">📺 Proyector</button><button class="btn ghost" id="cs">⬇️ CSV</button>${ab?'<button class="btn ghost" id="ed">✏️</button>':''}<button class="btn red" id="rm">🗑</button></div>
+   <p class="muted" style="margin:6px 0 0">${fdate(t.inicio)} · ${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min · ${js.length} jugadores${t.estado==='espera'?' · <b>Empieza solo a la hora indicada</b> (con esta página abierta) o pulsa Activar':''}${t.estado==='activo'?` · termina a las ${fdate(t.fin)} · <b>los puntos se calculan solos</b> y al acabar pasan al salón de la fama`:''}</p></div>
+  <div class="card"><div class="row" style="margin-bottom:8px"><h3 class="grow" style="margin:0">Clasificación</h3>${ab?'<button class="btn ghost sm" id="add">➕ Añadir jugador</button>':''}</div><div style="overflow:auto"><table><thead><tr><th>#</th><th>Usuario</th><th>Nombre</th><th>Grupo</th><th class="n">Puntos</th><th class="n">Partidas</th><th></th></tr></thead><tbody>${js.map((j,i)=>`<tr style="${j.fuera?'opacity:.45':''}"><td>${i+1}</td><td class="mono">${esc(j.alias)}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n">${ab&&!j.live?`<input type="number" class="pt" data-id="${j.id}" value="${j.puntos||0}" min="0" style="width:70px">`:`<b>${j.puntos||0}</b>`}</td><td class="n">${ab&&!j.live?`<input type="number" class="pa" data-id="${j.id}" value="${j.partidas||0}" min="0" style="width:70px">`:j.partidas||0}${j.est?` <span class="muted">${j.est}</span>`:''}</td><td class="n" style="white-space:nowrap">${ab?`<button class="btn ghost sm" data-f="${j.id}">${j.fuera?'Readmitir':'Descalificar'}</button> <button class="btn red sm" data-x="${j.id}">✕</button>`:j.fuera?'Descalificado':''}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Nadie se ha apuntado todavía.</td></tr>'}</tbody></table></div></div>`;
   $('#bk',m).onclick=()=>{A.tid=null;render();};
   const up=async(j,patch)=>{try{await FB.set(`torneos/${t.id}/jugadores/${j.id}`,patch,Object.keys(patch));Object.assign(j,patch);}catch(e){toast(FB.msg(e),1);}};
   $$('.pt',m).forEach(i=>i.onchange=async()=>{await up(js.find(j=>j.id===i.dataset.id),{puntos:Math.max(0,+i.value||0)});js.sort((a,b)=>(b.puntos||0)-(a.puntos||0));draw();});
   $$('.pa',m).forEach(i=>i.onchange=()=>up(js.find(j=>j.id===i.dataset.id),{partidas:Math.max(0,+i.value||0)}));
-  $$('[data-f]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.f);await up(j,{fuera:!j.fuera});draw();});
+  $$('[data-f]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.f);const fu=!j.fuera;try{await FB.set(`torneos/${t.id}/jugadores/${j.id}`,{alias:j.alias||'',nombre:j.nombre||'',grupo:j.grupo||'',puntos:j.puntos||0,partidas:j.partidas||0,fuera:fu});if(t.estado==='activo')await RT.patch(`arena/${t.id}/p/${j.id}`,{fuera:fu,wait:null}).catch(()=>{});j.fuera=fu;}catch(e){toast(FB.msg(e),1);}draw();});
   $$('[data-x]',m).forEach(b=>b.onclick=async()=>{const j=js.find(x=>x.id===b.dataset.x);if(!await confirmM('Quitar jugador',`¿Quitar a ${esc(j.nombre)} del torneo?`,'Quitar',true))return;try{await FB.del(`torneos/${t.id}/jugadores/${j.id}`);js=js.filter(x=>x!==j);draw();}catch(e){toast(FB.msg(e),1);}});
-  if($('#act',m))$('#act',m).onclick=async()=>{try{await FB.set('torneos/'+t.id,{estado:'activo',inicioReal:Date.now()},['estado','inicioReal']);t.estado='activo';toast('Torneo activo');draw();}catch(e){toast(FB.msg(e),1);}};
-  if($('#fin',m))$('#fin',m).onclick=()=>finish(t,js,draw);
+  if($('#act',m))$('#act',m).onclick=async()=>{try{await activar(t);toast('Torneo activo');await load();draw();}catch(e){toast(FB.msg(e),1);}};
+  if($('#fin',m))$('#fin',m).onclick=()=>finish(t,js,async()=>{await load();draw();});
   $('#pj',m).onclick=()=>projector(t,()=>js,load);
   $('#cs',m).onclick=()=>download(`torneo-${t.nombre.replace(/\W+/g,'_')}.csv`,csv([['Puesto','Usuario','Nombre','Grupo','Puntos','Partidas'],...js.map((j,i)=>[i+1,j.alias,j.nombre,j.grupo,j.puntos||0,j.partidas||0])]),'text/csv');
   if($('#ed',m))$('#ed',m).onclick=async()=>{const r=await askM('Editar torneo',`<p>Nombre<br><input value="${esc(t.nombre)}" style="width:100%"></p><p>Ritmo<br><input value="${esc(t.ritmo||'3+0')}"></p><p>Duración (min)<br><input type="number" value="${t.duracion||20}"></p>`,'Guardar');if(!r)return;
@@ -217,10 +242,30 @@ async function vTorneo(m,t){if(!t){A.tid=null;return render();}
    const u=A.users.find(x=>x.id===r[0]);const j={alias:u.alias,nombre:nm(u),grupo:u.grupo||'',puntos:0,partidas:0,fuera:false};try{await FB.set(`torneos/${t.id}/jugadores/${u.id}`,j);js.push({id:u.id,...j});draw();}catch(e){toast(FB.msg(e),1);}};};
  await load();draw();
  if(t.estado!=='terminado')A.timer=setInterval(async()=>{if(document.activeElement&&document.activeElement.tagName==='INPUT')return;if($('.mbg'))return;await load();draw();},15000);}
-async function finish(t,js,draw){const ok=js.filter(j=>!j.fuera);if(!await confirmM('Terminar torneo',`Se cerrará «${esc(t.nombre)}» y los puntos de ${ok.length} jugadores se sumarán al salón de la fama. No se puede deshacer.`,'Terminar'))return;
- try{const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
-  for(const j of ok){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
-  const p={estado:'terminado',fin:Date.now(),podio};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);toast('Torneo terminado ✔️');draw();}catch(e){toast(FB.msg(e),1);}}
+async function finish(t,js,draw){if(!await confirmM('Terminar torneo',`Se cerrará «${esc(t.nombre)}» y los puntos se sumarán al salón de la fama. No se puede deshacer.`,'Terminar'))return;
+ try{await finishTorneo(t);toast('Torneo terminado ✔️');draw?draw():render();}catch(e){toast(FB.msg(e),1);}}
+async function activar(t){const now=Date.now(),p={estado:'activo',inicioReal:now,fin:now+(t.duracion||20)*60000};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);}
+async function finishTorneo(t){
+ let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}
+ for(const [uid,p] of Object.entries(lv))await FB.set(`torneos/${t.id}/jugadores/${uid}`,{alias:p.a||'',nombre:p.n||'',grupo:p.g||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera});
+ const js=(await FB.list(`torneos/${t.id}/jugadores`)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));
+ const ok=js.filter(j=>!j.fuera&&((j.partidas||0)>0||(j.puntos||0)>0));
+ const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
+ for(const j of ok){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
+ const p={estado:'terminado',fin:Date.now(),podio};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);
+ try{await RT.del('arena/'+t.id);}catch(e){}setTimeout(()=>RT.del('arena/'+t.id).catch(()=>{}),9000);}
+let autoBusy=false;
+async function autoTick(){if(autoBusy||!FB.S.user)return;autoBusy=true;
+ try{const fresh=await FB.list('torneos');for(const f of fresh){const o=A.torneos.find(x=>x.id===f.id);if(o)Object.assign(o,f);else A.torneos.push(f);}
+  const now=Date.now();
+  for(const t of A.torneos){
+   if(t.estado==='espera'&&t.inicio&&t.inicio<=now){await activar(t);toast('🟢 «'+t.nombre+'» ha empezado');}
+   else if(t.estado==='activo'&&t.fin&&now>t.fin+15000){let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}
+    const busy=Object.values(lv).some(p=>p.busy&&now-(p.bt||0)<48e4&&now-(p.hb||0)<3e4);
+    if(!busy||now>t.fin+48e4){await finishTorneo(t);toast('🏁 «'+t.nombre+'» terminado: puntos sumados al salón de la fama');}}}
+  if(!document.querySelector('.mbg')&&!document.querySelector('.proj')&&!document.querySelector('.sheetov')&&(A.tab==='torneos'&&!A.tid||A.tab==='hof'))render();
+ }catch(e){}autoBusy=false;}
+setInterval(autoTick,20000);
 function projector(t,get,load){const ov=document.createElement('div');ov.className='proj';document.body.appendChild(ov);
  const paint=()=>{const l=get().filter(j=>!j.fuera).slice(0,12);ov.innerHTML=`<button class="btn x" id="px">✕ Cerrar</button><h1>🏆 ${esc(t.nombre)}</h1><table><thead><tr><th>#</th><th>Jugador</th><th>Grupo</th><th class="n">Puntos</th></tr></thead><tbody>${l.map((j,i)=>`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n"><b>${j.puntos||0}</b></td></tr>`).join('')}</tbody></table>`;$('#px',ov).onclick=()=>{clearInterval(iv);ov.remove();};};
  paint();const iv=setInterval(async()=>{await load();paint();},10000);}
