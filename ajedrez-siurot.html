@@ -442,13 +442,26 @@ nav.tabs{display:none!important}
 .lg-or{display:flex;align-items:center;gap:10px;color:#8a8070;font-weight:800;margin:10px 0 4px}.lg-or:before,.lg-or:after{content:'';flex:1;height:2px;background:#e5dcc6}
 
 .jumpc{display:inline-block;min-width:44px;padding:4px 10px;border-radius:999px;background:#f1eadb;cursor:pointer;font-weight:800}.jumpc:hover,.jumpc:active{background:#f6d77a}
-/* ---------- PC: el tablero es el protagonista (lo más grande posible sin salirse de la pantalla) ---------- */
+/* ---------- PC: el tablero es el protagonista (ocupa todo el alto disponible; relojes, botones y panel a la derecha) ---------- */
 @media (min-width:901px){
- body.intrainer main{max-width:none;padding-left:24px;padding-right:24px}
- body.intrainer .trainer{grid-template-columns:auto minmax(320px,440px);justify-content:center;gap:24px;
-  --bs:max(300px,min(calc(100vh - var(--hh) - 104px),calc(100vw - 530px)))}
- body.intrainer .trainer.game{--bs:max(300px,min(calc(100vh - var(--hh) - 168px),calc(100vw - 530px)))}
- body.intrainer .trainer .panel{max-height:calc(100vh - var(--hh) - 24px);overflow:auto}
+ body.intrainer main{max-width:none;padding:10px 20px 10px}
+ body.intrainer .trainer{--bs:max(300px,min(calc(100vh - var(--hh) - 34px),calc(100vw - 560px)));
+  grid-template-columns:auto minmax(300px,440px);grid-template-rows:minmax(0,1fr) auto;justify-content:center;column-gap:22px;row-gap:10px;
+  height:calc(var(--bs) + 12px);align-items:stretch}
+ body.intrainer .trainer .boardcol{display:contents}
+ body.intrainer .trainer>.boardcol>#bd,body.intrainer .trainer>.boardcol>.bwrap{grid-column:1;grid-row:1/-1;align-self:start}
+ body.intrainer .trainer .panel{grid-column:2;grid-row:1;min-height:0;max-height:none;overflow:auto;margin:0}
+ body.intrainer .trainer #under{grid-column:2;grid-row:2;justify-content:flex-start;flex-wrap:wrap;margin:0}
+ /* partidas: reloj del rival arriba, panel, botones y tu reloj abajo */
+ body.intrainer .trainer.game{grid-template-rows:auto minmax(0,1fr) auto auto}
+ body.intrainer .trainer.game .pstrip{grid-column:2;width:auto;background:#fff;border:2px solid var(--line);border-radius:14px;padding:6px 12px;min-height:52px;flex-wrap:wrap;row-gap:2px}
+ body.intrainer .trainer.game .boardcol>.pstrip:first-child{grid-row:1}
+ body.intrainer .trainer.game .panel{grid-row:2}
+ body.intrainer .trainer.game #under{grid-row:3}
+ body.intrainer .trainer.game .boardcol>.pstrip:not(:first-child){grid-row:4}
+ body.intrainer .trainer.game .pstrip .pn{max-width:none;flex:1 1 auto;font-size:.95rem}
+ body.intrainer .trainer.game .pstrip .clk{font-size:1.5rem;padding:4px 12px}
+ body.intrainer .trainer.game.ev .board{width:var(--bs)}
 }
 
 </style>
