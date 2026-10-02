@@ -413,6 +413,8 @@ input.txt:focus{outline:none;border-color:var(--pri)}
 @media (max-width:900px){.trainer.game{--bs:clamp(220px,calc(100vh - var(--hh) - 320px),94vw)}}
 @media (max-width:900px) and (orientation:landscape) and (max-height:560px){.trainer.game{--bs:calc(100vh - var(--hh) - 140px)}}
 
+.warnbox{background:#fff4d6;border:2px solid #f0b429;color:#5c4400;border-radius:12px;padding:10px 12px;font-weight:700;font-size:.9rem;margin:10px 0;line-height:1.35}
+
 </style>
 </head>
 <body>
@@ -1780,6 +1782,7 @@ function viewHome(m){
  $('#quickpz',m).onclick=()=>go('tema','mezcla');
 }
 
+const MATE_AVISO='<div class="warnbox">⚠️ <b>Ojo:</b> con <b>solo el rey</b>, <b>rey y alfil</b> o <b>rey y caballo</b> es <b>imposible</b> dar mate. Hace falta al menos una torre, una dama o dos piezas menores (o un peón que corone).</div>';
 // ================= APRENDER =================
 function viewLearn(m){
  m.innerHTML=`<div class="sectitle"><h2>📚 Aprender</h2><span class="pill">${MODULES.reduce((a,md)=>a+modProgress(md).done,0)} / ${MODULES.reduce((a,md)=>a+md.lecciones.length,0)} lecciones</span></div><div class="grid g2" id="mods"></div>`;
@@ -1790,7 +1793,7 @@ function viewLearn(m){
 }
 function viewModule(m,id){
  const mod=MODULES.find(x=>x.id===id);
- m.innerHTML=`<div class="sectitle"><div style="display:flex;align-items:center;gap:12px"><button class="backbtn pconly" id="back">← Volver</button><h2>${mod.icono} ${mod.nombre}</h2></div><span class="pill">${modProgress(mod).done}/${mod.lecciones.length}</span></div><div class="lessonlist" id="ll"></div>`;
+ m.innerHTML=`<div class="sectitle"><div style="display:flex;align-items:center;gap:12px"><button class="backbtn pconly" id="back">← Volver</button><h2>${mod.icono} ${mod.nombre}</h2></div><span class="pill">${modProgress(mod).done}/${mod.lecciones.length}</span></div>${mod.id==='mates'?MATE_AVISO:''}<div class="lessonlist" id="ll"></div>`;
  $('#back',m).onclick=()=>go('aprender');
  mod.lecciones.forEach((l,i)=>{const st=P.lessons[lessonKey(mod.id,l.id)];const r=document.createElement('div');r.className='lrow'+(st?' done':'');
   r.innerHTML=`<div class="ln">${st?'✓':i+1}</div><div class="lt">${l.titulo}<div class="muted" style="font-size:.8rem;font-weight:700">${l.pasos.length} pasos · +${l.xp} XP</div></div>${st?starsHTML(st.stars):'<span class="pill">Nueva</span>'}`;
@@ -2116,7 +2119,7 @@ function viewTema(m,arg){
  nav.innerHTML=`<span class="pill" id="lvl"></span><span class="pill" id="rec"></span><span style="flex:1"></span><button class="btn sm" id="nx">Siguiente →</button>`;
  body.innerHTML=`<div class="btnrow" style="align-items:center" id="top"></div><div class="steptext" id="goal"></div><div id="fb"></div>
   <div class="btnrow"><span class="pill">✅ Resueltos: <b id="ok">${st.ok}</b></span><span class="pill">🔥 Racha: <b id="ra">${st.racha}</b></span><span class="pill">🏆 Récord: <b id="be">${st.best}</b></span></div>
-  <div class="muted" style="font-size:.85rem;font-weight:700">♾️ Ejercicios infinitos: cada acierto a la primera <b>sube un nivel</b>; si fallas, <b>baja</b>. 💬 ${T.que}</div>`;
+  <div class="muted" style="font-size:.85rem;font-weight:700">♾️ Ejercicios infinitos: cada acierto a la primera <b>sube un nivel</b>; si fallas, <b>baja</b>. 💬 ${T.que}</div>${id==='mate1'||id==='mate2'?MATE_AVISO:''}`;
  under.innerHTML='<button class="btn ghost sm" id="h1">💡 Pista</button><button class="btn ghost sm" id="h2">👀 Solución</button><button class="btn ghost sm" id="rs">↻ Reiniciar</button>';
  const setFb=(h,c)=>$('#fb',body).innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';
  const upd=()=>{$('#ok',body).textContent=st.ok;$('#ra',body).textContent=st.racha;$('#be',body).textContent=st.best;$('#lvl',nav).textContent='Nivel '+lvl();$('#rec',nav).textContent='🏆 Récord: nivel '+tr.lvl;};
@@ -2222,7 +2225,7 @@ function viewPuzzle(m,{cat,id}){
  const {board,body,under,nav}=trainerShell(m,C.nombre,()=>go('ejercicios'));
  const pos=new E.Pos(pz.fen);
  body.innerHTML=`<div class="btnrow" style="align-items:center">${turnHTML(pos.turn)}<span class="pill">${pz.tema}</span></div>
-  <div class="steptext">${cat==='tactica'?'Encuentra la mejor jugada: ¡gana material!':`Da <b>jaque mate en ${cat==='mate1'?1:2}</b>.`}</div><div id="fb"></div>
+  <div class="steptext">${cat==='tactica'?'Encuentra la mejor jugada: ¡gana material!':`Da <b>jaque mate en ${cat==='mate1'?1:2}</b>.`}</div><div id="fb"></div>${cat!=='tactica'?MATE_AVISO:''}
   <div><div class="muted" style="font-weight:800;font-size:.85rem;margin-bottom:6px">Todos los ejercicios</div><div class="chips">${list.map((p,k)=>`<button class="chip ${P.puzzles[p.id]?'ok':''} ${k===i?'cur':''}" data-k="${k}">${k+1}</button>`).join('')}</div></div>`;
  nav.innerHTML=`<button class="btn ghost sm pconly" id="prev" ${i?'':'disabled'}>← Anterior</button><span style="flex:1"></span><button class="btn sm" id="next">${i<list.length-1?'Siguiente →':'Terminar'}</button>`;
  under.innerHTML='<button class="btn ghost sm" id="h1">💡 Pista</button><button class="btn ghost sm" id="h2">👀 Solución</button><button class="btn ghost sm" id="rs">↻ Reiniciar</button>';
@@ -3059,7 +3062,7 @@ const sqN=s=>E.sqName(s);
 const pdesc=(pos,s)=>{const t=pos.b[s].toLowerCase();return PDEF[t]+' de '+sqN(s);};
 const cap1=t=>t.charAt(0).toUpperCase()+t.slice(1);
 // casillas de las piezas de `color` que atacan la casilla t
-function attackersOf(pos,t,color){
+function geoAttackers(pos,t,color){
  const b=pos.b,out=[],tr=t>>3,tf=t&7;
  for(let s=0;s<64;s++){
   const p=b[s];if(!p||s===t||E.colorOf(p)!==color)continue;
@@ -3077,16 +3080,41 @@ function attackersOf(pos,t,color){
  }
  return out;
 }
-// ¿está en peligro la pieza de la casilla s? (atacada y sin defensa, o atacada por una pieza de menos valor)
+// atacantes que pueden capturar de verdad (una pieza clavada no cuenta)
+function attackersOf(pos,t,color){
+ const geo=geoAttackers(pos,t,color);if(!geo.length)return geo;
+ let q=pos;if(pos.turn!==color){const f=pos.fen().split(' ');f[1]=color;f[3]='-';q=new E.Pos(f.join(' '));}
+ return geo.filter(a=>q.legal(a).some(m=>m.to===t));
+}
+// defensores: los que pueden recapturar (una pieza clavada al rey no cuenta)
+function defendersOf(pos,t,color){
+ const en=color==='w'?'b':'w';const out=[];
+ for(const a of geoAttackers(pos,t,color)){
+  const q=new E.Pos(pos.fen());q.b[a]='';const k=q.kingSq(color);
+  if(k>=0&&q.attacked(k,en)&&!pos.inCheck(color))continue;
+  out.push(a);
+ }
+ return out;
+}
+// intercambio estático: ganancia de material de quien captura primero (valores ascendentes)
+function seeGain(v0,att,def){
+ const g=[v0];let on=att[0],ai=1,di=0,d=0,turn='def';
+ for(;;){
+  if(turn==='def'){if(di>=def.length)break;d++;g[d]=on-g[d-1];on=def[di++];turn='att';}
+  else{if(ai>=att.length)break;d++;g[d]=on-g[d-1];on=att[ai++];turn='def';}
+ }
+ while(d>0){g[d-1]=-Math.max(-g[d-1],g[d]);d--;}
+ return g[0];
+}
+// ¿está en peligro la pieza de la casilla s? (el rival ganaría material al capturarla, contando los cambios)
 function dangerOf(pos,s){
  const p=pos.b[s];if(!p)return null;const t=p.toLowerCase();if(t==='k')return null;
  const col=E.colorOf(p),en=col==='w'?'b':'w';
  const att=attackersOf(pos,s,en);if(!att.length)return null;
- const def=attackersOf(pos,s,col);
- const minA=Math.min(...att.map(a=>PV2[pos.b[a].toLowerCase()]));
- if(!def.length)return {sq:s,piece:t,att,def,why:'sin'};
- if(minA<PV2[t])return {sq:s,piece:t,att,def,why:'menos'};
- return null;
+ const def=defendersOf(pos,s,col);
+ const av=att.map(a=>PV2[pos.b[a].toLowerCase()]).sort((x,y)=>x-y),dv=def.map(a=>PV2[pos.b[a].toLowerCase()]).sort((x,y)=>x-y);
+ if(seeGain(PV2[t],av,dv)<=0)return null;
+ return {sq:s,piece:t,att,def,why:!def.length?'sin':av[0]<PV2[t]?'menos':'cambio'};
 }
 // amenazas desde el punto de vista de quien tiene el turno
 function threatsOf(pos){
@@ -3099,12 +3127,15 @@ function attNames(pos,list){const seen={};return list.map(a=>PDEF[pos.b[a].toLow
 function joinEs(a){return a.length<2?a.join(''):a.slice(0,-1).join(', ')+' y '+a[a.length-1];}
 function explainDanger(pos,d){
  const f=PFEM[d.piece],who=cap1(pdesc(pos,d.sq)),by=joinEs(attNames(pos,d.att));
- return d.why==='sin'?`${who} está atacad${f?'a':'o'} por ${by} y <b>nadie ${f?'la':'lo'} defiende</b>.`:`${who} está atacad${f?'a':'o'} por ${by}, que vale${d.att.length>1?'n':''} menos: aunque esté defendid${f?'a':'o'}, saldrías perdiendo.`;
+ if(d.why==='sin')return `${who} está atacad${f?'a':'o'} por ${by} y <b>nadie ${f?'la':'lo'} defiende</b>.`;
+ if(d.why==='menos')return `${who} está atacad${f?'a':'o'} por ${by}, que vale${d.att.length>1?'n':''} menos: aunque esté defendid${f?'a':'o'}, saldrías perdiendo.`;
+ return `${who} está atacad${f?'a':'o'} ${d.att.length} vez${d.att.length>1?'es':''} y defendid${f?'a':'o'} ${d.def.length}: en los cambios <b>saldrías perdiendo material</b>.`;
 }
 function explainNot(pos,s){
  const p=pos.b[s],col=E.colorOf(p),en=col==='w'?'b':'w',t=p.toLowerCase(),f=PFEM[t];
- const att=attackersOf(pos,s,en);
- if(!att.length){const dn=attackersOf(pos,s,col).length;return `${cap1(pdesc(pos,s))}: nadie ${f?'la':'lo'} ataca ahora${dn?'':' (aunque tampoco '+(f?'la':'lo')+' defiende nadie: ¡ojo, puede quedar en peligro más adelante!)'}.`;}
+ const geo=geoAttackers(pos,s,en),att=attackersOf(pos,s,en);
+ if(geo.length&&!att.length){const pin=geo.filter(a=>true);return `${cap1(pdesc(pos,s))}: ${joinEs(attNames(pos,pin))} ${pin.length>1?'no pueden':'no puede'} capturar, porque ${pin.length>1?'están clavadas':'está clavad'+(PFEM[pos.b[pin[0]].toLowerCase()]?'a':'o')} (dejaría${pin.length>1?'n':''} al rey en jaque).`;}
+ if(!att.length){const dn=defendersOf(pos,s,col).length;return `${cap1(pdesc(pos,s))}: nadie ${f?'la':'lo'} ataca ahora${dn?'':' (aunque tampoco '+(f?'la':'lo')+' defiende nadie: ¡ojo, puede quedar en peligro más adelante!)'}.`;}
  return `${cap1(pdesc(pos,s))} está atacad${f?'a':'o'} pero <b>bien defendid${f?'a':'o'}</b>: si ${f?'la':'lo'} capturan, recuperas.`;
 }
 // ---------- generador de posiciones (determinista por semilla) ----------
@@ -3273,7 +3304,7 @@ function viewScanner(m,arg){
   for(const d of items)lines.push((tset.has(d.sq)&&!sel.has(d.sq)?'👀 ':'✅ ')+(mine?explainDanger(pos,d):explainTarget(pos,d)));
   for(const s of wrong)lines.push('❌ '+explainNot(pos,s));
   {const side=mine?pos.turn:(pos.turn==='w'?'b':'w'),en=side==='w'?'b':'w';const loose=[];
-   for(let q=0;q<64;q++){const pc=pos.b[q];if(!pc||E.colorOf(pc)!==side)continue;const t=pc.toLowerCase();if(t==='k'||t==='p')continue;if(!attackersOf(pos,q,en).length&&!attackersOf(pos,q,side).length)loose.push(pdesc(pos,q));}
+   for(let q=0;q<64;q++){const pc=pos.b[q];if(!pc||E.colorOf(pc)!==side)continue;const t=pc.toLowerCase();if(t==='k'||t==='p')continue;if(!geoAttackers(pos,q,en).length&&!defendersOf(pos,q,side).length)loose.push(pdesc(pos,q));}
    if(loose.length)lines.push('ℹ️ Sin defensa, pero <b>nadie las ataca ahora</b>: '+joinEs(loose)+'. No están en peligro todavía, pero vigílalas.');}
   setFb(`<div class="fb ${good?'ok':'bad'}">${h}${lines.length?'<div style="margin-top:6px;text-align:left;display:grid;gap:4px">'+lines.map(x=>`<div>${x}</div>`).join('')+'</div>':''}${extra}</div>`);
   nav.innerHTML=`<span style="flex:1"></span><button class="btn sm" id="nx">${step===1?'Paso 2 →':'Paso 3 →'}</button>`;
@@ -3281,7 +3312,9 @@ function viewScanner(m,arg){
  }
  function explainTarget(p,d){
   const f=PFEM[d.piece],who=cap1(pdesc(p,d.sq)),a=d.att.slice().sort((x,y)=>PV2[p.b[x].toLowerCase()]-PV2[p.b[y].toLowerCase()])[0];
-  return d.why==='sin'?`${who} está <b>sin defender</b> y ${f?'la':'lo'} atacas con ${pdesc(p,a)}.`:`${who} vale más que ${pdesc(p,a)}, que ${f?'la':'lo'} ataca: ¡cambio ventajoso!`;
+  if(d.why==='sin')return `${who} está <b>sin defender</b> y ${f?'la':'lo'} atacas con ${pdesc(p,a)}.`;
+  if(d.why==='menos')return `${who} vale más que ${pdesc(p,a)}, que ${f?'la':'lo'} ataca: ¡cambio ventajoso!`;
+  return `${who} está atacad${f?'a':'o'} ${d.att.length} vez${d.att.length>1?'es':''} y defendid${f?'a':'o'} ${d.def.length}: al cambiar, <b>ganas material</b>.`;
  }
  function step3(){
   body.innerHTML=head()+`<div class="steptext"><b>Paso 3 de 3 · ♟️ Elige tu jugada</b><br>Con lo que has visto, ¡juega la mejor! Stockfish la revisará.</div><div id="fb"></div>`;
