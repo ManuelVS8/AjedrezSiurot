@@ -2390,15 +2390,14 @@ function viewPlay(m){
  const unlocked=DB.settings.unlockAll?maxBot():Math.min(P.unlocked,maxBot());if(playCfg.level>unlocked)playCfg.level=unlocked;
  m.innerHTML=`<div class="sectitle"><h2>🤖 Jugar contra la máquina</h2></div>
  <div class="grid g3" id="bots"></div>
- <p class="muted" style="font-weight:700">Elige un nivel y pulsa <b>¡A jugar!</b>. Gana a un nivel para desbloquear el siguiente; la primera victoria contra cada nivel da XP extra.</p>
- <div class="playbar"><button class="btn acc" id="startg" style="font-size:1.15rem">▶ ¡A jugar! · Nivel <span id="lvn"></span></button></div>`;$('#lvn',m).textContent=playCfg.level;
+ <p class="muted" style="font-weight:700">Pulsa un nivel para empezar la partida. Gana a un nivel para desbloquear el siguiente; la primera victoria contra cada nivel da XP extra.</p>`;
  BOTS.filter(b=>b.n<=maxBot()).forEach(b=>{const g=P.games[b.n]||{w:0,d:0,l:0};const lk=b.n>unlocked;const d=document.createElement('div');d.className='card bot'+(lk?' locked':'')+(playCfg.level===b.n?' selected':'');
   d.innerHTML=`<div class="be">${b.emoji}</div><h3>Nivel ${b.n} · ${b.nombre}</h3><div class="muted" style="font-size:.9rem">${b.desc}</div><div class="rec">🏆 ${g.w} · 🤝 ${g.d} · ❌ ${g.l} · +${b.xp} XP</div><div class="rec">♟ ELO ≈ ${ELO_BOT[b.n]}</div>`;
-  d.onclick=()=>{if(lk){toast('🔒 Gana al nivel '+(b.n-1)+' para desbloquearlo');return;}playCfg.level=b.n;$$('#bots .bot',m).forEach(x=>x.classList.remove('selected'));d.classList.add('selected');$('#lvn',m).textContent=b.n;};$('#bots',m).appendChild(d);});
-  $('#startg',m).onclick=async()=>{
+  d.onclick=()=>{if(lk){toast('🔒 Gana al nivel '+(b.n-1)+' para desbloquearlo');return;}playCfg.level=b.n;$$('#bots .bot',m).forEach(x=>x.classList.remove('selected'));d.classList.add('selected');startG();};$('#bots',m).appendChild(d);});
+  async function startG(){
   const cfg=await gameSetup();if(!cfg)return;
   go('partida',{level:playCfg.level,color:cfg.color==='r'?(Math.random()<.5?'w':'b'):cfg.color,tc:cfg.tc,ev:cfg.ev,undo:cfg.undo});
- };
+ }
  const hs=(P.hist||[]).slice().reverse();
  const cont=P.cur&&P.cur.moves&&P.cur.moves.length?P.cur:null;
  if(cont){const bx=document.createElement('div');bx.className='card';bx.style.cssText='margin-top:16px;background:#fff8e6;border-color:#f2b134';bx.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:2rem">${BOTS[cont.level-1].emoji}</div><div style="flex:1;min-width:180px"><h3>Partida guardada</h3><div class="muted" style="font-weight:700">Nivel ${cont.level} · ${cont.color==='w'?'⚪':'⚫'} · ${Math.ceil(cont.moves.length/2)} jugadas · ${cont.date}</div></div><button class="btn acc" id="cont">▶ Continuar</button></div>`;m.appendChild(bx);$('#cont',bx).onclick=()=>go('partida',{level:cont.level,color:cont.color,resume:true});}
