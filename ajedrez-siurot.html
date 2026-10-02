@@ -481,6 +481,8 @@ nav.tabs{display:none!important}
 
 .xmv{display:flex;align-items:center;gap:10px;width:100%;border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 12px;margin:4px 0;cursor:pointer;font:inherit;text-align:left}.xmv:hover{border-color:var(--pri);background:#f4fbf7}.xmv b{min-width:58px}
 
+.rushopp{background:#fff3c4;border:2px solid #f2b134;border-radius:12px;padding:8px 12px;font-weight:700;margin:6px 0}
+
 </style>
 </head>
 <body>
@@ -1897,7 +1899,7 @@ function go(tab,arg){
  const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',escaner:'ejercicios',errores:'ejercicios',tarea:'aula',ogame:'online',arena:'torneos'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,explorador:viewExplorer,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
 }
 function alive(tok){return tok===VIEW;}
 function renderHeader(){
@@ -1960,7 +1962,7 @@ function viewHome(m){
  <div class="quick">
   <button class="qbtn" data-go="jugar"><div class="qi">🤖</div><b>Jugar</b><span>Contra la máquina</span></button>
   <button class="qbtn" data-go="online" style="border-color:#2563eb;background:#eef4ff"><div class="qi">🌐</div><b>Jugar online</b><span>Retos y compañeros conectados</span></button>
-  <button class="qbtn" data-go="contrarreloj"><div class="qi">⚡</div><b>Contrarreloj</b><span>Récord: ${Math.max(P.rushBest||0,P.rushBestMix||0)}</span></button>
+  <button class="qbtn" data-go="contrarreloj"><div class="qi">⚡</div><b>Contrarreloj</b><span>Récord: ${rushBestAll()}</span></button>
   <button class="qbtn" data-go="diario" style="border-color:#f2b134;background:#fff8e6"><div class="qi">📆</div><b>Reto diario</b><span>${(P.retos||{})[today()]?'Hecho hoy: '+retoEmoji(P.retos[today()].res):'¡5 ejercicios nuevos hoy!'}</span></button>
   <button class="qbtn" id="qmis"><div class="qi">🎯</div><b>Misiones de hoy</b><span>${mdone}/3 hechas${mdone===3?' ✅':''}</span></button>
   <button class="qbtn" data-go="aprender"><div class="qi">📚</div><b>Aprender</b><span>${nl?'Siguiente: '+esc(nl.l.titulo):'¡Todo completado! 🏆'}</span></button>
@@ -2620,7 +2622,7 @@ function viewChallenges(m){
  <div class="grid g2">
   <div class="card"><h3>🎯 Misiones de hoy</h3><p class="muted" style="margin:4px 0 8px">Cambian cada día. ¡Complétalas todas!</p>${missionsHTML()}</div>
   <div class="card" style="background:linear-gradient(135deg,#eef6ff,#fffdf8)"><h3>⚡ Contrarreloj</h3><p><b>3 minutos</b> y <b>3 vidas</b>. Los ejercicios se crean al momento: ¡nunca se repiten!</p>
-   <div class="btnrow" style="align-items:center"><span class="pill">🏅 Récord: ${Math.max(P.rushBest||0,P.rushBestMix||0)}</span><button class="btn acc" id="rush">▶ Empezar</button></div></div>
+   <div class="btnrow" style="align-items:center"><span class="pill">🏅 Récord: ${rushBestAll()}</span><button class="btn acc" id="rush">▶ Empezar</button></div></div>
   <div class="card"><h3>🏁 Desafíos de finales</h3><p class="muted" style="margin:4px 0 10px">Da mate a la máquina con poco material.</p><div class="lessonlist">${finales.lecciones.filter(l=>l.pasos.some(s=>s.t==='practice')).map(l=>{const st=P.lessons[lessonKey('finales',l.id)];return `<div class="lrow ${st?'done':''}" data-l="${l.id}"><div class="ln">${st?'✓':'🏁'}</div><div class="lt">${l.titulo}</div>${st?starsHTML(st.stars):''}</div>`;}).join('')}</div></div>
   <div class="card"><h3>🤖 Escalera de la máquina</h3><p class="muted" style="margin:4px 0 10px">Gana a cada nivel para desbloquear el siguiente.</p>
    <div style="display:flex;gap:8px;flex-wrap:wrap">${BOTS.filter(b=>b.n<=maxBot()).map(b=>{const w=(P.games[b.n]||{}).w;const lk=b.n>(DB.settings.unlockAll?maxBot():P.unlocked);return `<div class="pill" style="font-size:1rem;padding:8px 12px;${w?'background:#dcf3e5':''}">${lk?'🔒':b.emoji} ${b.n} ${w?'✅':''}</div>`;}).join('')}</div>
@@ -2630,35 +2632,76 @@ function viewChallenges(m){
  if(hoy)$('#rep',m).onclick=()=>go('diario',{practica:true});else $('#daily',m).onclick=()=>go('diario');
  $$('[data-l]',m).forEach(r=>r.onclick=()=>go('leccion',{mod:'finales',l:r.dataset.l}));
 }
-function viewRush(m,mode){
- const tok=VIEW;const mix=true;const bestKey='rushBest';if((P.rushBestMix||0)>(P.rushBest||0)){P.rushBest=P.rushBestMix;save();}
- let score=0,lives=3,left=180,running=false,timerId=null,n=0;const base=Date.now();
- const {board,body,under}=trainerShell(m,'⚡ Contrarreloj',()=>{clearInterval(timerId);go('retos');});
- body.innerHTML=`<div class="rushhud"><div class="timer" id="tm">3:00</div><div class="lives" id="lv">❤️❤️❤️</div><div style="margin-left:auto;text-align:right"><div class="muted" style="font-weight:800;font-size:.8rem">ACIERTOS</div><div class="score" id="sc">0</div></div></div>
-  <div class="btnrow" id="tb"></div><div class="steptext" id="goal">¡Rápido!</div><div id="fb"></div><div class="muted" style="font-weight:700">🏅 Récord: ${P[bestKey]||0}</div>`;
- const fb=$('#fb',body);const setFb=(h,c)=>fb.innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';
- const hud=()=>{$('#tm',body).textContent=Math.floor(left/60)+':'+String(left%60).padStart(2,'0');$('#tm',body).classList.toggle('low',left<=20);$('#lv',body).textContent='❤️'.repeat(lives)+'🤍'.repeat(3-lives);$('#sc',body).textContent=score;};
- function nextPz(){
-  let pz=null;while(!pz){n++;const th=mix?['mate1','pasillo','horquilla','colgada','clavada','enfilada','descubierta','coronacion','mate1'][hash(base+'t'+n)%9]:'mate1';pz=genPuzzle(th,hash(base+'|'+n),Math.min(6,1+Math.floor(score/3)));}
+const RUSH_K=d=>d===3?'rushBest':'rushBest'+d;
+const rushBestAll=()=>Math.max(P.rushBest||0,P.rushBestMix||0,P.rushBest1||0,P.rushBest2||0);
+async function rushSetup(){const S=DB.settings;let d=S.rushDur||3;
+ const chip=(on,a,t)=>`<button class="chip" style="min-width:auto;padding:0 14px;${on?'background:var(--acc);border-color:#d99a1c':''}" ${a}>${t}</button>`;
+ const pr=modal({title:'⚡ Contrarreloj',html:`<p>Ejercicios <b>variados</b>: mates, ataques dobles, clavadas… · 3 vidas.</p><b>⏱️ ¿Cuánto tiempo?</b><div class="chips" id="rd" style="margin:8px 0 6px;justify-content:center">${[1,2,3].map(k=>chip(k===d,`data-d="${k}"`,k+' min')).join('')}</div><p class="muted" id="rdr" style="margin:6px 0 0;font-weight:700"></p>`,
+  buttons:[{t:'Cancelar',cls:'ghost',v:false},...(typeof onlLogged==='function'&&onlLogged()&&!ONL.acc.guest?[{t:'⚔️ Retar a alguien',cls:'ghost',v:'duel'}]:[]),{t:'¡Preparado!',v:true}],dismiss:false});
+ const bg=$$('.modalbg').pop();const paint=()=>{$$('#rd .chip',bg).forEach(b=>{const on=+b.dataset.d===d;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});$('#rdr',bg).textContent=`🏅 Tu récord en ${d} min: ${P[RUSH_K(d)]||0}`;};
+ $$('#rd .chip',bg).forEach(b=>b.onclick=()=>{d=+b.dataset.d;paint();});paint();
+ const v=await pr;if(!v)return null;S.rushDur=d;save();return {dur:d,duel:v==='duel'};}
+function viewRush(m,arg){
+ arg=arg&&typeof arg==='object'?arg:{};
+ const tok=VIEW;if((P.rushBestMix||0)>(P.rushBest||0)){P.rushBest=P.rushBestMix;save();}
+ const duelId=arg.duel||null;let D=null,meK='a',opK='b',start=0;
+ let dur=arg.dur||3,score=0,lives=3,left=dur*60,running=false,finished=false,timerId=null,syncId=null,n=0,streak=0,bestStreak=0;let base=Date.now();
+ const rec0={best:P[RUSH_K(dur)]||0,streak:P.rushStreak||0,pz:(P.rt&&P.rt.problemas&&P.rt.problemas.max)||0};let liveRec=false,liveStreak=false;
+ const {board,body,under}=trainerShell(m,duelId?'⚔️ Batalla de contrarreloj':'⚡ Contrarreloj',async()=>{if(running&&!(await confirmModal('¿Salir?','Se terminará la partida de contrarreloj.','Salir','Seguir')))return;clearInterval(timerId);clearInterval(syncId);if(running){running=false;if(duelId)RT.patch(`rush/${duelId}/${meK}`,{s:score,l:0,d:1}).catch(()=>{});}go(duelId?'online':'retos');});
+ const draw0=()=>{body.innerHTML=`<div class="rushhud"><div class="timer" id="tm">${dur}:00</div><div class="lives" id="lv">❤️❤️❤️</div><div style="margin-left:auto;text-align:right"><div class="muted" style="font-weight:800;font-size:.8rem">ACIERTOS</div><div class="score" id="sc">0</div></div></div>
+  ${duelId?'<div class="rushopp" id="op"></div>':''}<div class="btnrow" id="tb"></div><div class="steptext" id="goal">¡Rápido!</div><div id="fb"></div><div class="muted" style="font-weight:700">🏅 Récord en ${dur} min: ${rec0.best}</div>`;};draw0();
+ const fb=()=>$('#fb',body);const setFb=(h,c)=>{const f=fb();if(f)f.innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';};
+ const hud=()=>{if(!$('#tm',body))return;const l=Math.max(0,left);$('#tm',body).textContent=Math.floor(l/60)+':'+String(l%60).padStart(2,'0');$('#tm',body).classList.toggle('low',l<=20);$('#lv',body).textContent='❤️'.repeat(Math.max(0,lives))+'🤍'.repeat(3-Math.max(0,lives));$('#sc',body).textContent=score;};
+ function nextPz(){if(!running)return;
+  let pz=null;while(!pz){n++;const th=['mate1','pasillo','horquilla','colgada','clavada','enfilada','descubierta','coronacion','mate1'][hash(base+'t'+n)%9];pz=genPuzzle(th,hash(base+'|'+n),Math.min(6,1+Math.floor(score/3)));}
   const p=new E.Pos(pz.fen);$('#tb',body).innerHTML=turnHTML(p.turn);$('#goal',body).innerHTML=goalText(pz);
   runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept},{
-   onSolved:()=>{score++;eloUpdate(pzRating(pz.level||1),1,5,'rush');sound('ok');hud();setFb('✅ ¡Bien!','ok');setTimeout(()=>{if(alive(tok)&&running)nextPz();},450);},
-   onWrong:()=>{lives--;eloUpdate(pzRating(pz.level||1),0,5,'rush');hud();setFb('❌ ¡No era esa!','bad');if(lives<=0){end();return;}setTimeout(()=>{if(alive(tok)&&running)nextPz();},700);},
+   onSolved:()=>{if(!running)return;score++;streak++;bestStreak=Math.max(bestStreak,streak);eloUpdate(pzRating(pz.level||1),1,5,'rush');sound('ok');hud();setFb('✅ ¡Bien!','ok');
+    // los récords se avisan sin parar la partida; al final se muestran todos
+    if(!liveRec&&score>rec0.best&&rec0.best>0){liveRec=true;toast('🏆 ¡Nuevo récord de aciertos! Sigue…','badge');}
+    if(!liveStreak&&streak>rec0.streak&&rec0.streak>0&&streak>=3){liveStreak=true;toast('🔥 ¡Récord de racha! Sigue…','badge');}
+    setTimeout(()=>{if(alive(tok)&&running)nextPz();},450);},
+   onWrong:()=>{if(!running)return;lives--;streak=0;eloUpdate(pzRating(pz.level||1),0,5,'rush');hud();setFb('❌ ¡No era esa!','bad');if(lives<=0){end();return;}setTimeout(()=>{if(alive(tok)&&running)nextPz();},700);},
    msg:setFb},tok);
  }
- function end(){
-  if(!running)return;running=false;clearInterval(timerId);board.interactive=false;
-  const rec=score>(P[bestKey]||0);if(rec)P[bestKey]=score;save();track('rush',score,true);if(score>=10)award('rush10');
-  const xp=score*5;if(xp)addXP(xp,'Contrarreloj');if(rec&&score)confetti();sound('done');
-  modal({title:rec&&score?'¡Nuevo récord!':'¡Tiempo!',html:`<div class="bigicon">${rec&&score?'🏆':'⚡'}</div><p>Has resuelto <b>${score}</b> ejercicios.</p><p class="muted">Récord: ${P[bestKey]}</p>`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'Otra vez',v:'o'}],dismiss:false}).then(v=>{if(v==='o')go('contrarreloj');else go('retos');});
+ function records(){const out=[];
+  if(score>rec0.best){P[RUSH_K(dur)]=score;out.push(`⚡ Más aciertos en ${dur} min: <b>${score}</b> <span class="muted">(${rec0.best?'antes '+rec0.best:'¡el primero!'})</span>`);}
+  if(bestStreak>rec0.streak){P.rushStreak=bestStreak;if(bestStreak>=3)out.push(`🔥 Mejor racha sin fallar: <b>${bestStreak}</b> <span class="muted">(antes ${rec0.streak})</span>`);}
+  const pzNow=(P.rt&&P.rt.problemas&&P.rt.problemas.max)||0;if(pzNow>rec0.pz&&rec0.pz>0)out.push(`🧩 Puntuación de problemas más alta: <b>${pzNow}</b> <span class="muted">(antes ${rec0.pz})</span>`);
+  if(dur===3&&score>(P.rushBestMix||0))P.rushBestMix=score;save();return out;}
+ async function end(){
+  if(!running)return;running=false;finished=true;clearInterval(timerId);board.interactive=false;
+  const recs=records();track('rush',score,true);if(score>=10)award('rush10');
+  const xp=score*5;if(xp)addXP(xp,'Contrarreloj');sound('done');
+  if(duelId){try{await RT.patch(`rush/${duelId}/${meK}`,{s:score,l:Math.max(0,lives),d:1,t:RT.SV});}catch(e){}
+   setFb('⏳ Esperando a que termine tu rival…','info');
+   const waitEnd=start+dur*60000+8000;let o=null;
+   while(alive(tok)){try{D=await RT.get('rush/'+duelId)||D;}catch(e){}o=D&&D[opK]||{};if(o.d||RT.srv()>waitEnd)break;paintOpp();await sleep(1500);}
+   if(!alive(tok))return;clearInterval(syncId);o=o||{};
+   const os=o.s||0,ol=o.l||0,win=score>os||(score===os&&lives>ol),draw=score===os&&lives===ol;
+   if(win){confetti(70);sound('win');}
+   const opN=D[opK+'n']||'Tu rival';
+   modal({title:draw?'🤝 ¡Empate!':win?'🏆 ¡Has ganado la batalla!':'💪 Esta vez gana '+esc(opN),html:`<div class="bigicon">${draw?'🤝':win?'🏆':'⚡'}</div><table class="rec" style="margin:0 auto"><tr><th></th><th>Aciertos</th><th>Vidas</th></tr><tr><td><b>${esc(P.name)}</b></td><td style="text-align:center"><b>${score}</b></td><td style="text-align:center">${'❤️'.repeat(Math.max(0,lives))||'—'}</td></tr><tr><td><b>${esc(opN)}</b></td><td style="text-align:center"><b>${os}</b></td><td style="text-align:center">${'❤️'.repeat(ol)||'—'}</td></tr></table>${recs.length?`<div style="text-align:left;margin-top:12px"><b>🏆 Récords conseguidos:</b><br>${recs.join('<br>')}</div>`:''}`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'🔁 Revancha',v:'r'}],dismiss:false}).then(v=>{
+    if(v==='r'&&typeof sendReto==='function'){go('online');setTimeout(()=>sendReto({id:D[opK],n:opN},'rush:'+dur),400);}else go('online');});
+   return;}
+  if(recs.length)confetti(60);
+  modal({title:recs.length?'🏆 ¡Récord!':'¡Tiempo!',html:`<div class="bigicon">${recs.length?'🏆':'⚡'}</div><p>Has resuelto <b>${score}</b> ejercicios en ${dur} min.</p>${recs.length?`<div style="text-align:left"><b>Récords conseguidos:</b><br>${recs.join('<br>')}</div>`:`<p class="muted">Récord en ${dur} min: ${P[RUSH_K(dur)]||0}</p>`}`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'Otra vez',v:'o'}],dismiss:false}).then(v=>{if(v==='o')go('contrarreloj',{dur});else go('retos');});
  }
+ function paintOpp(){const el=$('#op',body);if(!el||!D)return;const o=D[opK]||{};el.innerHTML=`🆚 <b>${esc(D[opK+'n']||'Rival')}</b> · ${o.s||0} aciertos · ${'❤️'.repeat(o.l==null?3:o.l)}${o.d?' · terminó':''}`;}
+ function go2(){running=true;hud();nextPz();
+  timerId=setInterval(()=>{if(!alive(tok)){clearInterval(timerId);return;}const nl=duelId?Math.ceil((start+dur*60000-RT.srv())/1000):left-1;if(nl!==left){left=nl;if(left<=10&&left>0)sound('tick');}hud();if(left<=0)end();},duelId?250:1000);}
  under.innerHTML='';
  board.set(new E.Pos(PUZZLES.mate1[0].fen),{last:null});
- modal({title:'⚡ Contrarreloj',html:`<p>3 minutos · 3 vidas.<br>Ejercicios <b>variados</b>: mates, ataques dobles, clavadas… ¡Mira bien cada posición!</p>`,buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:'¡Preparado!',v:true}],dismiss:false}).then(v=>{
-  if(!alive(tok))return;if(!v)return go('retos');
-  running=true;hud();nextPz();
-  timerId=setInterval(()=>{if(!alive(tok)){clearInterval(timerId);return;}left--;if(left<=10&&left>0)sound('tick');hud();if(left<=0)end();},1000);
- });
+ if(duelId){
+  (async()=>{try{D=await RT.get('rush/'+duelId);}catch(e){}if(!alive(tok))return;if(!D){toast('No se encuentra la batalla','bad');return go('online');}
+   meK=D.a===myUid()?'a':'b';opK=meK==='a'?'b':'a';dur=D.dur||3;base=D.seed;start=D.start;left=dur*60;rec0.best=P[RUSH_K(dur)]||0;draw0();hud();paintOpp();
+   syncId=setInterval(async()=>{if(!alive(tok))return clearInterval(syncId);try{if(running)RT.patch(`rush/${duelId}/${meK}`,{s:score,l:lives}).catch(()=>{});const d=await RT.get('rush/'+duelId);if(d)D=d;paintOpp();}catch(e){}},1500);
+   const cd=setInterval(()=>{if(!alive(tok))return clearInterval(cd);const w=Math.ceil((start-RT.srv())/1000);if(w>0){setFb(`⏳ ¡Prepárate! Empieza en <b>${w}</b>…`,'info');return;}clearInterval(cd);setFb('🚀 ¡Ya!','ok');go2();},250);})();
+  return;}
+ if(arg.dur){go2();return;}
+ rushSetup().then(c=>{if(!alive(tok))return;if(!c)return go('retos');
+  if(c.duel){if(typeof ON!=='undefined'){ON.tc='rush:'+c.dur;}return go('online');}
+  dur=c.dur;left=dur*60;rec0.best=P[RUSH_K(dur)]||0;draw0();go2();});
 }
 
 // ================= PROGRESO =================
@@ -4306,7 +4349,7 @@ setTimeout(pubWatch,1200);
 const ON={arena:null,pres:null,inb:null,search:null,wait:null,inGame:false,tc:'3+0',busy:false,v960:false,fr:null};
 const ON_TC=['1+0','3+0','5+0','10+0','3+2','10+5'];
 const tcObj=k=>{if(k==='corr')return{m:0,i:0,corr:1};const[m,i]=String(k||'3+0').split('+').map(Number);return{m:m||3,i:i||0};};
-const tcTxtO=k=>{if(k==='corr')return'📨 a distancia';const t=tcObj(k);return t.m+(t.i?'+'+t.i:' min');};
+const tcTxtO=k=>{if(k==='corr')return'📨 a distancia';if(String(k).startsWith('rush:'))return'⚡ batalla de contrarreloj de '+k.split(':')[1]+' min';const t=tcObj(k);return t.m+(t.i?'+'+t.i:' min');};
 const pget=p=>fetch(RT.B+p+'.json').then(r=>r.ok?r.json():null);   // lectura pública (partidas en directo)
 const INV_K='siurot_inv';const invGet=()=>{try{return JSON.parse(localStorage.getItem(INV_K)||'[]');}catch(e){return[];}};const invSet=l=>{try{localStorage.setItem(INV_K,JSON.stringify(l.slice(-20)));}catch(e){}};
 const myUid=()=>ONL.acc&&ONL.acc.uid;
@@ -4324,18 +4367,22 @@ function openWait(html,onCancel){const p=modal({title:'🌐 Online',html:`<p sty
 async function onMsg(x){
  if(x.t&&typeof x.t==='number'&&RT.srv()-x.t>(x.tc==='corr'||x.corr?7*864e5:90000))return;
  if(x.k==='game'&&x.corr){corrCache.t=0;sound('ok');toast(`📨 ${esc(x.fn||'Tu rival')} ha aceptado la partida a distancia. Está en «Jugar online».`,'ok');return;}
+ if(x.k==='rush'){if(ON.wait){ON.wait.close();ON.wait=null;}if(ON.search)ON.search.stop();return go('rushduel',{rid:x.rid});}
  if(x.k==='game'){if(ON.wait){ON.wait.close();ON.wait=null;}return enterGame(x.gid);}
  if(x.k==='no'||x.k==='busy'){if(ON.wait){ON.wait.close();ON.wait=null;}return toast(x.k==='busy'?`${esc(x.fn||'Tu rival')} está ocupado ahora`:`${esc(x.fn||'Tu rival')} no puede jugar ahora`,'bad');}
  if(x.k==='reto'&&x.tc==='corr'){const l=invGet();if(!l.some(i=>i.from===x.from&&i.t===x.t)){l.push({from:x.from,fn:x.fn,fe:x.fe,t:x.t,v:x.v||0});invSet(l);}sound('ok');toast(`📨 ${esc(x.fn)} te invita a una partida a distancia. Mírala en «Jugar online».`,'ok');return;}
  if(x.k==='reto'){
-  if(ON.inGame||ON.reto||ON.search||currentTab==='ogame'){RT.post('inbox/'+x.from,{k:'busy',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});return;}
+  if(ON.inGame||ON.reto||ON.search||['ogame','contrarreloj','rushduel','partida','local2'].includes(currentTab)){RT.post('inbox/'+x.from,{k:'busy',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});return;}
   ON.reto=true;sound('ok');
-  const v=await modal({title:'⚔️ ¡Te han retado!',html:`<p style="text-align:center"><b>${esc(x.fn)}</b> (ELO ${x.fe||'?'}) te reta a una partida de <b>${tcTxtO(x.tc)}</b>${x.v?' · <b>🔀 Chess960</b>':''}.</p>`,buttons:[{t:'No, gracias',cls:'ghost',v:false},{t:'¡Aceptar!',v:true}],dismiss:false});
+  const v=await modal({title:'⚔️ ¡Te han retado!',html:`<p style="text-align:center"><b>${esc(x.fn)}</b> (ELO ${x.fe||'?'}) te reta a ${String(x.tc).startsWith('rush:')?'una':'una partida de'} <b>${tcTxtO(x.tc)}</b>${x.v?' · <b>🔀 Chess960</b>':''}.</p>`,buttons:[{t:'No, gracias',cls:'ghost',v:false},{t:'¡Aceptar!',v:true}],dismiss:false});
   ON.reto=false;
   if(!v)return RT.post('inbox/'+x.from,{k:'no',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});
-  const wMe=Math.random()<.5;await createGame(wMe?{id:myUid(),n:ONL.acc.nombre,e:myElo()}:{id:x.from,n:x.fn,e:x.fe},wMe?{id:x.from,n:x.fn,e:x.fe}:{id:myUid(),n:ONL.acc.nombre,e:myElo()},x.tc,x.from,{v:x.v});}
+  const wMe=Math.random()<.5;await createGame(wMe?{id:myUid(),n:ONL.acc.nombre,e:myElo()}:{id:x.from,n:x.fn,e:x.fe},wMe?{id:x.from,n:x.fn,e:x.fe}:{id:myUid(),n:ONL.acc.nombre,e:myElo()},x.tc,x.from,{v:x.v&&!String(x.tc).startsWith('rush:')});}
 }
-async function createGame(W,B,tc,notifyId,o){o=o||{};
+async function createRush(W,B,tc,notifyId){const rid='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),dur=+tc.split(':')[1]||2;
+ try{await RT.put('rush/'+rid,{a:W.id,b:B.id,an:W.n,bn:B.n,dur,seed:Math.floor(Math.random()*1e9),start:RT.srv()+7000,t:RT.SV});
+  if(notifyId)await RT.post('inbox/'+notifyId,{k:'rush',rid,from:myUid(),t:RT.SV});go('rushduel',{rid});}catch(e){toast(FB.msg(e),'bad');}}
+async function createGame(W,B,tc,notifyId,o){o=o||{};if(String(tc).startsWith('rush:'))return createRush(W,B,tc,notifyId);
  const t=tcObj(tc),gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),corr=tc==='corr',f0=o.v?E.fen960():'';
  try{await RT.put('games/'+gid,{w:W.id,b:B.id,wn:W.n,bn:B.n,we:W.e||800,be:B.e||800,tc,tb:t.m*60000,ti:t.i*1000,moves:'',clk:{w:t.m*60000,b:t.m*60000},ts:RT.SV,turn:'w',st:'play',draw:'',res:'',why:'',...(f0?{f0}:{})});
   if(corr){await Promise.all([[W,B],[B,W]].map(([a,b])=>RT.put(`mygames/${a.id}/${gid}`,{o:b.n,t:RT.SV}).catch(()=>{})));}
@@ -4345,12 +4392,12 @@ async function createGame(W,B,tc,notifyId,o){o=o||{};
 function enterGame(gid){if(ON.search){ON.search.stop();}if(ON.wait){ON.wait.close();ON.wait=null;}try{localStorage.setItem('siurot_og',gid);}catch(e){}go('ogame',{gid});}
 async function sendReto(opp,tcF){if(ON.wait||ON.search)return;const tc=tcF||ON.tc;
  if(tc==='corr'){try{await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960?1:0,t:RT.SV});toast(`📨 Invitación enviada a ${esc(opp.n)}. Cuando la acepte, la partida aparecerá aquí.`,'ok');}catch(e){toast(FB.msg(e),'bad');}return;}
- try{const r=await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc:ON.tc,v:ON.v960?1:0,t:RT.SV});
+ try{const r=await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960&&!String(tc).startsWith('rush:')?1:0,t:RT.SV});
   const mid=r&&r.name;let to=null;
-  ON.wait=openWait(`Esperando a <b>${esc(opp.n)}</b>…<br><span class="muted">${tcTxtO(ON.tc)}${ON.v960?' · Chess960':''}</span>`,()=>{clearTimeout(to);ON.wait=null;if(mid)RT.del(`inbox/${opp.id}/${mid}`).catch(()=>{});});
+  ON.wait=openWait(`Esperando a <b>${esc(opp.n)}</b>…<br><span class="muted">${tcTxtO(tc)}${ON.v960&&!String(tc).startsWith('rush:')?' · Chess960':''}</span>`,()=>{clearTimeout(to);ON.wait=null;if(mid)RT.del(`inbox/${opp.id}/${mid}`).catch(()=>{});});
   to=setTimeout(()=>{if(ON.wait){ON.wait.close();toast('No ha contestado','bad');}},60000);}
  catch(e){toast(FB.msg(e),'bad');}}
-async function quickMatch(){if(ON.search||ON.wait)return;if(ON.tc==='corr')return toast('Las partidas a distancia se juegan retando a un compañero o amigo','bad');const uid=myUid(),tc=ON.tc+(ON.v960?'|960':'');
+async function quickMatch(){if(ON.search||ON.wait)return;if(ON.tc==='corr')return toast('Las partidas a distancia se juegan retando a un compañero o amigo','bad');const uid=myUid(),tc=ON.tc+(ON.v960&&!String(ON.tc).startsWith('rush:')?'|960':'');
  const w=openWait(`🔎 Buscando rival de <b>${tcTxtO(ON.tc)}</b>${ON.v960?' · Chess960':''}…`,()=>S.stop());
  const S={dead:false,stop(){if(S.dead)return;S.dead=true;clearInterval(S.iv);ON.search=null;RT.del('seeks/'+uid).catch(()=>{});w.close();}};ON.search=S;
  try{await RT.put('seeks/'+uid,{n:ONL.acc.nombre,e:myElo(),tc,t:RT.SV});}catch(e){S.stop();return toast(FB.msg(e),'bad');}
@@ -4394,8 +4441,9 @@ function viewOnline(m){const tok=VIEW;let timer=null,first=true;
   ${inv.length?`<div class="card" style="border:2px solid #7c3aed;background:#f5f0ff"><h3 style="margin:0 0 6px">📨 Te invitan a partidas a distancia</h3>${inv.map((x,i)=>`<div class="pl"><div style="flex:1"><b>${esc(x.fn)}</b> <span class="muted">ELO ${x.fe||'?'}${x.v?' · 🔀 Chess960':''}</span></div><button class="btn sm ghost" data-ino="${i}">No</button><button class="btn sm" data-iok="${i}">Aceptar</button></div>`).join('')}</div>`:''}
   ${cg.length?`<div class="card"><h3 style="margin:0 0 6px">📨 Partidas a distancia</h3>${cg.map(c=>`<div class="pl tap" data-cg="${c.gid}"><div style="flex:1"><b>vs ${esc(c.o)}</b><div class="muted" style="font-size:.8rem">${Math.ceil(c.n/2)} jugadas</div></div>${c.mine?'<span class="pill" style="background:#d9f5e3;color:#14703a">¡Te toca!</span>':'<span class="pill">Le toca</span>'}</div>`).join('')}</div>`:''}
   <div class="card"><div class="muted" style="font-weight:800;margin-bottom:6px">Ritmo de la partida</div><div class="btnrow" style="gap:6px;margin-bottom:8px">${[...ON_TC,'corr'].map(k=>`<button class="btn sm ${k===ON.tc?'':'ghost'}" data-tc="${k}">${tcTxtO(k)}</button>`).join('')}</div>
-   <div class="btnrow" style="gap:6px;margin-bottom:12px"><button class="btn sm ${ON.v960?'':'ghost'}" id="v960" title="Las piezas de atrás empiezan en orden aleatorio">🔀 Chess960 ${ON.v960?'✔':''}</button></div>
-   ${ON.tc==='corr'?'<p class="muted" style="margin:0;font-size:.88rem">📨 <b>A distancia:</b> sin reloj, cada uno juega cuando puede (por ejemplo, una jugada al día). Pulsa en un compañero o en un amigo para invitarle.</p>':'<button class="btn acc big" id="qm" style="width:100%">⚔️ Jugar online</button><p class="muted" style="margin:8px 0 0;font-size:.85rem">Te empareja con otro jugador que busque el mismo ritmo.</p>'}</div>
+   <div class="muted" style="font-weight:800;margin:4px 0 6px">⚡ Batalla de contrarreloj</div><div class="btnrow" style="gap:6px;margin-bottom:8px">${[1,2,3].map(d=>`<button class="btn sm ${ON.tc==='rush:'+d?'':'ghost'}" data-tc="rush:${d}">${d} min</button>`).join('')}</div>
+   <div class="btnrow" style="gap:6px;margin-bottom:12px">${String(ON.tc).startsWith('rush:')?'<p class="muted" style="margin:0;font-size:.88rem">⚡ <b>Batalla de contrarreloj:</b> los dos resolvéis los mismos ejercicios a la vez. Gana quien más acierte (si empatáis, quien conserve más vidas).</p>':''}<button class="btn sm ${ON.v960?'':'ghost'}" style="${String(ON.tc).startsWith('rush:')?'display:none':''}" id="v960" title="Las piezas de atrás empiezan en orden aleatorio">🔀 Chess960 ${ON.v960?'✔':''}</button></div>
+   ${ON.tc==='corr'?'<p class="muted" style="margin:0;font-size:.88rem">📨 <b>A distancia:</b> sin reloj, cada uno juega cuando puede (por ejemplo, una jugada al día). Pulsa en un compañero o en un amigo para invitarle.</p>':'<button class="btn acc big" id="qm" style="width:100%">'+(String(ON.tc).startsWith('rush:')?'⚡ Buscar rival de contrarreloj':'⚔️ Jugar online')+'</button><p class="muted" style="margin:8px 0 0;font-size:.85rem">Te empareja con otro jugador que busque el mismo ritmo.</p>'}</div>
   <div class="card"><h3 style="margin:0 0 2px">👥 Conectados ahora</h3><p class="muted" style="margin:0 0 6px;font-size:.85rem">Pulsa en un compañero para retarle. Con ☆ lo añades a tus amigos: saldrán siempre arriba.</p>${list.length?list.map(row).join(''):'<p class="muted" style="margin:0">No hay nadie más conectado ahora. Cuando entren tus compañeros aparecerán aquí.</p>'}
    ${offFr.length?`<div class="muted" style="font-weight:800;margin:12px 0 4px">⭐ Amigos desconectados</div>${offFr.map(p=>`<div class="pl"><span class="pdot" style="background:#c9c9c9"></span><div style="flex:1"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span></div><button class="btn sm ghost" data-fx="${p.id}" title="Quitar de amigos">⭐</button><button class="btn sm" data-dist="${p.id}">📨 Invitar a distancia</button></div>`).join('')}`:''}</div>
   <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:1.8rem">📺</div><div style="flex:1"><b>Partidas en directo</b><div class="muted" style="font-size:.85rem">Mira cómo juegan tus compañeros ahora mismo.</div></div><button class="btn ghost" id="tv">Ver</button></div>
