@@ -464,6 +464,8 @@ nav.tabs{display:none!important}
  body.intrainer .trainer.game.ev .board{width:var(--bs)}
 }
 
+.onl .pl.tap{cursor:pointer;border-radius:12px;transition:background .15s}.onl .pl.tap:hover,.onl .pl.tap:active{background:#eef4ff}
+
 </style>
 </head>
 <body>
@@ -4137,7 +4139,7 @@ window.addEventListener('onlpub',()=>{
 setTimeout(pubWatch,1200);
 /* ===== Jugar online: presencia, retos, emparejamiento y partida (Realtime Database por REST) ===== */
 const ON={arena:null,pres:null,inb:null,search:null,wait:null,inGame:false,tc:'3+0',busy:false};
-const ON_TC=['3+0','5+0','10+0','3+2','10+5'];
+const ON_TC=['1+0','3+0','5+0','10+0','3+2','10+5'];
 const tcObj=k=>{const[m,i]=String(k||'3+0').split('+').map(Number);return{m:m||3,i:i||0};};
 const tcTxtO=k=>{const t=tcObj(k);return t.m+(t.i?'+'+t.i:' min');};
 const myUid=()=>ONL.acc&&ONL.acc.uid;
@@ -4205,11 +4207,11 @@ function viewOnline(m){const tok=VIEW;let timer=null;
   ${og?`<div class="card" style="background:#fff3c4;border-color:#e8a317"><b>♟ Tienes una partida en curso</b><div class="btnrow" style="margin-top:8px"><button class="btn acc" id="back2g">Volver a la partida</button></div></div>`:''}
   <div class="card"><div class="muted" style="font-weight:800;margin-bottom:6px">Ritmo de la partida</div><div class="btnrow" style="gap:6px;margin-bottom:12px">${ON_TC.map(k=>`<button class="btn sm ${k===ON.tc?'':'ghost'}" data-tc="${k}">${tcTxtO(k)}</button>`).join('')}</div>
    <button class="btn acc big" id="qm" style="width:100%">⚔️ Jugar online</button><p class="muted" style="margin:8px 0 0;font-size:.85rem">Te empareja con otro jugador que busque el mismo ritmo.</p></div>
-  <div class="card"><h3 style="margin:0 0 6px">👥 Conectados ahora</h3>${list.length?list.map(p=>`<div class="pl"><span class="pdot ${p.s==='jugando'?'busy':''}"></span><div style="flex:1"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span><div class="muted" style="font-size:.8rem">♟ ${p.e||800} · ${p.s==='jugando'?'jugando':'libre'}</div></div><button class="btn sm ${p.s==='jugando'?'ghost':''}" data-r="${p.id}" ${p.s==='jugando'?'disabled':''}>⚔️ Retar</button></div>`).join(''):'<p class="muted" style="margin:0">No hay nadie más conectado ahora. Cuando entren tus compañeros aparecerán aquí.</p>'}</div></div>`;
+  <div class="card"><h3 style="margin:0 0 2px">👥 Conectados ahora</h3><p class="muted" style="margin:0 0 6px;font-size:.85rem">Pulsa en un compañero para retarle al ritmo elegido.</p>${list.length?list.map(p=>`<div class="pl ${p.s==='jugando'?'':'tap'}" data-pr="${p.id}" title="${p.s==='jugando'?'Está jugando':'Pulsa para retar'}"><span class="pdot ${p.s==='jugando'?'busy':''}"></span><div style="flex:1"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span><div class="muted" style="font-size:.8rem">♟ ${p.e||800} · ${p.s==='jugando'?'jugando':'libre'}</div></div><button class="btn sm ${p.s==='jugando'?'ghost':''}" data-r="${p.id}" ${p.s==='jugando'?'disabled':''}>⚔️ Retar</button></div>`).join(''):'<p class="muted" style="margin:0">No hay nadie más conectado ahora. Cuando entren tus compañeros aparecerán aquí.</p>'}</div></div>`;
   $$('[data-tc]',m).forEach(b=>b.onclick=()=>{ON.tc=b.dataset.tc;draw();});
   $('#qm',m).onclick=quickMatch;
   if($('#back2g',m))$('#back2g',m).onclick=()=>go('ogame',{gid:og});
-  $$('[data-r]',m).forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.r);if(p)sendReto({id:p.id,n:p.n});});};
+  $$('[data-pr]',m).forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.pr);if(!p)return;if(p.s==='jugando')return toast(esc(p.n)+' está jugando ahora');sendReto({id:p.id,n:p.n});});};
  m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2></div><div class="card muted">Cargando…</div>`;
  draw();timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw();},8000);}
 /* ---------- partida ---------- */
