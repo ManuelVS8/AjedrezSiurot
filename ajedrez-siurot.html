@@ -2843,20 +2843,24 @@ document.addEventListener('DOMContentLoaded',boot);
 
 // ================= DOS JUGADORES EN EL MISMO DISPOSITIVO =================
 async function localSetup(){
- const S=DB.settings;const g=Object.assign({wn:P.name||'Blancas',bn:'Amigo',m:0,i:0,flip:false,v960:false},S.l2cfg||{});
+ const S=DB.settings;const g=Object.assign({p1:P.name||'Jugador 1',p2:'Amigo',c1:'w',m:0,i:0,flip:false,v960:false},S.l2cfg||{});
  const chip=(on,attrs,t)=>`<button class="chip" style="min-width:auto;padding:0 12px;${on?'background:var(--acc);border-color:#d99a1c':''}" ${attrs}>${t}</button>`;
  const inp='width:100%;padding:10px;border:2px solid var(--line);border-radius:10px;font:inherit;font-weight:700';
  const pr=modal({title:'👥 Partida entre dos',html:`<div style="text-align:left"><p class="muted" style="margin:0 0 10px">Os turnáis el mismo dispositivo. No suma XP ni ELO, pero se guarda para analizarla.</p>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px"><label><b>⚪ Blancas</b><input id="lw" maxlength="18" value="${esc(g.wn)}" style="${inp}"></label><label><b>⚫ Negras</b><input id="lb" maxlength="18" value="${esc(g.bn)}" style="${inp}"></label></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px"><label><b>👤 Jugador 1</b><input id="lw" maxlength="18" value="${esc(g.p1)}" style="${inp}"></label><label><b>👤 Jugador 2</b><input id="lb" maxlength="18" value="${esc(g.p2)}" style="${inp}"></label></div>
+  <b>♟ ¿Qué color lleva el jugador 1?</b><div class="chips" id="lc" style="margin:6px 0 12px">${[['w','⚪ Blancas'],['b','⚫ Negras'],['r','🎲 Al azar']].map(([v,t])=>chip(g.c1===v,`data-c="${v}"`,t)).join('')}</div>
   <b>⏱️ Tiempo por jugador</b><div class="chips" id="lt" style="margin:6px 0 12px">${TC_PRESETS.map(([mm,ii,t])=>chip(g.m===mm&&g.i===ii,`data-m="${mm}" data-i="${ii}"`,t)).join('')}</div>
   <b>🎲 Variante</b><div class="chips" id="lv" style="margin:6px 0 12px">${[[0,'♟ Clásica'],[1,'🔀 Chess960']].map(([v,t])=>chip(!!g.v960===!!v,`data-v="${v}"`,t)).join('')}</div>
   <label class="btnrow" style="align-items:center;gap:8px;font-weight:800"><input type="checkbox" id="lf" ${g.flip?'checked':''}> 🔄 Girar el tablero en cada turno</label></div>`,buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:'▶ ¡A jugar!',v:true}]});
  const bg=$$('.modalbg').pop();
- const paint=()=>{$$('#lt .chip',bg).forEach(b=>{const on=+b.dataset.m===g.m&&+b.dataset.i===g.i;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});$$('#lv .chip',bg).forEach(b=>{const on=!!+b.dataset.v===!!g.v960;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});};
+ const paint=()=>{$$('#lt .chip',bg).forEach(b=>{const on=+b.dataset.m===g.m&&+b.dataset.i===g.i;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});$$('#lv .chip',bg).forEach(b=>{const on=!!+b.dataset.v===!!g.v960;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});$$('#lc .chip',bg).forEach(b=>{const on=b.dataset.c===g.c1;b.style.background=on?'var(--acc)':'';b.style.borderColor=on?'#d99a1c':'';});};
+ $$('#lc .chip',bg).forEach(b=>b.onclick=()=>{g.c1=b.dataset.c;paint();});
  $$('#lt .chip',bg).forEach(b=>b.onclick=()=>{g.m=+b.dataset.m;g.i=+b.dataset.i;paint();});$$('#lv .chip',bg).forEach(b=>b.onclick=()=>{g.v960=!!+b.dataset.v;paint();});
  if(!await pr)return null;
- g.wn=($('#lw',bg)?$('#lw',bg).value:g.wn).trim()||'Blancas';g.bn=($('#lb',bg)?$('#lb',bg).value:g.bn).trim()||'Negras';g.flip=!!($('#lf',bg)&&$('#lf',bg).checked);
- S.l2cfg=g;save();return {...g,tc:g.m>0?{m:g.m,i:g.i}:null};}
+ g.p1=($('#lw',bg)?$('#lw',bg).value:g.p1).trim()||'Jugador 1';g.p2=($('#lb',bg)?$('#lb',bg).value:g.p2).trim()||'Jugador 2';g.flip=!!($('#lf',bg)&&$('#lf',bg).checked);
+ S.l2cfg=g;save();const w1=g.c1==='w'||(g.c1==='r'&&Math.random()<.5);
+ if(g.c1==='r')setTimeout(()=>toast(`🎲 Sorteo: ${esc(w1?g.p1:g.p2)} lleva blancas`,'ok'),400);
+ return {wn:w1?g.p1:g.p2,bn:w1?g.p2:g.p1,flip:g.flip,v960:g.v960,tc:g.m>0?{m:g.m,i:g.i}:null};}
 function viewLocal2(m,{wn,bn,tc,flip,v960}){
  const tok=VIEW;const start=v960?E.fen960():undefined;const pos=new E.Pos(start);let over=false;const sans=[];
  const clk={w:tc?tc.m*60000:0,b:tc?tc.m*60000:0};let last=Date.now();
@@ -4346,10 +4350,12 @@ window.addEventListener('onlpub',()=>{
  if(ON&&ON.arena&&ON.arena.refT)ON.arena.refT();});
 setTimeout(pubWatch,1200);
 /* ===== Jugar online: presencia, retos, emparejamiento y partida (Realtime Database por REST) ===== */
-const ON={arena:null,pres:null,inb:null,search:null,wait:null,inGame:false,tc:'3+0',busy:false,v960:false,fr:null};
+const ON={arena:null,pres:null,inb:null,search:null,wait:null,inGame:false,tc:'3+0',busy:false,v960:false,fr:null,col:'r'};
 const ON_TC=['1+0','3+0','5+0','10+0','3+2','10+5'];
 const tcObj=k=>{if(k==='corr')return{m:0,i:0,corr:1};const[m,i]=String(k||'3+0').split('+').map(Number);return{m:m||3,i:i||0};};
 const tcTxtO=k=>{if(k==='corr')return'📨 a distancia';if(String(k).startsWith('rush:'))return'⚡ batalla de contrarreloj de '+k.split(':')[1]+' min';const t=tcObj(k);return t.m+(t.i?'+'+t.i:' min');};
+const accWhite=col=>col==='w'?false:col==='b'?true:Math.random()<.5;   // col = color que pide quien reta
+const colTxt=c=>c==='w'?'⚪ blancas':c==='b'?'⚫ negras':'🎲 color al azar';
 const pget=p=>fetch(RT.B+p+'.json').then(r=>r.ok?r.json():null);   // lectura pública (partidas en directo)
 const INV_K='siurot_inv';const invGet=()=>{try{return JSON.parse(localStorage.getItem(INV_K)||'[]');}catch(e){return[];}};const invSet=l=>{try{localStorage.setItem(INV_K,JSON.stringify(l.slice(-20)));}catch(e){}};
 const myUid=()=>ONL.acc&&ONL.acc.uid;
@@ -4370,14 +4376,14 @@ async function onMsg(x){
  if(x.k==='rush'){if(ON.wait){ON.wait.close();ON.wait=null;}if(ON.search)ON.search.stop();return go('rushduel',{rid:x.rid});}
  if(x.k==='game'){if(ON.wait){ON.wait.close();ON.wait=null;}return enterGame(x.gid);}
  if(x.k==='no'||x.k==='busy'){if(ON.wait){ON.wait.close();ON.wait=null;}return toast(x.k==='busy'?`${esc(x.fn||'Tu rival')} está ocupado ahora`:`${esc(x.fn||'Tu rival')} no puede jugar ahora`,'bad');}
- if(x.k==='reto'&&x.tc==='corr'){const l=invGet();if(!l.some(i=>i.from===x.from&&i.t===x.t)){l.push({from:x.from,fn:x.fn,fe:x.fe,t:x.t,v:x.v||0});invSet(l);}sound('ok');toast(`📨 ${esc(x.fn)} te invita a una partida a distancia. Mírala en «Jugar online».`,'ok');return;}
+ if(x.k==='reto'&&x.tc==='corr'){const l=invGet();if(!l.some(i=>i.from===x.from&&i.t===x.t)){l.push({from:x.from,fn:x.fn,fe:x.fe,t:x.t,v:x.v||0,col:x.col||'r'});invSet(l);}sound('ok');toast(`📨 ${esc(x.fn)} te invita a una partida a distancia. Mírala en «Jugar online».`,'ok');return;}
  if(x.k==='reto'){
   if(ON.inGame||ON.reto||ON.search||['ogame','contrarreloj','rushduel','partida','local2'].includes(currentTab)){RT.post('inbox/'+x.from,{k:'busy',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});return;}
   ON.reto=true;sound('ok');
-  const v=await modal({title:'⚔️ ¡Te han retado!',html:`<p style="text-align:center"><b>${esc(x.fn)}</b> (ELO ${x.fe||'?'}) te reta a ${String(x.tc).startsWith('rush:')?'una':'una partida de'} <b>${tcTxtO(x.tc)}</b>${x.v?' · <b>🔀 Chess960</b>':''}.</p>`,buttons:[{t:'No, gracias',cls:'ghost',v:false},{t:'¡Aceptar!',v:true}],dismiss:false});
+  const v=await modal({title:'⚔️ ¡Te han retado!',html:`<p style="text-align:center"><b>${esc(x.fn)}</b> (ELO ${x.fe||'?'}) te reta a ${String(x.tc).startsWith('rush:')?'una':'una partida de'} <b>${tcTxtO(x.tc)}</b>${x.v?' · <b>🔀 Chess960</b>':''}.${x.col&&x.col!=='r'&&!String(x.tc).startsWith('rush:')?`<br>${esc(x.fn)} quiere jugar con <b>${colTxt(x.col)}</b>: tú llevarás ${x.col==='w'?'⚫ negras':'⚪ blancas'}.`:''}</p>`,buttons:[{t:'No, gracias',cls:'ghost',v:false},{t:'¡Aceptar!',v:true}],dismiss:false});
   ON.reto=false;
   if(!v)return RT.post('inbox/'+x.from,{k:'no',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});
-  const wMe=Math.random()<.5;await createGame(wMe?{id:myUid(),n:ONL.acc.nombre,e:myElo()}:{id:x.from,n:x.fn,e:x.fe},wMe?{id:x.from,n:x.fn,e:x.fe}:{id:myUid(),n:ONL.acc.nombre,e:myElo()},x.tc,x.from,{v:x.v&&!String(x.tc).startsWith('rush:')});}
+  const wMe=accWhite(x.col);await createGame(wMe?{id:myUid(),n:ONL.acc.nombre,e:myElo()}:{id:x.from,n:x.fn,e:x.fe},wMe?{id:x.from,n:x.fn,e:x.fe}:{id:myUid(),n:ONL.acc.nombre,e:myElo()},x.tc,x.from,{v:x.v&&!String(x.tc).startsWith('rush:')});}
 }
 async function createRush(W,B,tc,notifyId){const rid='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),dur=+tc.split(':')[1]||2;
  try{await RT.put('rush/'+rid,{a:W.id,b:B.id,an:W.n,bn:B.n,dur,seed:Math.floor(Math.random()*1e9),start:RT.srv()+7000,t:RT.SV});
@@ -4391,10 +4397,10 @@ async function createGame(W,B,tc,notifyId,o){o=o||{};if(String(tc).startsWith('r
  catch(e){toast(FB.msg(e),'bad');}}
 function enterGame(gid){if(ON.search){ON.search.stop();}if(ON.wait){ON.wait.close();ON.wait=null;}try{localStorage.setItem('siurot_og',gid);}catch(e){}go('ogame',{gid});}
 async function sendReto(opp,tcF){if(ON.wait||ON.search)return;const tc=tcF||ON.tc;
- if(tc==='corr'){try{await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960?1:0,t:RT.SV});toast(`📨 Invitación enviada a ${esc(opp.n)}. Cuando la acepte, la partida aparecerá aquí.`,'ok');}catch(e){toast(FB.msg(e),'bad');}return;}
- try{const r=await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960&&!String(tc).startsWith('rush:')?1:0,t:RT.SV});
+ if(tc==='corr'){try{await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960?1:0,col:ON.col,t:RT.SV});toast(`📨 Invitación enviada a ${esc(opp.n)}. Cuando la acepte, la partida aparecerá aquí.`,'ok');}catch(e){toast(FB.msg(e),'bad');}return;}
+ try{const r=await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960&&!String(tc).startsWith('rush:')?1:0,col:String(tc).startsWith('rush:')?'r':ON.col,t:RT.SV});
   const mid=r&&r.name;let to=null;
-  ON.wait=openWait(`Esperando a <b>${esc(opp.n)}</b>…<br><span class="muted">${tcTxtO(tc)}${ON.v960&&!String(tc).startsWith('rush:')?' · Chess960':''}</span>`,()=>{clearTimeout(to);ON.wait=null;if(mid)RT.del(`inbox/${opp.id}/${mid}`).catch(()=>{});});
+  ON.wait=openWait(`Esperando a <b>${esc(opp.n)}</b>…<br><span class="muted">${tcTxtO(tc)}${String(tc).startsWith('rush:')?'':' · '+colTxt(ON.col)}${ON.v960&&!String(tc).startsWith('rush:')?' · Chess960':''}</span>`,()=>{clearTimeout(to);ON.wait=null;if(mid)RT.del(`inbox/${opp.id}/${mid}`).catch(()=>{});});
   to=setTimeout(()=>{if(ON.wait){ON.wait.close();toast('No ha contestado','bad');}},60000);}
  catch(e){toast(FB.msg(e),'bad');}}
 async function quickMatch(){if(ON.search||ON.wait)return;if(ON.tc==='corr')return toast('Las partidas a distancia se juegan retando a un compañero o amigo','bad');const uid=myUid(),tc=ON.tc+(ON.v960&&!String(ON.tc).startsWith('rush:')?'|960':'');
@@ -4441,21 +4447,23 @@ function viewOnline(m){const tok=VIEW;let timer=null,first=true;
   ${inv.length?`<div class="card" style="border:2px solid #7c3aed;background:#f5f0ff"><h3 style="margin:0 0 6px">📨 Te invitan a partidas a distancia</h3>${inv.map((x,i)=>`<div class="pl"><div style="flex:1"><b>${esc(x.fn)}</b> <span class="muted">ELO ${x.fe||'?'}${x.v?' · 🔀 Chess960':''}</span></div><button class="btn sm ghost" data-ino="${i}">No</button><button class="btn sm" data-iok="${i}">Aceptar</button></div>`).join('')}</div>`:''}
   ${cg.length?`<div class="card"><h3 style="margin:0 0 6px">📨 Partidas a distancia</h3>${cg.map(c=>`<div class="pl tap" data-cg="${c.gid}"><div style="flex:1"><b>vs ${esc(c.o)}</b><div class="muted" style="font-size:.8rem">${Math.ceil(c.n/2)} jugadas</div></div>${c.mine?'<span class="pill" style="background:#d9f5e3;color:#14703a">¡Te toca!</span>':'<span class="pill">Le toca</span>'}</div>`).join('')}</div>`:''}
   <div class="card"><div class="muted" style="font-weight:800;margin-bottom:6px">Ritmo de la partida</div><div class="btnrow" style="gap:6px;margin-bottom:8px">${[...ON_TC,'corr'].map(k=>`<button class="btn sm ${k===ON.tc?'':'ghost'}" data-tc="${k}">${tcTxtO(k)}</button>`).join('')}</div>
+   <div style="${String(ON.tc).startsWith('rush:')?'display:none':''}"><div class="muted" style="font-weight:800;margin:4px 0 6px">Tu color cuando retas a alguien</div><div class="btnrow" style="gap:6px;margin-bottom:8px">${[['w','⚪ Blancas'],['b','⚫ Negras'],['r','🎲 Al azar']].map(([k,t])=>`<button class="btn sm ${ON.col===k?'':'ghost'}" data-col="${k}">${t}</button>`).join('')}</div></div>
    <div class="muted" style="font-weight:800;margin:4px 0 6px">⚡ Batalla de contrarreloj</div><div class="btnrow" style="gap:6px;margin-bottom:8px">${[1,2,3].map(d=>`<button class="btn sm ${ON.tc==='rush:'+d?'':'ghost'}" data-tc="rush:${d}">${d} min</button>`).join('')}</div>
    <div class="btnrow" style="gap:6px;margin-bottom:12px">${String(ON.tc).startsWith('rush:')?'<p class="muted" style="margin:0;font-size:.88rem">⚡ <b>Batalla de contrarreloj:</b> los dos resolvéis los mismos ejercicios a la vez. Gana quien más acierte (si empatáis, quien conserve más vidas).</p>':''}<button class="btn sm ${ON.v960?'':'ghost'}" style="${String(ON.tc).startsWith('rush:')?'display:none':''}" id="v960" title="Las piezas de atrás empiezan en orden aleatorio">🔀 Chess960 ${ON.v960?'✔':''}</button></div>
-   ${ON.tc==='corr'?'<p class="muted" style="margin:0;font-size:.88rem">📨 <b>A distancia:</b> sin reloj, cada uno juega cuando puede (por ejemplo, una jugada al día). Pulsa en un compañero o en un amigo para invitarle.</p>':'<button class="btn acc big" id="qm" style="width:100%">'+(String(ON.tc).startsWith('rush:')?'⚡ Buscar rival de contrarreloj':'⚔️ Jugar online')+'</button><p class="muted" style="margin:8px 0 0;font-size:.85rem">Te empareja con otro jugador que busque el mismo ritmo.</p>'}</div>
+   ${ON.tc==='corr'?'<p class="muted" style="margin:0;font-size:.88rem">📨 <b>A distancia:</b> sin reloj, cada uno juega cuando puede (por ejemplo, una jugada al día). Pulsa en un compañero o en un amigo para invitarle.</p>':'<button class="btn acc big" id="qm" style="width:100%">'+(String(ON.tc).startsWith('rush:')?'⚡ Buscar rival de contrarreloj':'⚔️ Jugar online')+'</button><p class="muted" style="margin:8px 0 0;font-size:.85rem">Te empareja con otro jugador que busque el mismo ritmo. El color se sortea.</p>'}</div>
   <div class="card"><h3 style="margin:0 0 2px">👥 Conectados ahora</h3><p class="muted" style="margin:0 0 6px;font-size:.85rem">Pulsa en un compañero para retarle. Con ☆ lo añades a tus amigos: saldrán siempre arriba.</p>${list.length?list.map(row).join(''):'<p class="muted" style="margin:0">No hay nadie más conectado ahora. Cuando entren tus compañeros aparecerán aquí.</p>'}
    ${offFr.length?`<div class="muted" style="font-weight:800;margin:12px 0 4px">⭐ Amigos desconectados</div>${offFr.map(p=>`<div class="pl"><span class="pdot" style="background:#c9c9c9"></span><div style="flex:1"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span></div><button class="btn sm ghost" data-fx="${p.id}" title="Quitar de amigos">⭐</button><button class="btn sm" data-dist="${p.id}">📨 Invitar a distancia</button></div>`).join('')}`:''}</div>
   <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:1.8rem">📺</div><div style="flex:1"><b>Partidas en directo</b><div class="muted" style="font-size:.85rem">Mira cómo juegan tus compañeros ahora mismo.</div></div><button class="btn ghost" id="tv">Ver</button></div>
   ${hist.length?`<div class="card"><h3 style="margin:0 0 6px">📜 Mis últimas partidas online</h3>${hist.map(g=>`<div class="pl"><div style="flex:1"><b>${g.res==='w'?'🏆':g.res==='d'?'🤝':'❌'} ${esc(g.name||'')}</b><div class="muted" style="font-size:.8rem">${g.date} · ${Math.ceil(g.moves.length/2)} jugadas</div></div><button class="btn sm ghost" data-an="${g.id}">🔍 Analizar</button></div>`).join('')}</div>`:''}</div>`;
   $$('[data-tc]',m).forEach(b=>b.onclick=()=>{ON.tc=b.dataset.tc;draw();});
+  $$('[data-col]',m).forEach(b=>b.onclick=()=>{ON.col=b.dataset.col;draw();});
   $('#v960',m).onclick=()=>{ON.v960=!ON.v960;draw();};
   if($('#qm',m))$('#qm',m).onclick=quickMatch;
   $('#tv',m).onclick=()=>openTV({});
   if($('#back2g',m))$('#back2g',m).onclick=()=>go('ogame',{gid:og});
   $$('[data-an]',m).forEach(b=>b.onclick=()=>go('analisis',{id:+b.dataset.an}));
   $$('[data-cg]',m).forEach(b=>b.onclick=()=>{corrCache.t=0;go('ogame',{gid:b.dataset.cg});});
-  $$('[data-iok]',m).forEach(b=>b.onclick=async()=>{const l=invGet(),x=l[+b.dataset.iok];if(!x)return;invSet(l.filter(y=>y!==x));const wMe=Math.random()<.5,meP={id:myUid(),n:ONL.acc.nombre,e:myElo()},op={id:x.from,n:x.fn,e:x.fe};corrCache.t=0;await createGame(wMe?meP:op,wMe?op:meP,'corr',x.from,{v:x.v});});
+  $$('[data-iok]',m).forEach(b=>b.onclick=async()=>{const l=invGet(),x=l[+b.dataset.iok];if(!x)return;invSet(l.filter(y=>y!==x));const wMe=accWhite(x.col),meP={id:myUid(),n:ONL.acc.nombre,e:myElo()},op={id:x.from,n:x.fn,e:x.fe};corrCache.t=0;await createGame(wMe?meP:op,wMe?op:meP,'corr',x.from,{v:x.v});});
   $$('[data-ino]',m).forEach(b=>b.onclick=()=>{const l=invGet(),x=l[+b.dataset.ino];invSet(l.filter(y=>y!==x));if(x)RT.post('inbox/'+x.from,{k:'no',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});draw();});
   $$('[data-fs]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const p=list.find(x=>x.id===b.dataset.fs);if(p){await frToggle(p);draw();}});
   $$('[data-fx]',m).forEach(b=>b.onclick=async()=>{const p=offFr.find(x=>x.id===b.dataset.fx);if(p){await frToggle(p);draw();}});
@@ -4518,7 +4526,7 @@ async function viewOnGame(m,{gid}){
    if(ar){const left=(ON.arena&&ON.arena.T.fin||0)-RT.srv();
     const v=await modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p><p style="font-size:1.2rem"><b>${ai&&!ai.dup?'+'+ai.val+' puntos'+(ai.dbl?' 🔥 (¡doble!)':'')+(ai.bonus?' · 🔥 ¡bonus furia!':''):''}</b></p>`,buttons:[{t:'Salir del torneo',cls:'ghost',v:'s'},{t:left>ARENA_MIN_LEFT?'▶ Seguir jugando':'Ver clasificación',v:'c'}],dismiss:false});
     if(!alive(tok))return;if(v==='s'){arenaLeave();go('torneos');}else{if(left>ARENA_MIN_LEFT&&ON.arena){await arenaSearch(true);}go('arena',{tid:ar});}return;}
-   modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p>`,buttons:[{t:'Salir',cls:'ghost',v:'s'},...(hid?[{t:'🔍 Analizar',cls:'ghost',v:'a'}]:[]),{t:'🔁 Revancha',v:'r'}],dismiss:false}).then(v=>{if(v==='a')return go('analisis',{id:hid});if(v==='r'){ON.tc=G.tc;go('online');setTimeout(()=>sendReto({id:color==='w'?G.b:G.w,n:oppN}),400);}else go('online');});},600);}
+   modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p>`,buttons:[{t:'Salir',cls:'ghost',v:'s'},...(hid?[{t:'🔍 Analizar',cls:'ghost',v:'a'}]:[]),{t:'🔁 Revancha',v:'r'}],dismiss:false}).then(v=>{if(v==='a')return go('analisis',{id:hid});if(v==='r'){ON.tc=G.tc;ON.col=color==='w'?'b':'w';go('online');setTimeout(()=>sendReto({id:color==='w'?G.b:G.w,n:oppN}),400);}else go('online');});},600);}
  function afterLocal(mv,mover){const s=pos.status();let end=null;
   if(s&&s!=='jaque'){end={res:s==='mate'?(mover==='w'?'1-0':'0-1'):'1/2-1/2',why:s};}
   return end;}
