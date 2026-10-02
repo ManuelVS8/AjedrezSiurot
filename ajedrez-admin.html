@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ajedrez Siurot · Administración</title><meta name="robots" content="noindex">
+<title>Ajedrez Siurot · Administración</title><meta name="robots" content="noindex"><link rel="manifest" href="manifest-admin.webmanifest"><meta name="theme-color" content="#2f7d5b"><link rel="apple-touch-icon" href="icon192.png"><link rel="icon" href="icon192.png">
 <style>
 :root{--g:#2f7d5b;--gd:#1f5a41;--bg:#f3f6f4;--card:#fff;--tx:#1d2b25;--mu:#66756d;--ln:#dfe7e2;--rd:#c0392b;--yl:#f2b134}
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
@@ -116,6 +116,13 @@ const RT=(()=>{const B='https://ajedrez-siurot-default-rtdb.europe-west1.firebas
 function genClave(){const D='23456789',L='abcdefghjkmnpqrstuvwxyz',r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};let s='';for(let i=0;i<3;i++)s+=D[r(D.length)];for(let i=0;i<3;i++)s+=L[r(L.length)];return s;}
 const claveOK=c=>/^[0-9]{3}[a-z]{3}$/.test(c);
 function slugAlias(nombre){const t=nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').trim().split(/\s+/).filter(Boolean);if(!t.length)return'';return t[0].slice(0,14)+(t.length>1?t[t.length-1].charAt(0):'');}
+/* 👁 ver/ocultar clave en todos los campos de contraseña */
+(function(){const add=i=>{if(i.dataset.eye||i.type!=='password')return;i.dataset.eye=1;const w=document.createElement('span');w.style.cssText='position:relative;display:block;width:'+(i.style.width||'100%');i.parentNode.insertBefore(w,i);w.appendChild(i);i.style.width='100%';i.style.boxSizing='border-box';i.style.paddingRight='46px';
+ const b=document.createElement('button');b.type='button';b.textContent='👁';b.title='Ver clave';b.setAttribute('aria-label','Ver clave');b.style.cssText='position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;background:transparent;font-size:1.2rem;cursor:pointer;padding:0;opacity:.75';
+ b.onclick=e=>{e.preventDefault();const v=i.type==='password';i.type=v?'text':'password';b.textContent=v?'🙈':'👁';b.title=v?'Ocultar clave':'Ver clave';i.focus();};w.appendChild(b);};
+ const scan=r=>{(r.querySelectorAll?r.querySelectorAll('input[type=password]'):[]).forEach(add);};
+ const go=()=>{scan(document);new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.matches&&n.matches('input[type=password]'))add(n);else scan(n);}}))).observe(document.body,{childList:true,subtree:true});};
+ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);})();
 
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -131,16 +138,20 @@ const A={users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:
 const TABS=[['usuarios','👥 Usuarios'],['alta','➕ Alta'],['torneos','🏟️ Torneos'],['hof','🏆 Salón de la fama'],['ajustes','⚙️ Ajustes']];
 const nm=u=>u.nombre||u.alias;
 /* ---------- sesión ---------- */
-FB.S.onChange=u=>{try{u?sessionStorage.setItem('adm',JSON.stringify(u)):sessionStorage.removeItem('adm');}catch(e){}};
-async function boot(){let u=null;try{u=JSON.parse(sessionStorage.getItem('adm')||'null');}catch(e){}
+FB.S.onChange=u=>{try{u?localStorage.setItem('adm',JSON.stringify(u)):localStorage.removeItem('adm');}catch(e){}};
+let dInst=null;const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dInst=e;instUI();});
+function instUI(){const b=document.getElementById('inst');if(!b)return;b.style.display=standalone()?'none':'';b.onclick=async()=>{if(dInst){dInst.prompt();try{await dInst.userChoice;}catch(e){}dInst=null;instUI();}else modal({title:'📲 Instalar',html:'<p>En Chrome (móvil): menú <b>⋮</b> → <b>Instalar aplicación</b> o <b>Añadir a pantalla de inicio</b>.<br>En iPhone (Safari): <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.</p>',buttons:[{t:'Entendido'}]});};}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw-admin.js',{scope:'./ajedrez-admin.html'}).catch(()=>{});
+async function boot(){let u=null;try{u=JSON.parse(localStorage.getItem('adm')||'null');}catch(e){}
  if(u&&u.email===FBC.admin){FB.restore(u);try{await loadAll();return shell();}catch(e){FB.logout();}}
  loginView();}
 function loginView(){$('#app').innerHTML=`<div class="card login"><h2>♞ Ajedrez Siurot</h2><p class="muted">Administración</p><input id="em" type="email" placeholder="Correo" value="${FBC.admin}" autocomplete="username"><input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password"><button class="btn" id="go" style="width:100%">Entrar</button><p class="err" id="er"></p></div>`;
  const go=async()=>{$('#er').textContent='';try{const u=await FB.login($('#em').value.trim().toLowerCase(),$('#pw').value);if(u.email!==FBC.admin){FB.logout();throw {code:'NO_ADMIN'};}await loadAll();shell();}catch(e){$('#er').textContent=e.code==='NO_ADMIN'?'Esta cuenta no es de administración.':FB.msg(e);}};
  $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go();};$('#pw').focus();}
 async function loadAll(){const[u,t,h,c]=await Promise.all([FB.list('users'),FB.list('torneos'),FB.list('hof'),FB.get('config/main')]);A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;if(c)A.cfg={...A.cfg,...c};}
-function shell(){$('#app').innerHTML=`<div class="top"><h1>♞ Ajedrez Siurot · Administración</h1><span class="who">${esc(FB.S.user.email)}</span><button class="btn ghost sm" id="out">Salir</button></div><nav>${TABS.map(([i,t])=>`<button data-t="${i}">${t}</button>`).join('')}</nav><main id="main"></main>`;
- $$('nav button').forEach(b=>b.onclick=()=>{A.tab=b.dataset.t;A.tid=null;render();});$('#out').onclick=()=>{FB.logout();loginView();};render();}
+function shell(){$('#app').innerHTML=`<div class="top"><h1>♞ Ajedrez Siurot · Administración</h1><span class="who">${esc(FB.S.user.email)}</span><button class="btn ghost sm" id="inst" style="display:none">📲 Instalar</button><button class="btn ghost sm" id="out">Salir</button></div><nav>${TABS.map(([i,t])=>`<button data-t="${i}">${t}</button>`).join('')}</nav><main id="main"></main>`;
+ $$('nav button').forEach(b=>b.onclick=()=>{A.tab=b.dataset.t;A.tid=null;render();});$('#out').onclick=()=>{FB.logout();loginView();};instUI();render();}
 function render(){clearInterval(A.timer);$$('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===A.tab));const m=$('#main');
  ({usuarios:vUsers,alta:vAlta,torneos:vTorneos,hof:vHof,ajustes:vAjustes})[A.tab](m);}
 const active=()=>A.users.filter(u=>u.ultimoLogin);
