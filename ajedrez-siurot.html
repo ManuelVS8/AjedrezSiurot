@@ -483,6 +483,8 @@ nav.tabs{display:none!important}
 
 .rushopp{background:#fff3c4;border:2px solid #f2b134;border-radius:12px;padding:8px 12px;font-weight:700;margin:6px 0}
 
+body.profemode header,body.profemode nav.tabs,body.profemode #installbar{display:none!important}body.profemode main{padding-top:12px}
+
 </style>
 </head>
 <body>
@@ -925,15 +927,19 @@ const BUILD={
    g.put(g.kingSafe('w'),'K');g.pawns('w',1+g.rnd(3));g.pawns('b',1+g.rnd(3));
    for(let i=0;i<pi;i++)if(g.b[line[i]])g.b[line[i]]='';for(let i=pi+1;i<si;i++)if(g.b[line[i]])g.b[line[i]]='';
    return {b:g.b,key:{from:P,to:Q2}};},
- clavada(r){const g=G(r);const diag=r()<.5;const d=g.pick(diag?DIAGD:ORTHD);const K=g.randEmpty(s=>(s>>3)<=3);const line=ray(K,d[0],d[1]);if(line.length<3)return null;
-   const xi=g.rnd(Math.min(3,line.length-2)),si=xi+1+g.rnd(line.length-xi-1);const X=line[xi],S=line[si];
-   if((X>>3)>4)return null;g.put(K,'k');g.put(X,g.pick(['n','b','n','r']));g.put(S,diag?'B':'R');
+ clavada(r){   // el alumno HACE la clavada (alfil o torre se coloca en la línea rey–pieza) y después la ataca con un peón
+   const g=G(r);const diag=r()<.5;const d=g.pick(diag?DIAGD:ORTHD);const K=g.randEmpty(s=>(s>>3)<=3);const line=ray(K,d[0],d[1]);if(line.length<3)return null;
+   const xi=g.rnd(Math.min(2,line.length-2)),ti=xi+1+g.rnd(line.length-xi-1);const X=line[xi],T=line[ti];
+   if((X>>3)>4)return null;g.put(K,'k');g.put(X,g.pick(['n','b','n','r','b']));
+   const S=diag?'B':'R';
+   // casilla de salida del alfil/torre: desde ella llega a T, pero no está en la línea
+   const tmp=posFrom((()=>{const b=g.b.slice();b[T]=S;return b;})());const from=tmp.pseudo(T).map(m=>m.to).filter(q=>!line.includes(q)&&q!==K&&g.empty(q)&&!adj(q,K));
+   if(!from.length)return null;const SF=g.pick(from);g.put(SF,S);
    const side=g.pick([-1,1]);const pf=(X&7)+side,pr=(X>>3)+2;const PS=RC(pr,pf);if(PS<0||pr>6)return null;if(!g.put(PS,'P'))return null;if(!g.empty(RC(pr-1,pf)))return null;
-   // defensor del pieza clavada
-   const dfs=[RC((X>>3)-1,(X&7)-1),RC((X>>3)-1,(X&7)+1)].filter(s=>s>=0&&!line.includes(s));if(dfs.length&&r()<.8)g.put(g.pick(dfs),'p');
-   g.put(g.kingSafe('w'),'K');g.pawns('w',1+g.rnd(3));g.pawns('b',1+g.rnd(2));
-   for(let i=0;i<si;i++)if(i!==xi&&g.b[line[i]])g.b[line[i]]='';
-   return {b:g.b,key:{from:PS,to:RC(pr-1,pf)}};},
+   const dfs=[RC((X>>3)-1,(X&7)-1),RC((X>>3)-1,(X&7)+1)].filter(q=>q>=0&&!line.includes(q));if(dfs.length&&r()<.7)g.put(g.pick(dfs),'p');
+   g.put(g.kingSafe('w'),'K');g.pawns('w',1+g.rnd(2));g.pawns('b',1+g.rnd(2));
+   for(let k=0;k<=ti;k++)if(k!==xi&&g.b[line[k]])g.b[line[k]]='';
+   return {b:g.b,key:{from:SF,to:T},pin:{P:PS,to:RC(pr-1,pf)}};},
  coronacion(r){const g=G(r);const f=g.rnd(8);const S=RC(1,f);g.put(S,'P');
    g.put(g.kingSafe('b'),'k');g.put(g.kingSafe('w'),'K');
    const n=1+g.rnd(2);for(let i=0;i<n;i++)g.put(g.randEmpty(),g.pick(['r','b','n','r']));
@@ -955,6 +961,24 @@ function followPlan(p,km){
   const r1=rep[0].m;p.make(r1);const f=rootScores(p,3);let plan=null;
   if(f.length&&f[0].m.captured&&f[0].s>=150&&f[0].s<MATE-200)plan={rep:uci(r1),best:uci(f[0].m),acc:f.filter(x=>f[0].s-x.s<=90).map(x=>uci(x.m))};
   p.unmake();p.unmake();return plan;
+}
+/* clavada en dos tiempos: 1) clavar (única jugada que gana) 2) tras la respuesta, empujar el peón contra la pieza clavada */
+function pinTwoStep(p,key,push){
+  const lg=p.legal();const km=lg.find(m=>same(m,key));if(!km||lg.length<4)return null;
+  // 1) tras clavar, la pieza no puede salir de la línea
+  p.make(km);const X=push.to+(p.turn==='w'?8:-8);   // casilla de la pieza clavada (en diagonal del peón, se comprueba abajo)
+  const pinned=[push.to-9,push.to-7,push.to+7,push.to+9].filter(q=>q>=0&&q<64&&p.b[q]&&p.b[q]!=='k'&&p.b[q]!=='K'&&colorOf(p.b[q])===p.turn);
+  if(!pinned.length){p.unmake();return null;}
+  // 2) mejor respuesta del rival (rápida) y el empujón de peón debe ganar material
+  const rep=rootScores(p,2);if(!rep.length){p.unmake();return null;}const r1=rep[0].m;p.make(r1);
+  const pm=p.legal().find(m=>same(m,push));let fp=null;
+  if(pm){const sp=rootScores(p,3,[pm])[0];if(sp&&sp.s>=150&&sp.s<MATE-200)fp={rep:uci(r1),best:uci(pm),acc:[uci(pm)],msg:'¡Clavada! Ahora <b>ataca la pieza clavada con un peón</b>: no se puede mover.'};}
+  p.unmake();p.unmake();if(!fp)return null;
+  // 3) la clavada debe ser la mejor jugada con diferencia (se comparan las 4 alternativas más prometedoras)
+  const pre=rootScores(p,2,lg).filter(x=>!same(x.m,km)).slice(0,4).map(x=>x.m);
+  const sc=rootScores(p,4,[km,...pre]);if(!same(sc[0].m,km)||sc[0].s<200||sc[0].s>MATE-200)return null;
+  if(sc[1]&&sc[0].s-sc[1].s<170)return null;
+  return {fen:p.fen(),goal:'move',accept:[p.san(km)],follow:true,fp};
 }
 function tryTheme(theme,r,level){
   level=level||1;
@@ -983,6 +1007,7 @@ function tryTheme(theme,r,level){
     return {fen:p.fen(),goal:'move',accept:alts.map(x=>p.san(x.m))};
   }
   const key={from:fx(c.key.from),to:fx(c.key.to)};
+  if(theme==='clavada'&&c.pin)return pinTwoStep(p,key,{from:fx(c.pin.P),to:fx(c.pin.to)});
   const km=verifyKey(p,key);if(!km)return null;
   const fol=FOLLOW_THEMES.includes(theme);let fp=null;if(fol){fp=followPlan(p,km);if(!fp)return null;}
   return {fen:p.fen(),goal:'move',accept:[p.san(km)],follow:fol,fp};
@@ -1478,7 +1503,7 @@ const TEMAS=[
  {id:'pasillo',nombre:'Mate del pasillo',icono:'🚪',color:'#a93226',xp:10,que:'El rey está encerrado por sus peones en la última fila.',pista:'Busca una torre o dama que pueda llegar a la última fila.'},
  {id:'horquilla',nombre:'Horquilla',icono:'🍴',color:'#1f6fb2',xp:10,que:'Ataca dos piezas a la vez. ¡El caballo y el peón son expertos!',pista:'Busca una casilla desde la que ataques al rey y a otra pieza.'},
  {id:'colgada',nombre:'Pieza indefensa',icono:'🎁',color:'#2e9d5b',xp:8,que:'Hay una pieza sin defender. ¡Captúrala!',pista:'Revisa cada pieza rival: ¿quién la defiende?'},
- {id:'clavada',nombre:'Clavada',icono:'📌',color:'#d4841c',xp:10,que:'Una pieza rival no se puede mover porque dejaría a su rey en jaque. ¡Atácala!',pista:'Busca una pieza rival entre tu torre/alfil y su rey. Atácala con un peón.'},
+ {id:'clavada',nombre:'Clavada',icono:'📌',color:'#d4841c',xp:10,que:'Primero clava una pieza rival contra su rey y después atácala con un peón: ¡no podrá escapar!',pista:'Busca una pieza rival en la misma línea (fila, columna o diagonal) que su rey. Pon tu alfil o tu torre en esa línea, detrás de la pieza.'},
  {id:'enfilada',nombre:'Enfilada',icono:'🍢',color:'#16857a',xp:10,que:'Da jaque al rey y captura la pieza que está detrás.',pista:'¿Hay una pieza valiosa en la misma línea que el rey?'},
  {id:'descubierta',nombre:'A la descubierta',icono:'💥',color:'#8e44ad',xp:12,que:'Aparta una pieza para descubrir un jaque y ataca algo a la vez.',pista:'Una de tus piezas tapa a otra que apunta al rey. ¡Muévela atacando!'},
  {id:'coronacion',nombre:'Coronación',icono:'⭐',color:'#b7950b',xp:8,que:'Lleva tu peón a la última fila y conviértelo en dama.',pista:'¿Qué peón está a punto de coronar?'},
@@ -1892,14 +1917,14 @@ function playSound(pos,m){if(pos.inCheck())sound('check');else if(m.captured)sou
 
 // ================= Navegación =================
 let VIEW=0;let currentTab='inicio',currentArg=null,CUR_BOARD=null;
-const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['torneos','🏟️','Torneos'],['progreso','📈','Progreso']];
+const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['torneos','🏟️','Torneos'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
 function go(tab,arg){
  VIEW++;currentTab=tab;currentArg=arg;CUR_BOARD=null;window.scrollTo(0,0);stopSpeech();document.body.classList.remove('intrainer');fitHeader();
  $$('.modalbg').forEach(bg=>bg._close?bg._close(null):bg.remove());closeMenu();
- const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',escaner:'ejercicios',errores:'ejercicios',tarea:'aula',ogame:'online',arena:'torneos'};
+ const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',escaner:'ejercicios',errores:'ejercicios',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
 }
 function alive(tok){return tok===VIEW;}
 function renderHeader(){
@@ -1976,7 +2001,7 @@ function viewHome(m){
 const MATE_AVISO='<div class="warnbox">⚠️ <b>Ojo:</b> con <b>solo el rey</b>, <b>rey y alfil</b> o <b>rey y caballo</b> es <b>imposible</b> dar mate. Hace falta al menos una torre, una dama o dos piezas menores (o un peón que corone).</div>';
 // ================= APRENDER =================
 function viewLearn(m){
- m.innerHTML=`<div class="sectitle"><h2>📚 Aprender</h2><span class="pill">${MODULES.reduce((a,md)=>a+modProgress(md).done,0)} / ${MODULES.reduce((a,md)=>a+md.lecciones.length,0)} lecciones</span></div><div class="card" id="xpl" style="display:flex;align-items:center;gap:14px;cursor:pointer;margin-bottom:14px;border:2px solid #2563eb;background:#eef4ff"><div style="font-size:2.2rem">📖</div><div style="flex:1"><h3 style="margin:0">Explorador de aperturas</h3><div class="muted" style="font-weight:700">Mueve las piezas y descubre el nombre de la apertura, las jugadas de teoría y lo que jugaría Stockfish</div></div><span class="btn sm">Abrir</span></div><div class="grid g2" id="mods"></div>`;$('#xpl',m).onclick=()=>go('explorador');
+ m.innerHTML=`<div class="sectitle"><h2>📚 Aprender</h2><span class="pill">${MODULES.reduce((a,md)=>a+modProgress(md).done,0)} / ${MODULES.reduce((a,md)=>a+md.lecciones.length,0)} lecciones</span></div><div class="grid g2" id="mods"></div>`;
  const g=$('#mods',m);
  MODULES.forEach(mod=>{const pr=modProgress(mod);const c=document.createElement('div');c.className='card mod';
   c.innerHTML=`<div class="mic" style="background:${mod.color}">${mod.icono}</div><div style="flex:1"><h3>${mod.nombre}</h3><p>${mod.desc}</p><div class="pbar"><i style="width:${pr.done/pr.total*100}%;background:${mod.color}"></i></div><div class="muted" style="font-size:.8rem;font-weight:800;margin-top:4px">${pr.done}/${pr.total} lecciones ${pr.done===pr.total?'✅':''}</div></div>`;
@@ -2012,7 +2037,7 @@ function runPuzzle(board,cfg,cb,tok){
  const reset=async()=>{await sleep(650);if(!alive(tok))return;pos.undo();board.set(pos,{last:null});busy=false;};
  // ¿hay, tras la respuesta del rival, una captura que gane material? (plan precalculado o calculado al momento)
  const planFollow=()=>{
-  if(cfg.fp)return {rep:pos.fromUci(cfg.fp.rep),best:pos.fromUci(cfg.fp.best),acc:cfg.fp.acc};
+  if(cfg.fp)return {rep:pos.fromUci(cfg.fp.rep),best:pos.fromUci(cfg.fp.best),acc:cfg.fp.acc,msg:cfg.fp.msg};
   const sc=E.scoreMoves(pos,2);if(!sc.length)return null;const rep=sc[0].m;pos.play(rep);const f=E.scoreMoves(pos,3);pos.undo();
   const b=f[0];if(b&&(b.m.captured||b.m.promo)&&b.s>=150&&b.s<99000)return {rep,best:b.m,acc:f.filter(x=>b.s-x.s<=90).map(x=>E.uci(x.m))};return null;};
  board.onMove=async(m,anim)=>{
@@ -2035,7 +2060,7 @@ function runPuzzle(board,cfg,cb,tok){
      // quitamos la jugada un momento para planificar sobre la posición anterior sin alterar el tablero
      const plan=planFollow();
      if(plan){cb.msg('¡Buena jugada! El rival responde… ahora <b>ejecuta la captura</b>.','info');board.interactive=false;await sleep(700);if(!alive(tok))return;
-      pos.play(plan.rep);board.set(pos,{last:plan.rep,anim:true});playSound(pos,plan.rep);fol=plan;phase=2;board.interactive=true;busy=false;cb.msg('Ahora <b>gana material</b>: ¡haz la captura!','info');return;}
+      pos.play(plan.rep);board.set(pos,{last:plan.rep,anim:true});playSound(pos,plan.rep);fol=plan;phase=2;board.interactive=true;busy=false;cb.msg(plan.msg||'Ahora <b>gana material</b>: ¡haz la captura!','info');return;}
     }
     done=true;board.interactive=false;cb.onSolved(mistakes,help,pos,m);return;
    }
@@ -2300,7 +2325,7 @@ function viewExercises(m){
 // genera un ejercicio (rápido: < 0,2 s). La semilla decide la posición.
 function genPuzzle(theme,seed,level){const r=E.generate(theme,seed>>>0,4000,level||1);return r;}
 const THEME_OF=id=>TEMAS.find(t=>t.id===id)||TEMAS[0];
-function goalText(pz){return pz.goal==='mate'?`Da <b>jaque mate en ${pz.n}</b>.`:pz.theme==='coronacion'?'Encuentra la jugada ganadora: ¡corona!':pz.follow?'Encuentra la jugada que <b>gana material</b> y luego <b>ejecuta la captura</b>.':'Encuentra la jugada que <b>gana material</b>.';}
+function goalText(pz){return pz.goal==='mate'?`Da <b>jaque mate en ${pz.n}</b>.`:pz.theme==='coronacion'?'Encuentra la jugada ganadora: ¡corona!':pz.theme==='clavada'&&pz.follow?'<b>Clava</b> una pieza rival contra su rey con tu alfil o tu torre y después <b>atácala con un peón</b>.':pz.follow?'Encuentra la jugada que <b>gana material</b> y luego <b>ejecuta la captura</b>.':'Encuentra la jugada que <b>gana material</b>.';}
 function viewTema(m,arg){
  const id=typeof arg==='object'?arg.id:arg,from=typeof arg==='object'?arg.from:null;
  const tok=VIEW;const T=THEME_OF(id);const st=temaStats(id);P.tnivel=P.tnivel||{};
@@ -2655,7 +2680,7 @@ function viewRush(m,arg){
  function nextPz(){if(!running)return;
   let pz=null;while(!pz){n++;const th=['mate1','pasillo','horquilla','colgada','clavada','enfilada','descubierta','coronacion','mate1'][hash(base+'t'+n)%9];pz=genPuzzle(th,hash(base+'|'+n),Math.min(6,1+Math.floor(score/3)));}
   const p=new E.Pos(pz.fen);$('#tb',body).innerHTML=turnHTML(p.turn);$('#goal',body).innerHTML=goalText(pz);
-  runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept},{
+  runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept,follow:pz.follow,fp:pz.fp},{
    onSolved:()=>{if(!running)return;score++;streak++;bestStreak=Math.max(bestStreak,streak);eloUpdate(pzRating(pz.level||1),1,5,'rush');sound('ok');hud();setFb('✅ ¡Bien!','ok');
     // los récords se avisan sin parar la partida; al final se muestran todos
     if(!liveRec&&score>rec0.best&&rec0.best>0){liveRec=true;toast('🏆 ¡Nuevo récord de aciertos! Sigue…','badge');}
@@ -2811,7 +2836,7 @@ function closeMenu(){const d=$('.drawerbg');if(d)d.remove();}
 function openMenu(){
  if($('.drawerbg')){closeMenu();return;}
  const bg=document.createElement('div');bg.className='drawerbg';
- const cur=({modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios'})[currentTab]||currentTab;
+ const cur=({modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',explorador:'laboratorio',tablero:'laboratorio'})[currentTab]||currentTab;
  bg.innerHTML=`<div class="drawer"><div class="dh"><b>♞ Ajedrez Siurot</b><button class="iconbtn sm" id="dclose" aria-label="Cerrar">✕</button></div>${TABS.map(([id,ic,t])=>`<button class="ditem ${cur===id?'on':''}" data-tab="${id}"><span>${ic}</span>${t}</button>`).join('')}<hr><button class="ditem" id="dacc"><span>🏫</span>${onlLogged()?esc(ONL.acc.nombre)+' · Salir':'Entrar con usuario del cole'}</button><button class="ditem" id="dset"><span>⚙️</span>Ajustes</button><button class="ditem" id="dprof"><span>👥</span>Cambiar jugador</button></div>`;
  document.body.appendChild(bg);
  bg.addEventListener('pointerdown',e=>{if(e.target===bg)closeMenu();});
@@ -2829,7 +2854,15 @@ async function hideSplash(){
  else if(gate&&gate.guest){try{await arenaJoinGuest(gate.guest);}catch(e){}}
  s.classList.add('out');setTimeout(()=>s.remove(),700);
 }
-function boot(){if(/^#tv/.test(location.hash)){const tid=decodeURIComponent((location.hash.split('=')[1]||''));setTimeout(()=>openTV({tid}),200);}const hl=document.getElementById('hlogo');if(hl)hl.src=LOGO_URL;hideSplash();initBack();$('#burger').onclick=openMenu;
+function boot(){
+ if(location.hash==='#profe'){   // panel del profesor: solo desde la app de administración (con su sesión)
+  let a=null;try{a=JSON.parse(localStorage.getItem('adm')||'null');}catch(e){}
+  const sp=document.getElementById('splash');if(sp)sp.remove();document.body.classList.add('profemode');
+  try{applyLook();}catch(e){}
+  const mm=document.querySelector('main');
+  if(!a||a.email!==FBC.admin){mm.innerHTML='<div class="card" style="margin:20px;text-align:center">🔒 Esta parte es solo para el profesor.<br>Ábrela desde la app de administración.</div>';return;}
+  PROFE=true;AULA_OK=true;teacherView(mm,'tareas');return;}
+ if(/^#tv/.test(location.hash)){const tid=decodeURIComponent((location.hash.split('=')[1]||''));setTimeout(()=>openTV({tid}),200);}const hl=document.getElementById('hlogo');if(hl)hl.src=LOGO_URL;hideSplash();initBack();$('#burger').onclick=openMenu;
  $('#tabs').innerHTML=TABS.map(([id,ic,t])=>`<button data-tab="${id}">${ic} ${t}</button>`).join('');
  $$('#tabs button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
  $('.logo').onclick=()=>P&&go('inicio');
@@ -3076,7 +3109,7 @@ function explorerTree(){if(_xtree)return _xtree;const T=new Map();
  _xtree=T;return T;}
 function viewExplorer(m){
  const tok=VIEW;const T=explorerTree();let pos=new E.Pos();const sans=[];let seq=0,lastName='';
- const {board,body,under}=trainerShell(m,'📖 Explorador de aperturas',()=>go('aprender'));
+ const {board,body,under}=trainerShell(m,'📖 Explorador de aperturas',()=>go('laboratorio'));
  under.innerHTML='<button class="btn ghost sm" id="x0">⏮ Inicio</button><button class="btn ghost sm" id="x1">◀ Atrás</button><button class="btn ghost sm" id="xf">🔄 Girar</button>';
  board.orient='w';board.interactive=true;board.premoveOK=false;
  function play(mv){pos.play(mv);sans.push(mv);board.movable=pos.turn;board.set(pos,{last:mv,anim:true});playSound(pos,mv);draw();}
@@ -3108,6 +3141,68 @@ function viewExplorer(m){
  $('#x1',under).onclick=()=>{if(!sans.length)return;pos.undo();sans.pop();board.set(pos,{last:sans[sans.length-1]||null});draw();};
  $('#xf',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();};
  board.set(pos,{last:null});draw();}
+
+/* ================= TABLERO DE ANÁLISIS LIBRE (pegar FEN o PGN, reproducir, Stockfish) ================= */
+function viewBoardAn(m){
+ const tok=VIEW;let start;let line=[];let cur=0;let pos=new E.Pos();let seq=0;let engOn=true;
+ const {board,body,under}=trainerShell(m,'🔍 Tablero de análisis',()=>go('laboratorio'));
+ under.innerHTML='<button class="btn ghost sm" id="b0">⏮</button><button class="btn ghost sm" id="b1">◀</button><button class="btn sm" id="b2">▶</button><button class="btn ghost sm" id="b3">⏭</button><button class="btn ghost sm" id="bf">🔄 Girar</button>';
+ board.orient='w';board.interactive=true;board.premoveOK=false;
+ body.innerHTML=`<div class="card" style="padding:10px 12px"><div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:4px">PEGA UNA POSICIÓN (FEN) O UNA PARTIDA (PGN)</div><textarea id="tx" placeholder="Ej.: rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1&#10;o una partida: 1. e4 e5 2. Nf3 Nc6 …" style="width:100%;min-height:70px;padding:8px;border:2px solid var(--line);border-radius:10px;font-family:monospace;font-size:.82rem"></textarea>
+  <div class="btnrow" style="margin-top:6px;gap:6px"><button class="btn sm" id="ld">📋 Cargar</button><button class="btn sm ghost" id="ini">♟ Posición inicial</button><button class="btn sm ghost" id="cf">Copiar FEN</button><button class="btn sm ghost" id="cp">Copiar PGN</button></div></div>
+  <div class="movelist" id="ml" style="max-height:130px"></div>
+  <div class="card" style="padding:10px 12px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><div class="muted" style="font-weight:800;font-size:.8rem;flex:1">🤖 STOCKFISH</div><button class="btn sm ghost" id="eng">Apagar</button></div><div id="sf"></div></div>
+  <div class="btnrow"><button class="btn acc" id="full">🔬 Análisis completo de la partida</button></div>
+  <p class="muted" style="font-size:.82rem;margin:0">Puedes mover las piezas de los dos colores. Si mueves en mitad de la partida, se crea una línea nueva desde ahí. Usa ← y → del teclado para avanzar y retroceder.</p>`;
+ const posAt=k=>{const p=new E.Pos(start);for(let i=0;i<k;i++){const mv=p.fromUci(line[i]);if(!mv)break;p.play(mv);}return p;};
+ function sanList(){const p=new E.Pos(start);const out=[];for(const u of line){const mv=p.fromUci(u);if(!mv)break;out.push(p.san(mv));p.play(mv);}return out;}
+ function pgn(){const p=new E.Pos(start);let s='',num=p.full,first=true;for(const u of line){const mv=p.fromUci(u);if(!mv)break;if(p.turn==='w')s+=num+'. ';else if(first)s+=num+'... ';s+=p.san(mv)+' ';if(p.turn==='b')num++;p.play(mv);first=false;}
+  return (start?`[SetUp "1"]\n[FEN "${start}"]\n\n`:'')+s.trim()+' *';}
+ async function engine(){const my=++seq,box=$('#sf',body);if(!box)return;
+  if(!engOn){box.innerHTML='<p class="muted" style="margin:0">Apagado.</p>';return;}
+  if(!SF.ok){box.innerHTML='<p class="muted" style="margin:0">Stockfish no está disponible en este dispositivo.</p>';return;}
+  const st=pos.status();if(st&&st!=='jaque'){box.innerHTML=`<p style="margin:0;font-weight:800">${{mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición'}[st]||''}</p>`;return;}
+  box.innerHTML='<p class="muted" style="margin:0">Pensando…</p>';
+  const fen=pos.fen(),turn=pos.turn;const r=await SF.go(fen,{ms:900,multipv:3,info:true});if(my!==seq||!alive(tok))return;
+  if(!r||!r.lines){box.innerHTML='<p class="muted" style="margin:0">Sin respuesta.</p>';return;}
+  box.innerHTML=Object.keys(r.lines).sort().map(k=>{const L=r.lines[k];const pv=Array.isArray(L.pv)?L.pv:String(L.pv).split(' ');const q=new E.Pos(fen);const sans=[];
+   for(const u of pv.slice(0,7)){const mm=q.fromUci(u);if(!mm)break;sans.push(E.sanES(q.san(mm)));q.play(mm);}
+   let cp=L.t==='cp'?L.v:(L.v>0?10000-L.v*10:-10000-L.v*10);if(turn==='b')cp=-cp;
+   return `<button class="xmv" data-u="${pv[0]}"><span class="pill">${evTxt(cp)}</span><span style="font-size:.88rem"><b>${sans[0]||''}</b> ${sans.slice(1).join(' ')}</span></button>`;}).join('');
+  $$('[data-u]',box).forEach(b=>b.onclick=()=>{const mm=pos.fromUci(b.dataset.u);if(mm)board.onMove(mm,true);});}
+ function draw(anim){pos=posAt(cur);board.movable=pos.turn;const last=cur?pos.played[pos.played.length-1]:null;board.set(pos,{last,anim:!!(anim&&last)});
+  const sans=sanList();const p0=new E.Pos(start);let h='',num=p0.full;const off=p0.turn==='b'?1:0;
+  for(let i=0;i<sans.length;i++){const k=i+off;if(k%2===0)h+=`<span class="n">${num+Math.floor(k/2)}.</span>`;else if(i===0)h+=`<span class="n">${num}.</span><span>…</span>`;h+=`<span class="${i===cur-1?'cur':''}" data-i="${i+1}" style="cursor:pointer">${E.sanES(sans[i])}</span>`;}
+  const ml=$('#ml',body);ml.innerHTML=h||'<span class="muted" style="grid-column:1/-1">Mueve una pieza o pega una partida.</span>';$$('[data-i]',ml).forEach(s=>s.onclick=()=>{cur=+s.dataset.i;draw();});const c=$('.cur',ml);if(c)c.scrollIntoView({block:'nearest'});
+  $('#b0',under).disabled=$('#b1',under).disabled=!cur;$('#b2',under).disabled=$('#b3',under).disabled=cur>=line.length;engine();}
+ board.onMove=(mv,anim)=>{const u=E.uci(mv);if(line[cur]===u){cur++;draw(true);return;}line=line.slice(0,cur);line.push(u);cur++;playSound(pos,mv);draw(true);};
+ function load(t){t=String(t||'').trim();if(!t)return toast('Pega primero un FEN o un PGN','bad');
+  const fenRe=/^([rnbqkpRNBQKP1-8]+\/){7}[rnbqkpRNBQKP1-8]+\s+[wb]\b/;
+  if(fenRe.test(t)){try{const p=new E.Pos(t);if(p.kingSq('w')<0||p.kingSq('b')<0)throw 0;start=p.fen();line=[];cur=0;board.orient=p.turn;draw();toast('Posición cargada','ok');}catch(e){toast('Ese FEN no es válido','bad');}return;}
+  const g=(typeof parsePGN==='function'?parsePGN(t):[]).find(x=>!x.error);if(!g)return toast('No he podido leer esa partida','bad');
+  start=g.fen||undefined;line=[];let n=g.root;while(n&&n.ch&&n.ch.length){n=n.ch[0];line.push(n.uci);}cur=0;board.orient='w';draw();toast(`Partida cargada: ${line.length} jugadas. Pulsa ▶ para reproducirla.`,'ok');}
+ $('#ld',body).onclick=()=>load($('#tx',body).value);
+ $('#ini',body).onclick=()=>{start=undefined;line=[];cur=0;$('#tx',body).value='';draw();};
+ $('#cf',body).onclick=async()=>toast((await copyText(pos.fen()))?'📋 FEN copiado':'No se pudo copiar');
+ $('#cp',body).onclick=async()=>toast((await copyText(pgn()))?'📋 PGN copiado':'No se pudo copiar');
+ $('#eng',body).onclick=()=>{engOn=!engOn;$('#eng',body).textContent=engOn?'Apagar':'Encender';engine();};
+ $('#full',body).onclick=()=>{if(line.length<2)return toast('Hacen falta al menos 2 jugadas','bad');const e={id:Date.now(),date:today(),level:0,color:board.orient,res:'?',moves:line.slice(),name:'Tablero de análisis',start:start||undefined,keep:true};P.hist=P.hist||[];P.hist.push(e);save();go('analisis',{id:e.id});};
+ $('#b0',under).onclick=()=>{cur=0;draw();};$('#b1',under).onclick=()=>{if(cur){cur--;draw();}};$('#b2',under).onclick=()=>{if(cur<line.length){cur++;draw(true);}};$('#b3',under).onclick=()=>{cur=line.length;draw();};
+ $('#bf',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();};
+ const key=e=>{if(!alive(tok))return document.removeEventListener('keydown',key);if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT')return;if(e.key==='ArrowLeft'&&cur){cur--;draw();}else if(e.key==='ArrowRight'&&cur<line.length){cur++;draw(true);}};
+ document.addEventListener('keydown',key);
+ draw();}
+function viewLab(m){
+ m.innerHTML=`<div class="sectitle"><h2>🔬 Análisis y aperturas</h2></div>
+ <div class="grid g2">
+  <div class="card mod" id="lb1" style="cursor:pointer"><div class="mic" style="background:#2563eb">📖</div><div style="flex:1"><h3>Explorador de aperturas</h3><p>Mueve las piezas y descubre el nombre de la apertura, las jugadas de teoría y lo que jugaría Stockfish.</p></div></div>
+  <div class="card mod" id="lb2" style="cursor:pointer"><div class="mic" style="background:#16a34a">🔍</div><div style="flex:1"><h3>Tablero de análisis</h3><p>Pega una posición (FEN) o una partida (PGN), reprodúcela jugada a jugada y prueba ideas con Stockfish.</p></div></div>
+  <div class="card mod" id="lb3" style="cursor:pointer"><div class="mic" style="background:#7c3aed">🔬</div><div style="flex:1"><h3>Analizar una partida completa</h3><p>Pega el PGN de cualquier partida y verás la valoración de cada jugada: brillantes, errores, imprecisiones…</p></div></div>
+  <div class="card mod" id="lb4" style="cursor:pointer"><div class="mic" style="background:#d4841c">📜</div><div style="flex:1"><h3>Mis partidas</h3><p>Tus partidas contra la máquina, online y con amigos, listas para analizar.</p></div></div>
+ </div>`;
+ $('#lb1',m).onclick=()=>go('explorador');$('#lb2',m).onclick=()=>go('tablero');
+ $('#lb3',m).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
+ $('#lb4',m).onclick=()=>go('jugar');}
 // ================= PGN, ESTUDIOS Y PARTIDAS GUARDADAS =================
 const NAGS={1:'!',2:'?',3:'!!',4:'??',5:'!?',6:'?!'};const NAGN={'!':1,'?':2,'!!':3,'??':4,'!?':5,'?!':6};
 const CALC={G:'g',R:'r',Y:'o',B:'b'},CALR={g:'G',r:'R',o:'Y',b:'B'};
@@ -3381,10 +3476,10 @@ function gamePGN(g){
  return `[Event "Ajedrez Siurot"]\n[Site "ajedrezsiurot.com"]\n[Date "${g.date.replace(/-/g,'.')}"]\n[White "${wn}"]\n[Black "${bn}"]\n[Result "${res}"]\n${g.start?`[Variant "Chess960"]\n[SetUp "1"]\n[FEN "${g.start}"]\n`:''}\n${(mt+res).replace(/(.{1,90})(\s|$)/g,'$1\n').trim()}\n`;
 }
 function addImportedGame(text,color){
- const gs=parsePGN(text).filter(g=>!g.error&&!g.fen);if(!gs.length)return null;const g=gs[0];
+ const gs=parsePGN(text).filter(g=>!g.error);if(!gs.length)return null;const g=gs[0];
  const moves=[];let n=g.root;while(n.ch.length){n=n.ch[0];moves.push(n.uci);}if(!moves.length)return null;
  const nm=(g.tags.White&&g.tags.Black)?`${g.tags.White} – ${g.tags.Black}`:'Partida importada';
- const e={id:Date.now(),date:today(),level:0,color:color||'w',res:'?',moves,name:nm,keep:true};P.hist=P.hist||[];P.hist.push(e);save();return e;
+ const e={id:Date.now(),date:today(),level:0,color:color||'w',res:'?',moves,name:nm,keep:true,start:g.fen||undefined};P.hist=P.hist||[];P.hist.push(e);save();return e;
 }
 async function importGameDialog(){
  const t=await askText('📥 Importar partida (PGN)','Pega aquí el PGN de la partida…','',true);if(!t)return null;
@@ -3812,7 +3907,9 @@ function readCodes(txt){
  return out;
 }
 function aulaDB(){DB.aula=DB.aula||{};const a=DB.aula;a.pin=a.pin||null;a.tareas=a.tareas||[];a.informes=a.informes||{};a.entregas=a.entregas||[];a.torneos=a.torneos||[];return a;}
-let AULA_OK=false;
+let AULA_OK=false,PROFE=false;
+/* el panel del profe solo se abre desde la app de administración (ajedrez-siurot.html#profe con la sesión del admin) */
+const aulaGo=o=>PROFE?teacherView(document.querySelector('main'),o.sec,o):go('aula',o);
 const nkey=n=>String(n||'').trim().toLowerCase();
 const baseURL=()=>location.href.split('#')[0].split('?')[0];
 const rid=()=>Math.random().toString(36).slice(2,8);
@@ -3948,16 +4045,16 @@ function viewTask(m,{task:t}){
 // ---------- vista principal: Aula ----------
 async function viewAula(m,arg){
  arg=arg||{};
- if(arg.sec){if(!AULA_OK){const ok=await aulaGate();if(!ok)return go('aula');}return teacherView(m,arg.sec,arg);}
+ if(arg.sec&&PROFE)return teacherView(m,arg.sec,arg);
  const A=aulaDB();const tareas=Object.entries((P.aula&&P.aula.tareas)||{}).map(([id,r])=>({id,r,s:taskScore(r)}));
  m.innerHTML=`<div class="sectitle"><h2>🏫 Aula</h2><span class="pill">${esc(P.avatar)} ${esc(P.name)}</span></div>
  <div class="grid g2">
   <div class="card"><h3>📥 Tarea de mi profe</h3><p class="muted" style="margin:4px 0 10px">Abre el enlace o escanea el QR que te dé tu profe. También puedes pegar aquí el código.</p><button class="btn acc" id="pt">📥 Pegar código o enlace</button></div>
   <div class="card"><h3>📤 Mi informe</h3><p class="muted" style="margin:4px 0 10px">Genera un código con tu progreso para entregárselo a tu profe.</p><button class="btn" id="mr">📤 Generar mi informe</button></div>
  </div>
- <div class="card" style="margin-top:16px"><h3>📋 Mis tareas</h3>${tareas.length?`<div style="display:grid;gap:8px;margin-top:10px">${tareas.map(({id,r,s})=>`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:2px solid var(--line);border-radius:12px;background:#fff"><div style="flex:1;min-width:160px"><b>${esc(r.ti||'Tarea')}</b><div class="muted" style="font-size:.8rem;font-weight:700">${r.task?taskLabel(r.task):''}</div></div><span class="pill">${s?(s.sc>=s.mx?'✅ ':'')+s.sc+'/'+s.mx:'⏳ Pendiente'}</span><button class="btn sm ${s?'ghost':''}" data-run="${id}">${s?'Repetir':'▶ Empezar'}</button>${s?`<button class="btn sm ghost" data-del="${id}">📤 Código</button>`:''}</div>`).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Todavía no tienes tareas. Cuando tu profe te dé un enlace, aparecerá aquí.</p>'}</div>
- <div class="card" style="margin-top:16px;background:linear-gradient(135deg,#eef6ff,#fffdf8)"><h3>🔒 Panel del profesor</h3><p class="muted" style="margin:4px 0 10px">Crea tareas con enlace y QR, imprime fichas, organiza torneos y recoge los informes de la clase.</p><button class="btn" id="tp">🔒 Entrar al panel</button></div>`;
- $('#pt',m).onclick=pasteTask;$('#mr',m).onclick=showMyReport;$('#tp',m).onclick=()=>go('aula',{sec:'tareas'});
+ <div class="card" style="margin-top:16px"><h3>📋 Mis tareas</h3>${tareas.length?`<div style="display:grid;gap:8px;margin-top:10px">${tareas.map(({id,r,s})=>`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:2px solid var(--line);border-radius:12px;background:#fff"><div style="flex:1;min-width:160px"><b>${esc(r.ti||'Tarea')}</b><div class="muted" style="font-size:.8rem;font-weight:700">${r.task?taskLabel(r.task):''}</div></div><span class="pill">${s?(s.sc>=s.mx?'✅ ':'')+s.sc+'/'+s.mx:'⏳ Pendiente'}</span><button class="btn sm ${s?'ghost':''}" data-run="${id}">${s?'Repetir':'▶ Empezar'}</button>${s?`<button class="btn sm ghost" data-del="${id}">📤 Código</button>`:''}</div>`).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Todavía no tienes tareas. Cuando tu profe te dé un enlace, aparecerá aquí.</p>'}</div>`;
+
+ $('#pt',m).onclick=pasteTask;$('#mr',m).onclick=showMyReport;
  $$('[data-run]',m).forEach(b=>b.onclick=()=>{const r=P.aula.tareas[b.dataset.run];if(r&&r.task)runTask(r.task);});
  $$('[data-del]',m).forEach(b=>b.onclick=()=>showDelivery(b.dataset.del,''));
 }
@@ -3968,13 +4065,12 @@ async function pasteTask(){
  taskIntro(c.data);
 }
 // ---------- panel del profesor ----------
-const SECS=[['tareas','📝','Tareas'],['clase','👥','Clase'],['fichas','🖨️','Fichas'],['torneos','🏆','Torneos']];
+const SECS=[['tareas','📝','Tareas'],['clase','👥','Clase'],['fichas','🖨️','Fichas']];
 function teacherView(m,sec,arg){
- m.innerHTML=`<div class="sectitle"><h2>🏫 Panel del profesor</h2><div class="btnrow"><button class="btn ghost sm" id="tpin">🔑 PIN</button><button class="btn ghost sm" id="tout">🔒 Salir</button></div></div>
+ m.innerHTML=`<div class="sectitle"><h2>🏫 Tareas, clase y fichas</h2></div>
  <div class="chips" style="margin-bottom:14px">${SECS.map(([id,ic,t])=>`<button class="btn sm ${id===sec?'':'ghost'}" data-sec="${id}">${ic} ${t}</button>`).join('')}</div><div id="sec"></div>`;
- $$('[data-sec]',m).forEach(b=>b.onclick=()=>go('aula',{sec:b.dataset.sec}));
- $('#tout',m).onclick=()=>{AULA_OK=false;go('aula');};
- $('#tpin',m).onclick=async()=>{const v=await askPin('🔑 Nuevo PIN','Escribe el nuevo PIN (déjalo vacío para quitarlo).');if(v===null)return;const A=aulaDB();A.pin=v?hash(v+'siurot'):null;save();toast(v?'🔒 PIN cambiado':'PIN quitado');};
+ $$('[data-sec]',m).forEach(b=>b.onclick=()=>aulaGo({sec:b.dataset.sec}));
+ if(false)$('#tpin',m).onclick=async()=>{const v=await askPin('🔑 Nuevo PIN','Escribe el nuevo PIN (déjalo vacío para quitarlo).');if(v===null)return;const A=aulaDB();A.pin=v?hash(v+'siurot'):null;save();toast(v?'🔒 PIN cambiado':'PIN quitado');};
  const box=$('#sec',m);
  ({tareas:secTareas,clase:secClase,fichas:secFichas,torneos:secTorneos})[sec](box,arg);
 }
@@ -4005,10 +4101,10 @@ function secTareas(box){
   if(ty==='tema'){t.th=$('#fth',box).value;t.n=+$('#fn',box).value;t.lv=+$('#flv',box).value;t.s=Math.floor(Math.random()*1e6);}
   else if(ty==='lec'){t.mod=$('#fmo',box).value;t.l=$('#fle',box).value;}
   else{t.n=+$('#fn',box).value;t.s=Math.floor(Math.random()*1e6);}
-  A.tareas.unshift(t);save();go('aula',{sec:'tareas'});showTaskLink(t);
+  A.tareas.unshift(t);save();aulaGo({sec:'tareas'});showTaskLink(t);
  };
  $$('[data-lk]',box).forEach(b=>b.onclick=()=>showTaskLink(A.tareas.find(t=>t.id===b.dataset.lk)));
- $$('[data-rm]',box).forEach(b=>b.onclick=async()=>{if(await confirmModal('¿Borrar la tarea?','El enlace seguirá funcionando para quien ya lo tenga.','Borrar','Cancelar',true)){A.tareas=A.tareas.filter(t=>t.id!==b.dataset.rm);save();go('aula',{sec:'tareas'});}});
+ $$('[data-rm]',box).forEach(b=>b.onclick=async()=>{if(await confirmModal('¿Borrar la tarea?','El enlace seguirá funcionando para quien ya lo tenga.','Borrar','Cancelar',true)){A.tareas=A.tareas.filter(t=>t.id!==b.dataset.rm);save();aulaGo({sec:'tareas'});}});
 }
 function taskToCode(t){const o={id:t.id,ti:t.ti,t:t.t};if(t.t==='tema'){o.th=t.th;o.n=t.n;o.lv=t.lv;o.s=t.s;}else if(t.t==='lec'){o.mod=t.mod;o.l=t.l;}else{o.n=t.n;o.s=t.s;}return mkCode('T',o);}
 function showTaskLink(t){
@@ -4041,10 +4137,10 @@ function secClase(box){
    else if(c.kind==='R'&&c.data&&c.data.n){A.informes[nkey(c.data.n)]=c.data;r++;}
    else bad++;
   }
-  save();toast(`✅ ${e} entrega${e===1?'':'s'} y ${r} informe${r===1?'':'s'} añadidos${bad?` · ${bad} no válidos`:''}`);go('aula',{sec:'clase'});
+  save();toast(`✅ ${e} entrega${e===1?'':'s'} y ${r} informe${r===1?'':'s'} añadidos${bad?` · ${bad} no válidos`:''}`);aulaGo({sec:'clase'});
  };
- $$('[data-rmn]',box).forEach(b=>b.onclick=()=>{A.entregas=A.entregas.filter(x=>nkey(x.n)!==nkey(b.dataset.rmn));save();go('aula',{sec:'clase'});});
- $$('[data-rmi]',box).forEach(b=>b.onclick=()=>{delete A.informes[b.dataset.rmi];save();go('aula',{sec:'clase'});});
+ $$('[data-rmn]',box).forEach(b=>b.onclick=()=>{A.entregas=A.entregas.filter(x=>nkey(x.n)!==nkey(b.dataset.rmn));save();aulaGo({sec:'clase'});});
+ $$('[data-rmi]',box).forEach(b=>b.onclick=()=>{delete A.informes[b.dataset.rmi];save();aulaGo({sec:'clase'});});
  const csv=()=>{const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
   let out=['Alumno','Nivel','XP','ELO','Lecciones','Ejercicios','Partidas ganadas','Partidas','Escaner perfectos','Fecha'].map(q).join(';')+'\n';
   inf.forEach(r=>{out+=[r.n,r.rk,r.xp,r.elo,r.ls,r.ps,r.gw,r.gp,r.sp||0,r.d].map(q).join(';')+'\n';});
@@ -4052,7 +4148,7 @@ function secClase(box){
   return out;};
  $('#csv',box).onclick=async()=>toast((await copyText(csv()))?'📋 Tabla copiada: pégala en una hoja de cálculo':'No se pudo copiar');
  $('#csvf',box).onclick=()=>{const blob=new Blob(['﻿'+csv()],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='clase-ajedrez-'+today()+'.csv';a.click();};
- $('#clr',box).onclick=async()=>{if(await confirmModal('¿Vaciar la clase?','Se borrarán todas las entregas e informes recogidos.','Vaciar','Cancelar',true)){A.entregas=[];A.informes={};save();go('aula',{sec:'clase'});}};
+ $('#clr',box).onclick=async()=>{if(await confirmModal('¿Vaciar la clase?','Se borrarán todas las entregas e informes recogidos.','Vaciar','Cancelar',true)){A.entregas=[];A.informes={};save();aulaGo({sec:'clase'});}};
 }
 // ================= FICHAS IMPRIMIBLES Y TORNEOS DE CLASE =================
 function sheetBoard(pos,mm,orient){
@@ -4179,10 +4275,10 @@ function secTorneos(box,arg){
   if(names.length<4){toast('👥 Escribe al menos 4 jugadores (uno por línea)');return;}
   const fmt=$('#tf',box).value;if(fmt==='liga'&&names.length>10){toast('Todos contra todos admite hasta 10 jugadores');return;}
   const T={id:rid(),name:$('#tn',box).value.trim()||'Torneo de clase',fmt,players:names.map((n,i)=>({id:'j'+i,n})),rounds:[],created:today(),done:false};
-  T.total=tTotal(fmt,names.length,+$('#tr',box).value);newRound(T);A.torneos.unshift(T);save();go('aula',{sec:'torneos',tid:T.id});
+  T.total=tTotal(fmt,names.length,+$('#tr',box).value);newRound(T);A.torneos.unshift(T);save();aulaGo({sec:'torneos',tid:T.id});
  };
- $$('[data-ot]',box).forEach(b=>b.onclick=()=>go('aula',{sec:'torneos',tid:b.dataset.ot}));
- $$('[data-dt]',box).forEach(b=>b.onclick=async()=>{if(await confirmModal('¿Borrar el torneo?','Se perderán las rondas y los resultados.','Borrar','Cancelar',true)){A.torneos=A.torneos.filter(x=>x.id!==b.dataset.dt);save();go('aula',{sec:'torneos'});}});
+ $$('[data-ot]',box).forEach(b=>b.onclick=()=>aulaGo({sec:'torneos',tid:b.dataset.ot}));
+ $$('[data-dt]',box).forEach(b=>b.onclick=async()=>{if(await confirmModal('¿Borrar el torneo?','Se perderán las rondas y los resultados.','Borrar','Cancelar',true)){A.torneos=A.torneos.filter(x=>x.id!==b.dataset.dt);save();aulaGo({sec:'torneos'});}});
 }
 function standHTML(T,big){
  const st=tStand(T);const med=['🥇','🥈','🥉'];
@@ -4202,7 +4298,7 @@ function viewTorneo(box,T){
   <div class="btnrow" style="margin-top:12px">${finished?'':`<button class="btn acc" id="tnx" ${doneAll?'':'disabled'}>${T.rounds.length<T.total?'Siguiente ronda →':'Terminar'}</button>${doneAll?'':'<span class="muted" style="font-weight:700">Introduce todos los resultados para continuar</span>'}`}</div></div>
  <div class="card" style="margin-top:16px"><h3>📊 Clasificación</h3>${standHTML(T)}</div>
  ${T.rounds.length>1?`<div class="card" style="margin-top:16px"><h3>📜 Rondas anteriores</h3>${T.rounds.slice(0,-1).map((r,k)=>`<details style="margin:6px 0"><summary style="font-weight:900;cursor:pointer">Ronda ${k+1}</summary>${pairsHTML(T,k)}</details>`).join('')}</div>`:''}`;
- $('#tb',box).onclick=()=>go('aula',{sec:'torneos'});
+ $('#tb',box).onclick=()=>aulaGo({sec:'torneos'});
  $$('[data-g]',box).forEach(b=>b.onclick=()=>{const g=T.rounds[last][+b.dataset.g];g.r=g.r===b.dataset.r?null:b.dataset.r;save();viewTorneo(box,T);});
  const nx=$('#tnx',box);if(nx)nx.onclick=()=>{if(T.rounds.length<T.total){newRound(T);}else{T.done=true;confetti(40);sound('done');}save();viewTorneo(box,T);};
  if(T.done&&!T._cf){T._cf=1;save();confetti(40);}

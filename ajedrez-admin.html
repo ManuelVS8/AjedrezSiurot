@@ -98,6 +98,7 @@ details.box>div{padding:0 14px 14px}
 @media print{body>*:not(.sheetov){display:none!important}.sheetov{position:static;padding:0}.sheetov .bar2{display:none}.cards{width:190mm}@page{size:A4;margin:10mm}}
 @media(max-width:640px){.cards{grid-template-columns:1fr}}
 @media(min-width:700px){.tiles{grid-template-columns:repeat(3,1fr)}}
+body.framed main{max-width:none;padding:0}
 </style></head><body>
 <div id="app"></div><div id="toasts"></div>
 <script>
@@ -208,7 +209,7 @@ const fhora=ms=>ms?new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minut
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
 const A={users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
-const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['ajustes','⚙️','Ajustes']];
+const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
 const TT=Object.fromEntries(TABS.map(([k,e,t])=>[k,t]));
 const nm=u=>u.nombre||u.alias;
 const ICON='icon-admin192.png';
@@ -255,7 +256,7 @@ function badges(){const d=$('#mdot');if(d){d.style.display=A.reqN?'':'none';d.te
 function render(){clearInterval(A.timer);const m=$('#main');if(!m)return;
  const home=A.tab==='inicio';$('#bk').style.display=home?'none':'';$('#lg').style.display=home?'':'none';
  const t=A.tid&&A.torneos.find(x=>x.id===A.tid);$('#ttl').textContent=home?'Siurot Admin':t?t.nombre:TT[A.tab];
- ({inicio:vInicio,usuarios:vUsers,alta:vAlta,torneos:vTorneos,hof:vHof,ajustes:vAjustes})[A.tab](m);badges();}
+ document.body.classList.toggle('framed',A.tab==='profe');({inicio:vInicio,usuarios:vUsers,alta:vAlta,torneos:vTorneos,hof:vHof,profe:vProfe,ajustes:vAjustes})[A.tab](m);badges();}
 const active=()=>A.users.filter(u=>u.ultimoLogin);
 /* ---------- inicio ---------- */
 function vInicio(m){const h=new Date().getHours(),sal=h<14?'¡Buenos días!':h<21?'¡Buenas tardes!':'¡Buenas noches!';
@@ -270,6 +271,7 @@ function vInicio(m){const h=new Date().getHours(),sal=h<14?'¡Buenos días!':h<2
   ${tile('alta','➕','Dar de alta','Alumno o grupo')}
   ${tile('torneos','🏟️','Torneos',act.length?`${act.length} en marcha`:esp.length?`Próximo: ${fdate(esp[0].inicio)}`:'Programar torneo','<span class="dot" id="tdot" style="display:none"></span>')}
   ${tile('hof','🏆','Salón de la fama',A.hof.length?`${A.hof.length} jugadores`:'Sin datos aún')}
+  ${tile('profe','📝','Tareas y fichas','Tareas con QR, notas, fichas')}
   ${tile('ajustes','⚙️','Ajustes','Aviso, cursos, exportar')}
  </div>
  <p class="muted" style="text-align:center;margin-top:18px">${na} de ${A.users.length} alumnos ya han entrado en la app.<br>Mantén esta app abierta durante los torneos: los inicia y cierra sola.</p>`;
@@ -516,6 +518,8 @@ function projector(t,get,load){const ov=document.createElement('div');ov.classNa
  const close=()=>{clearInterval(iv);ov.remove();};ov._close=close;
  const paint=()=>{const l=get().filter(j=>!j.fuera).slice(0,12);ov.innerHTML=`<button class="btn x" id="px">✕ Cerrar</button><h1>🏆 ${esc(t.nombre)}</h1><table><thead><tr><th>#</th><th>Jugador</th><th>Grupo</th><th class="n">Puntos</th></tr></thead><tbody>${l.map((j,i)=>`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n"><b>${j.puntos||0}</b></td></tr>`).join('')}</tbody></table>`;$('#px',ov).onclick=close;};
  paint();const iv=setInterval(async()=>{await load();paint();},10000);}
+/* ---------- tareas, clase y fichas (se abre la herramienta del profe de la app de juego, con la sesión de admin) ---------- */
+function vProfe(m){m.innerHTML=`<iframe src="ajedrez-siurot.html#profe" title="Tareas y fichas" style="width:100%;height:calc(100vh - 62px - env(safe-area-inset-top));border:0;display:block;background:#fbf7ee"></iframe>`;}
 /* ---------- salón de la fama ---------- */
 function vHof(m){const l=[...A.hof].sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
  m.innerHTML=`<div class="row" style="margin-bottom:10px"><p class="muted grow" style="margin:0 4px">Top 10 · suma de los puntos de todos los torneos terminados.</p><button class="ib2" id="opt" aria-label="Opciones">⋯</button></div>
