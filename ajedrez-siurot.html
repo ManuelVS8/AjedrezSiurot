@@ -1552,7 +1552,8 @@ const FB=(()=>{
   logout(){S.user=null;save();},
   async tok(){const u=S.user;if(!u)return null;
    if(u.exp-Date.now()<90000){try{const r=await req(TOK,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(u.refresh)},2);
-    u.idToken=r.id_token;u.refresh=r.refresh_token||u.refresh;u.exp=Date.now()+(+r.expires_in||3600)*1000;save();}catch(e){if(e.status){S.user=null;save();}throw e;}}
+    u.idToken=r.id_token;u.refresh=r.refresh_token||u.refresh;u.exp=Date.now()+(+r.expires_in||3600)*1000;save();}
+    catch(e){if(e.status&&S.reauth){try{const nu=await S.reauth();if(nu){S.user=nu;save();return nu.idToken;}}catch(x){}}throw e;}}   // la sesión NO se borra sola: se recupera en silencio
    return u.idToken;},
   async H(tok){const t=tok===undefined?await api.tok():tok;return t?{Authorization:'Bearer '+t}:{};},
   async get(path,tok){try{return dec(await req(FS+'/'+path,{headers:await api.H(tok)},2));}catch(e){if(e.status===404)return null;throw e;}},
@@ -1992,6 +1993,7 @@ function viewHome(m){
   <button class="qbtn" id="qmis"><div class="qi">🎯</div><b>Misiones de hoy</b><span>${mdone}/3 hechas${mdone===3?' ✅':''}</span></button>
   <button class="qbtn" data-go="aprender"><div class="qi">📚</div><b>Aprender</b><span>${nl?'Siguiente: '+esc(nl.l.titulo):'¡Todo completado! 🏆'}</span></button>
   <button class="qbtn" data-go="ejercicios"><div class="qi">🧩</div><b>Táctica por temas</b><span>Ejercicios sin límite</span></button>
+  <button class="qbtn" data-go="laboratorio" style="border-color:#2563eb"><div class="qi">🔬</div><b>Análisis y aperturas</b><span>Explorador y tablero de análisis</span></button>
  </div>`;
  $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));
  $('#qmis',m).onclick=()=>modal({title:'🎯 Misiones de hoy',html:missionsHTML(),buttons:[{t:'Cerrar',cls:'ghost'}]});
@@ -4313,6 +4315,8 @@ function viewTorneo(box,T){
 /* ===== Cuenta del cole y torneos (Firebase REST) ===== */
 const ONL={acc:null,cache:null,cacheT:0};
 (function(){try{const u=JSON.parse(localStorage.getItem('siurot_sess')||'null');if(u&&u.refresh){FB.restore(u);ONL.acc=JSON.parse(localStorage.getItem('siurot_acc')||'null');}}catch(e){}
+ /* «recordar usuario»: si el token caduca o falla al renovarse, se vuelve a entrar solo (sin pedir la clave) */
+ FB.S.reauth=async()=>{let k=null;try{k=localStorage.getItem('siurot_k');}catch(e){}if(!k||(ONL.acc&&ONL.acc.guest))return null;const [u,p]=decodeURIComponent(escape(atob(k))).split('\n');return FB.signIn(u,p);};
  FB.S.onChange=u=>{try{if(u&&ONL.acc&&ONL.acc.guest)return;if(u)localStorage.setItem('siurot_sess',JSON.stringify(u));else{localStorage.removeItem('siurot_sess');localStorage.removeItem('siurot_acc');ONL.acc=null;}}catch(e){}};})();
 const onlLogged=()=>!!(FB.S.user&&ONL.acc);
 function onlFecha(ms){if(!ms)return'';const d=new Date(ms),n=new Date(),h=d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});const dd=Math.round((new Date(d).setHours(0,0,0,0)-new Date(n).setHours(0,0,0,0))/864e5);
@@ -4320,7 +4324,7 @@ function onlFecha(ms){if(!ms)return'';const d=new Date(ms),n=new Date(),h=d.toLo
 async function onlPublic(force){if(!force&&ONL.cache&&Date.now()-ONL.cacheT<25000)return ONL.cache;
  const [t,h,c]=await Promise.all([FB.query('torneos',{where:['estado','IN',['espera','activo']]}),FB.query('hof',{orderBy:['puntos','desc'],limit:10}),FB.get('config/main')]);
  ONL.cache={torneos:t.filter(x=>x.estado==='espera'||x.estado==='activo').sort((a,b)=>(a.inicio||0)-(b.inicio||0)),hof:h.sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10),cfg:c||{}};ONL.cacheT=Date.now();return ONL.cache;}
-async function onlDoLogin(u,p){const s=await FB.login(u,p);const d=await FB.get('users/'+s.uid);
+async function onlDoLogin(u,p){const s=await FB.login(u,p);try{localStorage.setItem('siurot_k',btoa(unescape(encodeURIComponent(u+'\n'+p))));}catch(e){}const d=await FB.get('users/'+s.uid);
  if(!d){FB.logout();throw {code:'BAJA'};}
  ONL.acc={uid:s.uid,alias:d.alias,nombre:d.nombre||d.alias,grupo:d.grupo||''};try{localStorage.setItem('siurot_acc',JSON.stringify(ONL.acc));}catch(e){}
  FB.set('users/'+s.uid,{ultimoLogin:Date.now()},['ultimoLogin']).catch(()=>{});onlStart();return ONL.acc;}
@@ -4336,7 +4340,7 @@ async function onlLogin(){
     catch(e){btn.disabled=false;btn.textContent='Entrar';le.textContent=onlErr(e);}};
    btn.onclick=e=>{e.stopPropagation();enter();};$('#lp',root).onkeydown=e=>{if(e.key==='Enter')enter();};$('#lu',root).focus();},30);
   bg.then(()=>res(false));});}
-async function onlLogout(){try{if(FB.S.user)await RT.del('presence/'+myUid());}catch(e){}onlStop();FB.logout();toast('Sesión cerrada');}
+async function onlLogout(){try{if(FB.S.user)await RT.del('presence/'+myUid());}catch(e){}onlStop();try{localStorage.removeItem('siurot_k');}catch(e){}FB.logout();toast('Sesión cerrada');}
 async function onlLoginProfile(){if(!onlLogged()&&!(await onlLogin()))return;selectProfile(accountProfile().id);}
 async function onlJoin(t){if(!onlLogged())return toast('Primero entra con tu usuario','bad');
  try{const ex=await FB.get(`torneos/${t.id}/jugadores/${ONL.acc.uid}`);if(ex)return toast('Ya estás apuntado ✔️');

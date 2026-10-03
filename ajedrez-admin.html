@@ -141,7 +141,8 @@ const FB=(()=>{
   logout(){S.user=null;save();},
   async tok(){const u=S.user;if(!u)return null;
    if(u.exp-Date.now()<90000){try{const r=await req(TOK,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(u.refresh)},2);
-    u.idToken=r.id_token;u.refresh=r.refresh_token||u.refresh;u.exp=Date.now()+(+r.expires_in||3600)*1000;save();}catch(e){if(e.status){S.user=null;save();}throw e;}}
+    u.idToken=r.id_token;u.refresh=r.refresh_token||u.refresh;u.exp=Date.now()+(+r.expires_in||3600)*1000;save();}
+    catch(e){if(e.status&&S.reauth){try{const nu=await S.reauth();if(nu){S.user=nu;save();return nu.idToken;}}catch(x){}}throw e;}}   // la sesión NO se borra sola: se recupera en silencio
    return u.idToken;},
   async H(tok){const t=tok===undefined?await api.tok():tok;return t?{Authorization:'Bearer '+t}:{};},
   async get(path,tok){try{return dec(await req(FS+'/'+path,{headers:await api.H(tok)},2));}catch(e){if(e.status===404)return null;throw e;}},
