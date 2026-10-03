@@ -209,7 +209,7 @@ const fdate=ms=>ms?new Date(ms).toLocaleString('es-ES',{day:'2-digit',month:'2-d
 const fhora=ms=>ms?new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
-const A={users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
+const A={grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
 const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
 const TT=Object.fromEntries(TABS.map(([k,e,t])=>[k,t]));
 const nm=u=>u.nombre||u.alias;
@@ -231,7 +231,7 @@ async function boot(){let u=null;try{u=JSON.parse(localStorage.getItem('adm')||'
 function loginView(){$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><h2 style="margin:16px 0 2px">Ajedrez Siurot</h2><p class="muted" style="margin:0 0 18px">Administración</p><input id="em" type="email" placeholder="Correo" value="${FBC.admin}" autocomplete="username"><input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password"><button class="btn" id="go">Entrar</button><p class="err" id="er"></p></div>`;
  const go=async()=>{$('#er').textContent='';const b=$('#go');b.disabled=true;b.textContent='Entrando…';try{const u=await FB.login($('#em').value.trim().toLowerCase(),$('#pw').value);if(u.email!==FBC.admin){FB.logout();throw {code:'NO_ADMIN'};}await loadAll();shell();}catch(e){b.disabled=false;b.textContent='Entrar';$('#er').textContent=e.code==='NO_ADMIN'?'Esta cuenta no es de administración.':FB.msg(e);}};
  $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go();};}
-async function loadAll(){lastRefresh=Date.now();needRefresh=false;const[u,t,h,c]=await Promise.all([FB.list('users'),FB.list('torneos'),FB.list('hof'),FB.get('config/main')]);A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;if(c)A.cfg={...A.cfg,...c};}
+async function loadAll(){lastRefresh=Date.now();needRefresh=false;const[u,t,h,c,gr]=await Promise.all([FB.list('users'),FB.list('torneos'),FB.list('hof'),FB.get('config/main'),FB.get('config/grupos').catch(()=>null)]);A.grupos=(gr&&gr.lista)||[];A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;if(c)A.cfg={...A.cfg,...c};}
 async function logout(){if(!await confirmM('Cerrar sesión','¿Salir de la administración en este dispositivo?','Salir',true))return;FB.logout();A.tab='inicio';A.tid=null;loginView();}
 /* ---------- armazón: barra, cajón y navegación ---------- */
 function shell(){$('#app').innerHTML=`<header class="top"><button class="ib" id="bk" aria-label="Atrás">←</button><img class="lg" id="lg" src="${ICON}" alt=""><h1 id="ttl"></h1><button class="ib" id="mn" aria-label="Menú">☰<span class="dot" id="mdot" style="display:none"></span></button></header><main id="main"></main>`;
@@ -286,6 +286,16 @@ function printCards(list){const ov=document.createElement('div');ov.className='s
 /* ---------- alumnado ---------- */
 const csvUsers=l=>csv([['Usuario','Nombre','Grupo','Clave','Estado','Último acceso'],...l.map(u=>[u.alias,u.nombre,u.grupo,u.clave,u.ultimoLogin?'activo':'sin estrenar',fdate(u.ultimoLogin)])]);
 const gOf=u=>u.grupo||'(sin grupo)';
+/* grupos (clases): se crean aquí y luego se elige uno al dar de alta */
+const allGroups=()=>[...new Set([...A.grupos,...A.users.map(u=>u.grupo).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+async function saveGroups(){A.grupos=[...new Set(A.grupos.filter(Boolean))];await FB.set('config/grupos',{lista:A.grupos});}
+async function newGroup(name){name=String(name||'').trim().slice(0,20);if(!name){toast('Escribe el nombre del grupo',1);return null;}
+ if(allGroups().some(g=>g.toLowerCase()===name.toLowerCase())){toast('Ese grupo ya existe',1);return allGroups().find(g=>g.toLowerCase()===name.toLowerCase());}
+ A.grupos.push(name);try{await saveGroups();toast('Grupo «'+name+'» creado ✔️');}catch(e){toast(FB.msg(e),1);}return name;}
+async function askNewGroup(){const r=await askM('➕ Crear grupo',`<label class="f">Nombre del grupo</label><input placeholder="Ej.: 4ºA" maxlength="20" autocomplete="off">`,'Crear');if(!r)return null;return newGroup(r[0]);}
+const groupSelect=(id,sel)=>{const gs=allGroups();return `<select id="${id}">${gs.map(g=>`<option ${g===sel?'selected':''}>${esc(g)}</option>`).join('')}<option value="__new" ${gs.length?'':'selected'}>➕ Crear grupo nuevo…</option></select><input id="${id}n" placeholder="Nombre del grupo nuevo (ej. 4ºA)" maxlength="20" autocomplete="off" style="margin-top:8px;${gs.length?'display:none':''}">`;};
+const groupBind=(m,id)=>{const s=$('#'+id,m),n=$('#'+id+'n',m);s.onchange=()=>{n.style.display=s.value==='__new'?'':'none';if(s.value==='__new')n.focus();};};
+async function groupValue(m,id){const s=$('#'+id,m);if(s.value!=='__new')return s.value;return newGroup($('#'+id+'n',m).value);}
 const filtered=()=>A.users.filter(u=>(!A.est||(A.est==='act'?!!u.ultimoLogin:!u.ultimoLogin))&&(!A.q||(u.alias+' '+u.nombre+' '+(u.grupo||'')).toLowerCase().includes(A.q.toLowerCase())));
 function vUsers(m){
  const na=active().length;
@@ -295,19 +305,23 @@ function vUsers(m){
  const q=$('#q',m);q.oninput=()=>{A.q=q.value;drawUsers(m);};
  $$('[data-e]',m).forEach(b=>b.onclick=()=>{A.est=b.dataset.e;vUsers(m);});
  $('#more',m).onclick=async()=>{const l=filtered();const s=l.filter(u=>A.sel.has(u.id));
-  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
+  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'ng',e:'🏷️',t:'Crear grupo'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
   if(k==='pdfl')l.length?printCards(l):toast('No hay nadie en la lista',1);if(k==='pdfs')printCards(s);if(k==='clr'){A.sel.clear();drawUsers(m);}
-  if(k==='csv')download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');if(k==='alta')nav('alta');if(k==='bdel')bulkDel('');};
+  if(k==='csv')download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');if(k==='alta')nav('alta');if(k==='ng'){const g=await askNewGroup();if(g){A.open.add(g);drawUsers(m);}}if(k==='bdel')bulkDel('');};
  drawUsers(m);}
 function drawUsers(m){const box=$('#ul',m);if(!box)return;const l=filtered();
- const gs={};l.forEach(u=>(gs[gOf(u)]=gs[gOf(u)]||[]).push(u));const keys=Object.keys(gs).sort((a,b)=>a.localeCompare(b,'es'));
+ const gs={};l.forEach(u=>(gs[gOf(u)]=gs[gOf(u)]||[]).push(u));if(!A.q&&!A.est)A.grupos.forEach(g=>{gs[g]=gs[g]||[];});const keys=Object.keys(gs).sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
  const row=u=>`<div class="li" data-u="${u.id}"><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}><div class="t"><b>${esc(nm(u))}</b><span><span class="mono">${esc(u.alias)}</span> · clave <span class="mono">${esc(u.clave)}</span></span></div><span title="${u.ultimoLogin?'Ha entrado: '+fdate(u.ultimoLogin):'Aún no ha entrado'}">${u.ultimoLogin?'✔️':'🎟'}</span></div>`;
- box.innerHTML=keys.map(g=>`<details class="grp" data-g="${esc(g)}" ${A.q||A.open.has(g)?'open':''}><summary><span class="grow">${esc(g)} <span class="pill">${gs[g].length}</span></span><button class="ib2" data-gm="${esc(g)}" aria-label="Opciones del grupo">⋯</button></summary>${gs[g].map(row).join('')}</details>`).join('')||`<div class="card empty">${A.users.length?'Nadie coincide con la búsqueda.':'Aún no hay alumnado. Pulsa ⋯ → Dar de alta.'}</div>`;
+ box.innerHTML=keys.map(g=>`<details class="grp" data-g="${esc(g)}" ${A.q||A.open.has(g)?'open':''}><summary><span class="grow">${esc(g)} <span class="pill">${gs[g].length}</span></span><button class="ib2" data-gm="${esc(g)}" aria-label="Opciones del grupo">⋯</button></summary>${gs[g].map(row).join('')||'<p class="muted" style="padding:10px 14px;margin:0">Grupo vacío: pulsa ⋯ → «Añadir alumnos a este grupo».</p>'}</details>`).join('')||`<div class="card empty">${A.users.length?'Nadie coincide con la búsqueda.':'Aún no hay alumnado. Pulsa ⋯ → Dar de alta.'}</div>`;
  $$('details.grp',box).forEach(d=>d.ontoggle=()=>{if(A.q)return;d.open?A.open.add(d.dataset.g):A.open.delete(d.dataset.g);});
  const ns=()=>{const e=$('#nsel',m);if(e)e.textContent=A.sel.size?A.sel.size+' marcados':'toca un grupo para verlo';};
  $$('.ck',box).forEach(c=>{c.onclick=e=>e.stopPropagation();c.onchange=()=>{c.checked?A.sel.add(c.dataset.id):A.sel.delete(c.dataset.id);ns();};});
  $$('[data-gm]',box).forEach(b=>b.onclick=async e=>{e.preventDefault();e.stopPropagation();const g=b.dataset.gm,gl=A.users.filter(u=>gOf(u)===g);
-  const k=await sheet(`Grupo ${esc(g)} · ${gl.length} alumnos`,[{k:'pdf',e:'🖨️',t:'PDF de claves del grupo'},{k:'sel',e:'☑',t:'Marcar a todo el grupo'},{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'del',e:'🗑',t:'Borrar el grupo entero…',cls:'red'}]);
+  const k=await sheet(`Grupo ${esc(g)} · ${gl.length} alumnos`,gl.length?[{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'pdf',e:'🖨️',t:'PDF de claves del grupo'},{k:'sel',e:'☑',t:'Marcar a todo el grupo'},g!=='(sin grupo)'&&{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'del',e:'🗑',t:'Borrar el grupo entero…',cls:'red'}]:[{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'rm',e:'🗑',t:'Quitar este grupo vacío',cls:'red'}]);
+  if(k==='rm'){A.grupos=A.grupos.filter(x=>x!==g);try{await saveGroups();toast('Grupo quitado');}catch(er){toast(FB.msg(er),1);}drawUsers(m);return;}
+  if(k==='ren'){const r=await askM('✏️ Cambiar nombre del grupo',`<label class="f">Nuevo nombre</label><input value="${esc(g)}" maxlength="20">`,'Guardar');const nn=r&&r[0].trim();if(!nn||nn===g)return;
+   if(allGroups().some(x=>x.toLowerCase()===nn.toLowerCase()&&x!==g))return toast('Ya existe un grupo con ese nombre',1);
+   try{for(const u of gl){await FB.set('users/'+u.id,{grupo:nn},['grupo']);u.grupo=nn;}A.grupos=A.grupos.map(x=>x===g?nn:x);if(!A.grupos.includes(nn))A.grupos.push(nn);await saveGroups();if(A.open.has(g)){A.open.delete(g);A.open.add(nn);}toast('Grupo renombrado');}catch(er){toast(FB.msg(er),1);}drawUsers(m);return;}
   if(k==='pdf')printCards(gl);if(k==='sel'){gl.forEach(u=>A.sel.add(u.id));drawUsers(m);ns();}if(k==='add'){A.alta='grupo';A.altaG=g==='(sin grupo)'?'':g;nav('alta');}if(k==='del')bulkDel(g);});
  $$('[data-u]',box).forEach(r=>r.onclick=async()=>{const u=A.users.find(x=>x.id===r.dataset.u);if(!u)return;
   const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'ed',e:'✏️',t:'Editar nombre o grupo'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
@@ -324,7 +338,7 @@ async function bulkDel(g){
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
    await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}
    A.users=A.users.filter(x=>x.id!==u.id);A.hof=A.hof.filter(x=>x.id!==u.id);A.sel.delete(u.id);}catch(e){fail++;}}
- A.open.delete(g);
+ A.open.delete(g);A.grupos=A.grupos.filter(x=>x!==g);saveGroups().catch(()=>{});
  toast(fail?`Borrados ${list.length-fail}; fallaron ${fail}`:`Grupo «${g}» eliminado (${list.length})`,!!fail);render();}
 async function userAct(a,u){
  if(a==='del'){if(!await confirmM('Eliminar usuario',`¿Eliminar a <b>${esc(nm(u))}</b> (${esc(u.alias)})? Se borra su cuenta y su puntuación del salón de la fama.`,'Eliminar',true))return;
@@ -334,18 +348,20 @@ async function userAct(a,u){
  if(a==='rs'){if(!await confirmM('Nueva clave',`Se generará una clave nueva para <b>${esc(nm(u))}</b>. La anterior dejará de funcionar.`,'Generar'))return;
   try{const nc=genClave();const s=await FB.signIn(u.alias,u.clave);await FB.setPass(s.idToken,nc);await FB.set('users/'+u.id,{clave:nc},['clave']);u.clave=nc;
    await modal({title:'🔑 Nueva clave',html:`<p style="text-align:center">Usuario: <span class="mono">${esc(u.alias)}</span><br>Clave: <span class="mono" style="font-size:1.6rem">${nc}</span></p>`,buttons:[{t:'🖨️ Tarjeta',cls:'ghost',v:()=>{printCards([u]);return 1;}},{t:'Cerrar',v:1}]});render();}catch(e){toast(FB.msg(e),1);}}
- if(a==='ed'){const r=await askM('✏️ Editar',`<label class="f">Nombre</label><input value="${esc(u.nombre)}"><label class="f">Grupo</label><input value="${esc(u.grupo)}">`,'Guardar');if(!r)return;
+ if(a==='ed'){const r=await askM('✏️ Editar',`<label class="f">Nombre</label><input value="${esc(u.nombre)}"><label class="f">Grupo</label>${groupSelect('eg',u.grupo)}`,'Guardar',bg=>groupBind(bg,'eg'));if(!r)return;
+  if(r[1]==='__new'){const g=await newGroup(r[2]);if(!g)return;r[1]=g;}
   try{await FB.set('users/'+u.id,{nombre:r[0].trim(),grupo:r[1].trim()},['nombre','grupo']);u.nombre=r[0].trim();u.grupo=r[1].trim();toast('Guardado');render();}catch(e){toast(FB.msg(e),1);}}}
 /* ---------- alta ---------- */
 function vAlta(m){const one=A.alta!=='grupo';const g0=A.altaG||'';A.altaG='';
  m.innerHTML=`<div class="seg"><button data-m="uno" class="${one?'on':''}">👤 Un alumno</button><button data-m="grupo" class="${one?'':'on'}">👥 Un grupo</button></div>
- ${one?`<div class="card"><label class="f">Nombre e inicial</label><input id="n1" placeholder="Lucía M." autocomplete="off"><label class="f">Grupo</label><input id="g1" placeholder="4ºA" list="gl" autocomplete="off"><button class="btn big" id="b1" style="margin-top:14px">Crear usuario</button></div>`
- :`<div class="card"><label class="f">Grupo</label><input id="g2" placeholder="4ºA" list="gl" value="${esc(g0)}" autocomplete="off"><label class="f">Alumnado (uno por línea)</label><textarea id="ta" placeholder="Lucía M.&#10;Pablo R.&#10;Ana G."></textarea><button class="btn big" id="b2" style="margin-top:14px">Crear usuarios</button></div>`}
+ ${one?`<div class="card"><label class="f">Nombre e inicial</label><input id="n1" placeholder="Lucía M." autocomplete="off"><label class="f">Grupo</label>${groupSelect('gs',g0||A.lastG||'')}<button class="btn big" id="b1" style="margin-top:14px">Crear usuario</button></div>`
+ :`<div class="card"><label class="f">Grupo</label>${groupSelect('gs',g0||A.lastG||'')}<label class="f">Alumnado (uno por línea)</label><textarea id="ta" placeholder="Lucía M.&#10;Pablo R.&#10;Ana G."></textarea><button class="btn big" id="b2" style="margin-top:14px">Crear usuarios</button></div>`}
  <p class="muted" style="margin:0 4px 12px">Solo nombre e inicial del apellido. El usuario será nombre + inicial (ej. «Lucía M.» → <span class="mono">luciam</span>) y la clave, 3 números y 3 letras.</p>
- <datalist id="gl">${[...new Set(A.users.map(u=>u.grupo).filter(Boolean))].sort().map(g=>`<option value="${esc(g)}">`).join('')}</datalist><div id="res"></div>`;
+ <div id="res"></div>`;groupBind(m,'gs');
  $$('[data-m]',m).forEach(b=>b.onclick=()=>{A.alta=b.dataset.m;vAlta(m);});
- if(one)$('#b1',m).onclick=()=>createUsers([$('#n1',m).value],$('#g1',m).value.trim(),m);
- else $('#b2',m).onclick=()=>createUsers($('#ta',m).value.split('\n'),$('#g2',m).value.trim(),m);}
+ const go=async names=>{if(!names.map(x=>x.trim()).filter(Boolean).length)return toast('Escribe algún nombre',1);const g=await groupValue(m,'gs');if(!g)return;A.lastG=g;createUsers(names,g,m);};
+ if(one)$('#b1',m).onclick=()=>go([$('#n1',m).value]);
+ else $('#b2',m).onclick=()=>go($('#ta',m).value.split('\n'));}
 async function createUsers(names,grupo,m){names=names.map(s=>s.trim()).filter(Boolean);if(!names.length)return toast('Escribe algún nombre',1);
  const used=new Set(A.users.map(u=>u.alias));const out=[],fail=[];$$('button',m).forEach(b=>b.disabled=true);
  const prog=$('#res',m);
@@ -531,7 +547,7 @@ function vHof(m){const l=[...A.hof].sort((a,b)=>(b.puntos||0)-(a.puntos||0)).sli
   if(k==='rs'){const r=await askM('♻️ Vaciar salón de la fama',`<p>Se borrarán los puntos acumulados de <b>${A.hof.length}</b> jugadores. Antes se descargará una copia.</p><p>Escribe <b>RESTAURAR</b> para confirmar:</p><input autocomplete="off" autocapitalize="characters">`,'Vaciar');if(!r||r[0].trim().toUpperCase()!=='RESTAURAR')return r?toast('No coincide: no se ha borrado nada',1):0;
    try{backup();for(const h of A.hof)await FB.del('hof/'+h.id);A.hof=[];toast('Salón de la fama vacío');render();}catch(e){toast(FB.msg(e),1);}}};}
 /* ---------- ajustes ---------- */
-function vAjustes(m){const groups=[...new Set(A.users.map(u=>u.grupo).filter(Boolean))].sort();
+function vAjustes(m){const groups=allGroups();
  m.innerHTML=`<details class="box"><summary>📣 Aviso en la portada${A.cfg.aviso?' <span class="pill activo">activo</span>':''}</summary><div><p class="muted" style="margin:0 0 8px">Lo ve todo el alumnado. Déjalo vacío para quitarlo.</p><input id="av" maxlength="140" placeholder="Hoy torneo en el recreo a las 11:30" value="${esc(A.cfg.aviso)}"><label class="f">Dirección de la app (sale en las tarjetas de claves)</label><input id="ur" value="${esc(A.cfg.url)}" inputmode="url"><button class="btn big" id="sv" style="margin-top:12px">Guardar</button></div></details>
  <details class="box"><summary>⬆️ Subir de curso</summary><div><p class="muted" style="margin:0 0 8px">Cambia el nombre de los grupos de golpe (ej. 4ºA → 5ºA). Deja en blanco los que no cambien.</p>${groups.length?groups.map(g=>`<div class="row" style="margin:6px 0;flex-wrap:nowrap"><b style="min-width:84px">${esc(g)}</b><span class="muted">(${A.users.filter(u=>u.grupo===g).length})</span><span>→</span><input class="ng" data-g="${esc(g)}" placeholder="Nuevo" style="flex:1;min-width:0"></div>`).join('')+'<button class="btn big" id="up" style="margin-top:10px">Aplicar cambios</button>':'<p class="muted">Aún no hay grupos.</p>'}</div></details>
  <details class="box"><summary>📤 Exportar</summary><div><button class="btn ghost wide" id="cu">⬇️ Todo el alumnado (CSV)</button></div></details>
@@ -543,6 +559,6 @@ function vAjustes(m){const groups=[...new Set(A.users.map(u=>u.grupo).filter(Boo
  if($('#ins',m))$('#ins',m).onclick=doInstall;$('#lo',m).onclick=logout;
  if($('#up',m))$('#up',m).onclick=async()=>{const map={};$$('.ng',m).forEach(i=>{if(i.value.trim())map[i.dataset.g]=i.value.trim();});const ks=Object.keys(map);if(!ks.length)return toast('No hay cambios',1);
   if(!await confirmM('Subir de curso',ks.map(k=>`${esc(k)} → <b>${esc(map[k])}</b>`).join('<br>'),'Aplicar'))return;
-  try{const orig=A.users.map(u=>[u,u.grupo]);for(const [u,g] of orig)if(map[g]){await FB.set('users/'+u.id,{grupo:map[g]},['grupo']);u.grupo=map[g];}toast('Grupos actualizados');render();}catch(e){toast(FB.msg(e),1);}};}
+  try{const orig=A.users.map(u=>[u,u.grupo]);for(const [u,g] of orig)if(map[g]){await FB.set('users/'+u.id,{grupo:map[g]},['grupo']);u.grupo=map[g];}A.grupos=A.grupos.map(g=>map[g]||g);await saveGroups();toast('Grupos actualizados');render();}catch(e){toast(FB.msg(e),1);}};}
 boot();
 </script></body></html>
