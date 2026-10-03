@@ -3198,11 +3198,12 @@ function viewLab(m){
  m.innerHTML=`<div class="sectitle"><h2>🔬 Análisis y aperturas</h2></div>
  <div class="grid g2">
   <div class="card mod" id="lb1" style="cursor:pointer"><div class="mic" style="background:#2563eb">📖</div><div style="flex:1"><h3>Explorador de aperturas</h3><p>Mueve las piezas y descubre el nombre de la apertura, las jugadas de teoría y lo que jugaría Stockfish.</p></div></div>
+  <div class="card mod" id="lb0" style="cursor:pointer"><div class="mic" style="background:#d4841c">📚</div><div style="flex:1"><h3>Estudiar las aperturas</h3><p>Las lecciones de Aprender: las principales aperturas explicadas jugada a jugada, con sus variantes y trampas.</p></div></div>
   <div class="card mod" id="lb2" style="cursor:pointer"><div class="mic" style="background:#16a34a">🔍</div><div style="flex:1"><h3>Tablero de análisis</h3><p>Pega una posición (FEN) o una partida (PGN), reprodúcela jugada a jugada y prueba ideas con Stockfish.</p></div></div>
   <div class="card mod" id="lb3" style="cursor:pointer"><div class="mic" style="background:#7c3aed">🔬</div><div style="flex:1"><h3>Analizar una partida completa</h3><p>Pega el PGN de cualquier partida y verás la valoración de cada jugada: brillantes, errores, imprecisiones…</p></div></div>
   <div class="card mod" id="lb4" style="cursor:pointer"><div class="mic" style="background:#d4841c">📜</div><div style="flex:1"><h3>Mis partidas</h3><p>Tus partidas contra la máquina, online y con amigos, listas para analizar.</p></div></div>
  </div>`;
- $('#lb1',m).onclick=()=>go('explorador');$('#lb2',m).onclick=()=>go('tablero');
+ $('#lb1',m).onclick=()=>go('explorador');$('#lb0',m).onclick=()=>go('modulo','aperturas');$('#lb2',m).onclick=()=>go('tablero');
  $('#lb3',m).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
  $('#lb4',m).onclick=()=>go('jugar');}
 // ================= PGN, ESTUDIOS Y PARTIDAS GUARDADAS =================
