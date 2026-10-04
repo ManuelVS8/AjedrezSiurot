@@ -2848,7 +2848,7 @@ function eloCard(){
 function viewProgress(m){
  const r=rankIdx(P.xp),nx=RANKS[r+1];const wins=Object.values(P.games).reduce((a,g)=>a+g.w,0),played=Object.values(P.games).reduce((a,g)=>a+g.w+g.d+g.l,0);
  const lessonsDone=Object.keys(P.lessons).length,totalL=MODULES.reduce((a,md)=>a+md.lecciones.length,0);
- m.innerHTML=`<div class="sectitle"><h2>📈 Mi progreso</h2><div class="btnrow"><button class="btn ghost sm" id="mrep">📤 Informe para el profe</button><button class="btn ghost sm" id="sw">👥 Cambiar jugador</button></div></div>
+ m.innerHTML=`<div class="sectitle"><h2>📈 Mi progreso</h2><div class="btnrow"><button class="btn ghost sm" id="mrep">📤 Informe para el profe</button></div></div>
  <div class="grid g2">
   <div class="card" style="display:flex;gap:16px;align-items:center"><div style="font-size:4rem">${P.avatar}</div><div style="flex:1"><h2>${esc(P.name)}</h2><div style="font-weight:800;margin:4px 0">${RANKS[r].icono} ${RANKS[r].nombre} · ${P.xp} XP</div>
    <div class="pbar"><i style="width:${nx?Math.round((P.xp-RANKS[r].xp)/(nx.xp-RANKS[r].xp)*100):100}%;background:var(--acc)"></i></div><div class="muted" style="font-size:.85rem;font-weight:700;margin-top:4px">${nx?`Te faltan <b>${nx.xp-P.xp} XP</b> para ser <b>${nx.nombre}</b>`:'¡Has llegado al rango máximo!'}</div></div></div>
@@ -2870,7 +2870,7 @@ function viewProgress(m){
  </div>
  <div class="card" style="margin-top:16px"><h3 style="margin-bottom:12px">🏅 Insignias (${Object.keys(P.badges).length}/${BADGES.length})</h3><div class="badges">${BADGES.map(b=>`<div class="badge ${P.badges[b.id]?'':'off'}"><div class="bi">${b.icono}</div><b>${b.nombre}</b><small>${b.desc}</small></div>`).join('')}</div></div>
  <div class="card" style="margin-top:16px"><h3>🗂️ Rangos</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${RANKS.map((k,i)=>`<span class="pill" style="font-size:.95rem;padding:6px 12px;${i<=r?'background:#fbe3a8':''}">${k.icono} ${k.nombre} · ${k.xp}</span>`).join('')}</div></div>`;
- $('#sw',m).onclick=()=>showProfiles();$('#mrep',m).onclick=showMyReport;
+ $('#mrep',m).onclick=showMyReport;
 }
 
 // ================= PERFILES Y AJUSTES =================
@@ -2888,9 +2888,10 @@ function showProfiles(first){
  $('#newp',m).onclick=newProfileModal;
  $('#schoolin',m).onclick=()=>onlLoginProfile();
  if(P)$('#cancelp',m).onclick=()=>go('inicio');
- if($('#logoutp',m))$('#logoutp',m).onclick=async()=>{if(!(await confirmModal('¿Cerrar sesión?',`Se cerrará la sesión de <b>${esc(ONL.acc.nombre)}</b> en este dispositivo. Para volver a entrar necesitarás el usuario y la clave.`,'Cerrar sesión','Cancelar',true)))return;
-  try{await perfilSync(true);}catch(e){}await onlLogout();setTimeout(()=>location.reload(),400);};
+ if($('#logoutp',m))$('#logoutp',m).onclick=doLogout;
 }
+async function doLogout(){if(!onlLogged())return;if(!(await confirmModal('¿Cerrar sesión?',`Se cerrará la sesión de <b>${esc(ONL.acc.nombre)}</b> en este dispositivo. Para volver a entrar necesitarás el usuario y la clave.`,'Cerrar sesión','Cancelar',true)))return;
+ try{await perfilSync(true);}catch(e){}await onlLogout();setTimeout(()=>location.reload(),400);}
 function newProfileModal(){
  let av=AVATARS[Math.floor(Math.random()*AVATARS.length)];
  const html=`<p class="muted">Escribe tu nombre y elige un avatar.</p><input class="txt" id="pname" maxlength="18" placeholder="Tu nombre" autocomplete="off"><div class="avpick">${AVATARS.map(a=>`<button data-a="${a}" class="${a===av?'on':''}">${a}</button>`).join('')}</div><div id="perr" style="color:var(--bad);font-weight:800;min-height:1.2em"></div>`;
@@ -2945,13 +2946,13 @@ function openMenu(){
  if($('.drawerbg')){closeMenu();return;}
  const bg=document.createElement('div');bg.className='drawerbg';
  const cur=({modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',explorador:'laboratorio',tablero:'laboratorio'})[currentTab]||currentTab;
- bg.innerHTML=`<div class="drawer"><div class="dh"><b>♞ Ajedrez Siurot</b><button class="iconbtn sm" id="dclose" aria-label="Cerrar">✕</button></div>${TABS.map(([id,ic,t])=>`<button class="ditem ${cur===id?'on':''}" data-tab="${id}"><span>${ic}</span>${t}</button>`).join('')}<hr><button class="ditem" id="dacc"><span>🏫</span>${onlLogged()?esc(ONL.acc.nombre)+' · Salir':'Entrar con usuario del cole'}</button><button class="ditem" id="dset"><span>⚙️</span>Ajustes</button><button class="ditem" id="dprof"><span>👥</span>Cambiar jugador</button></div>`;
+ bg.innerHTML=`<div class="drawer"><div class="dh"><b>♞ Ajedrez Siurot</b><button class="iconbtn sm" id="dclose" aria-label="Cerrar">✕</button></div>${TABS.map(([id,ic,t])=>`<button class="ditem ${cur===id?'on':''}" data-tab="${id}"><span>${ic}</span>${t}</button>`).join('')}<hr><button class="ditem" id="dacc"><span>${onlLogged()?'🚪':'🏫'}</span>${onlLogged()?'Cerrar sesión · '+esc(ONL.acc.nombre):'Entrar con usuario del cole'}</button><button class="ditem" id="dset"><span>⚙️</span>Ajustes</button></div>`;
  document.body.appendChild(bg);
  bg.addEventListener('pointerdown',e=>{if(e.target===bg)closeMenu();});
  $('#dclose',bg).onclick=closeMenu;
  $$('.ditem[data-tab]',bg).forEach(b=>b.onclick=async()=>{const t=b.dataset.tab;closeMenu();if($('#back')&&currentTab==='partida'&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;if((currentTab==='ogame')&&!(await confirmModal('¿Salir de la partida?','La partida online sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir jugando')))return;go(t);});
- $('#dacc',bg).onclick=async()=>{closeMenu();if(onlLogged()){await onlLogout();if(currentTab==='torneos'||currentTab==='online')go(currentTab);}else await onlLoginProfile();};
- $('#dset',bg).onclick=()=>{closeMenu();showSettings();};$('#dprof',bg).onclick=()=>{closeMenu();showProfiles();};
+ $('#dacc',bg).onclick=async()=>{closeMenu();if(onlLogged())await doLogout();else await onlLoginProfile();};
+ $('#dset',bg).onclick=()=>{closeMenu();showSettings();};
 }
 async function hideSplash(){
  const s=document.getElementById('splash');if(!s)return;
