@@ -2592,15 +2592,15 @@ function viewMyGames(m){
  m.innerHTML=`<div class="sectitle"><h2>📜 Mis partidas</h2><button class="btn ghost sm" id="gimp">📥 Importar PGN</button></div>
  <div class="card mod" id="gerr" style="cursor:pointer;background:linear-gradient(135deg,#f3ecff,#fffdf8)"><div class="mic" style="background:#7c3aed">🧠</div><div style="flex:1"><h3>Aprender de mis errores</h3><p>Repasa los fallos de tus partidas analizadas con repetición espaciada.</p><div class="btnrow" style="gap:6px"><span class="pill">${st.due?'📌 '+st.due+' para repasar hoy':'🎉 Nada pendiente hoy'}</span><span class="pill">🗂️ ${st.total} guardados</span></div></div><span class="muted" style="font-size:1.4rem">›</span></div>
  <div class="card" style="margin-top:16px"><div class="btnrow" style="gap:6px;margin-bottom:8px">${F.map(([k,t])=>`<button class="btn sm ${MG_F===k?'':'ghost'}" data-f="${k}">${t} <small>(${k==='all'?all.length:all.filter(g=>kind(g)===k).length})</small></button>`).join('')}</div>
- <p class="muted" style="margin:4px 0 8px">Se guardan solas en este dispositivo (las 15 últimas). Pulsa <b>Analizar</b> para ver tus errores y las mejores jugadas; con 📌 fijas una partida para que no se borre sola (⭐ es solo para amigos, en «Online» y «Amigos»).</p><div id="glist" style="display:flex;flex-direction:column;gap:8px"></div></div>`;
+ <p class="muted" style="margin:4px 0 8px">Se guardan solas en este dispositivo (las 15 últimas). Pulsa <b>Analizar</b> para ver tus errores y las mejores jugadas; con 📌 una partida no se borra nunca.</p><div id="glist" style="display:flex;flex-direction:column;gap:8px"></div></div>`;
  $('#gerr',m).onclick=()=>go('errores');
  $$('[data-f]',m).forEach(b=>b.onclick=()=>{MG_F=b.dataset.f;go('partidas');});
  const gl=$('#glist',m);
  if(!hs.length)gl.innerHTML='<div class="muted" style="font-weight:700">Aún no hay partidas aquí. ¡Juega una!</div>';
- hs.forEach(g=>{const b=botOf(g);const r=document.createElement('div');r.className='lrow';r.innerHTML=`<div class="ln">${g.res==='w'?'🏆':g.res==='d'?'🤝':g.res==='l'?'❌':'📥'}</div><div class="lt">${g.level?`Nivel ${g.level} · `:''}${esc(g.online&&g.name?g.name:b.nombre)} · ${g.color==='w'?'⚪':'⚫'}<small>${g.date} · ${Math.ceil(g.moves.length/2)} jugadas${g.an&&g.an.acc?` · Precisión ${g.an.acc[g.color]}%`:''}</small></div><div class="lbt">${g.online&&g.ou&&typeof playerCard==='function'?'<button class="btn sm ghost" data-a="pl" title="Ver al rival: perfil, amigo, silenciar">👤</button>':''}<button class="btn sm ghost" data-a="star" title="${g.keep?'Fijada: no se borra sola':'Fijar: que no se borre sola'}">${g.keep?'📌':'📍'}</button><button class="btn sm ghost" data-a="del" title="Borrar">🗑️</button><button class="btn sm" data-a="an">🔍 Analizar</button></div>`;
+ hs.forEach(g=>{const b=botOf(g);const r=document.createElement('div');r.className='lrow';r.innerHTML=`<div class="ln">${g.res==='w'?'🏆':g.res==='d'?'🤝':g.res==='l'?'❌':'📥'}</div><div class="lt">${g.level?`Nivel ${g.level} · `:''}${g.online&&g.name&&!g.local&&typeof playerCard==='function'?`<span data-a="pl" style="text-decoration:underline dotted;text-underline-offset:3px">${esc(g.name)}</span>`:esc(g.online&&g.name?g.name:b.nombre)} · ${g.color==='w'?'⚪':'⚫'}<small>${g.date} · ${Math.ceil(g.moves.length/2)} jugadas${g.an&&g.an.acc?` · Precisión ${g.an.acc[g.color]}%`:''}</small></div><div class="lbt"><button class="btn sm ghost" data-a="star" title="${g.keep?'Fijada: no se borra sola':'Fijar: que no se borre sola'}">${g.keep?'📌':'📍'}</button><button class="btn sm ghost" data-a="del" title="Borrar">🗑️</button><button class="btn sm" data-a="an">🔍 Analizar</button></div>`;
   r.onclick=e=>{const t=e.target.closest('[data-a]');const act=t?t.dataset.a:'an';
-   if(act==='pl'){playerCard({id:g.ou,n:String(g.name||'').replace(/^.*vs /,'')});}
-   else if(act==='star'){g.keep=!g.keep;save();go('partidas');}
+   if(act==='pl'){const nm=String(g.name||'').replace(/^.*vs /,'');(async()=>{const id=g.ou||await uidByName(nm);if(!id)return toast('No encuentro a este jugador (partida antigua). En partidas nuevas sí se puede.','bad');if(!g.ou){g.ou=id;save();}playerCard({id,n:nm});})();}
+   else if(act==='star'){if(!g.keep&&(P.hist||[]).filter(x=>x.keep).length>=15)return toast('Ya tienes 15 partidas fijadas. Quita el 📌 de alguna para fijar otra.','bad');g.keep=!g.keep;save();go('partidas');}
    else if(act==='del'){confirmModal('¿Borrar partida?','Se borrará de este dispositivo.','Borrar','Cancelar',true).then(ok=>{if(ok){P.hist=P.hist.filter(x=>x!==g);save();go('partidas');}});}
    else go('analisis',{id:g.id});};gl.appendChild(r);});
  $('#gimp',m).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
@@ -4759,6 +4759,12 @@ function viewOnline(m){const tok=VIEW;let timer=null,first=true;
   $$('[data-hc]',m).forEach(b=>b.onclick=e=>{e.stopPropagation();playerCard({id:b.dataset.hc,n:b.dataset.hn},{onChange:draw});});};
  m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2></div><div class="card muted">Cargando…</div>`;
  draw();timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg')&&!$('.pcard'))draw();},15000);}
+async function uidByName(n){n=String(n||'').trim();if(!n||!onlLogged())return null;const eq=x=>String(x||'').trim()===n;
+ try{const fr=await frLoad();for(const[id,x]of Object.entries(fr))if(eq(x.n))return id;}catch(e){}
+ try{const pr=await RT.get('presence')||{};for(const[id,x]of Object.entries(pr))if(x&&eq(x.n))return id;}catch(e){}
+ try{const d=(typeof PUB!=='undefined'&&PUB.d)||{};for(const h of Object.values(d.hof||{}))if(h&&eq(h.nombre||h.n))return h.id||h.u;
+  for(const t of Object.values(d.ins||{}))for(const[id,x]of Object.entries(t||{}))if(x&&eq(x.n))return id;}catch(e){}
+ return null;}
 /* ---------- amigos: solo tus amigos ⭐, con punto verde si están conectados (si te han silenciado, nunca lo ves) ---------- */
 function viewAmigos(m){const tok=VIEW;let timer=null,first=true;
  const head='<div class="sectitle"><h2>👥 Amigos</h2></div>';
