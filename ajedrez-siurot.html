@@ -484,6 +484,12 @@ nav.tabs{display:none!important}
 .rushopp{background:#fff3c4;border:2px solid #f2b134;border-radius:12px;padding:8px 12px;font-weight:700;margin:6px 0}
 
 body.profemode header,body.profemode nav.tabs,body.profemode #installbar{display:none!important}body.profemode main{padding-top:12px}
+/* tarjeta de jugador, apuntados, filas tocables */
+.modal.wide{max-width:560px;text-align:left}.modal.wide h2{text-align:center}.modal.wide>.btnrow{justify-content:center}
+.plwrap{display:flex;flex-wrap:wrap;gap:6px}.chipp{border:2px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-weight:700;font-size:.88rem;cursor:pointer}.chipp.me{background:#e8f6ee;border-color:#9bd3b0}.chipp:hover{border-color:var(--pri)}
+tr.tapr,.tapr{cursor:pointer}tr.tapr:hover td{background:#f5f0e2}.tapn{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.pl.tap{cursor:pointer}
+.mtop{display:flex;justify-content:flex-end;margin:-6px -6px 6px}
 
 </style>
 </head>
@@ -1580,7 +1586,7 @@ const FB=(()=>{
 })();
 /* Realtime Database por REST (presencia, retos y partidas) */
 const RT=(()=>{const B='https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/';
- const url=async p=>{const t=await FB.tok();return B+p+'.json?auth='+encodeURIComponent(t||'');};
+ const url=async(p,q)=>{const t=await FB.tok();return B+p+'.json?auth='+encodeURIComponent(t||'')+(q?'&'+q:'');};
  const SV={'.sv':'timestamp'};
  return{B,SV,off:0,srv(){return Date.now()+RT.off;},
   async get(p){return FB.req(await url(p),{},2);},
@@ -1588,8 +1594,74 @@ const RT=(()=>{const B='https://ajedrez-siurot-default-rtdb.europe-west1.firebas
   async patch(p,v){return FB.req(await url(p),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
   async post(p,v){return FB.req(await url(p),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
   async del(p){return FB.req(await url(p),{method:'DELETE'},2);},
+  /* escrituras «silenciosas»: Firebase no devuelve lo escrito (menos datos descargados) */
+  async putS(p,v){return FB.req(await url(p,'print=silent'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
+  async patchS(p,v){return FB.req(await url(p,'print=silent'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)},2);},
   async sync(p){const r=await RT.put(p,SV);if(typeof r==='number')RT.off=r-Date.now();return r;}};
 })();
+/* Escucha en directo (Server-Sent Events del REST de Realtime Database): llega la foto inicial y después SOLO los cambios
+   (mucho menos tráfico que preguntar cada segundo). Si no se puede (sin permiso, límite de conexiones…) lee cada pocos segundos.
+   Con la app en segundo plano la conexión se cierra (ahorra datos y conexiones) y al volver se abre de nuevo. */
+function rtWatch(path,o){o=o||{};const auth=o.auth!==false,poll=o.poll||4000;
+ let es=null,data=null,dead=false,pt=null,fails=0,mode='sse',hidT=null,last=0,wd=null,retryT=null,gen=0;
+ const emit=()=>{try{o.onData&&o.onData(data);}catch(e){console.error(e);}};
+ const setAt=(p,v)=>{const ks=String(p||'').split('/').filter(Boolean);if(!ks.length){data=v===undefined?null:v;return;}
+  if(data===null||typeof data!=='object')data={};let n=data;for(let i=0;i<ks.length-1;i++){if(n[ks[i]]===null||typeof n[ks[i]]!=='object')n[ks[i]]={};n=n[ks[i]];}
+  const k=ks[ks.length-1];if(v===null||v===undefined)delete n[k];else n[k]=v;};
+ const stop1=()=>{gen++;if(es){try{es.close();}catch(e){}es=null;}clearInterval(pt);pt=null;clearInterval(wd);wd=null;};
+ const urlOf=async()=>RT.B+path+'.json'+(auth?'?auth='+encodeURIComponent((await FB.tok())||''):'');
+ async function pollOnce(){try{const r=await fetch(await urlOf());if(r.ok){data=await r.json();last=Date.now();emit();}}catch(e){}}
+ function startPoll(){if(pt)return;pollOnce();pt=setInterval(()=>{if(!document.hidden)pollOnce();},poll);
+  clearTimeout(retryT);retryT=setTimeout(()=>{if(!dead&&mode==='poll'){mode='sse';fails=0;open();}},120000);}
+ async function open(){if(dead)return;stop1();if(document.hidden)return;const my=gen;
+  if(mode==='poll'||typeof EventSource==='undefined')return startPoll();
+  let u;try{u=await urlOf();}catch(e){mode='poll';return startPoll();}
+  if(dead||my!==gen)return;
+  try{es=new EventSource(u);}catch(e){mode='poll';return startPoll();}
+  last=Date.now();
+  es.addEventListener('put',e=>{try{const j=JSON.parse(e.data);setAt(j.path,j.data);fails=0;last=Date.now();emit();}catch(x){}});
+  es.addEventListener('patch',e=>{try{const j=JSON.parse(e.data),b=j.path==='/'?'':j.path;for(const k in j.data)setAt(b+'/'+k,j.data[k]);last=Date.now();emit();}catch(x){}});
+  es.addEventListener('keep-alive',()=>{last=Date.now();});
+  es.addEventListener('auth_revoked',()=>{if(my===gen)open();});            // el token caducó: se abre otra vez con uno nuevo
+  es.addEventListener('cancel',()=>{if(my===gen){mode='poll';open();}});     // sin permiso para escuchar: lectura normal
+  es.onerror=()=>{if(my!==gen)return;fails++;if(fails>=4||(es&&es.readyState===2)){mode='poll';open();}};
+  wd=setInterval(()=>{if(my===gen&&Date.now()-last>75000){fails=0;open();}},15000);}   // conexión muda: se rehace
+ const onVis=()=>{if(dead)return;if(document.hidden){clearTimeout(hidT);hidT=setTimeout(()=>{if(document.hidden)stop1();},o.hideMs||15000);}
+  else{clearTimeout(hidT);if(!es&&!pt)open();}};
+ document.addEventListener('visibilitychange',onVis);
+ open();
+ return{get data(){return data;},get mode(){return mode;},get last(){return last;},refresh:pollOnce,
+  close(){dead=true;stop1();clearTimeout(hidT);clearTimeout(retryT);document.removeEventListener('visibilitychange',onVis);}};}
+/* ===== Pantalla de progreso de un jugador (la usan la app de juego y la del profe). El resumen lo sube cada alumno a perfil/{uid} ===== */
+const PF_CSS=`.pf{font-size:.95rem}.pf .pf-h{display:flex;gap:14px;align-items:center}.pf .pf-av{font-size:3rem;line-height:1}.pf h3{margin:14px 0 6px;font-size:1rem}
+.pf .pf-bar{height:10px;background:#ece6d6;border-radius:6px;overflow:hidden}.pf .pf-bar i{display:block;height:100%;background:#2e9b5f;border-radius:6px}
+.pf .pf-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.pf .pf-s{background:#faf6ea;border:2px solid #ece3cc;border-radius:12px;padding:8px 4px;text-align:center}
+.pf .pf-s b{display:block;font-size:1.15rem}.pf .pf-s span{font-size:.72rem;font-weight:700;color:#7a6f57}.pf .pf-p{display:inline-block;background:#f1ecdf;border-radius:999px;padding:4px 10px;margin:3px 3px 0 0;font-weight:700;font-size:.85rem}
+.pf .pf-m{display:grid;grid-template-columns:26px 1fr 48px;gap:8px;align-items:center;margin:5px 0}.pf .pf-m small{font-weight:800}.pf .pf-bd{display:flex;flex-wrap:wrap;gap:6px}.pf .pf-bd span{background:#fff4d1;border-radius:10px;padding:4px 8px;font-size:.82rem;font-weight:700}
+.pf .pf-mut{color:#8a7f66;font-size:.82rem;font-weight:700}`;
+(function(){try{const st=document.createElement('style');st.textContent=PF_CSS;(document.head||document.documentElement).appendChild(st);}catch(e){}})();
+function profileHTML(s,o){o=o||{};if(!s)return'<p class="pf-mut">Todavía no hay datos de progreso de este jugador. Aparecerán cuando abra la app actualizada.</p>';
+ const e=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const pct=s.nx?Math.max(0,Math.min(100,Math.round((s.xp-(s.rx||0))/((s.nx.xp-(s.rx||0))||1)*100))):100;
+ const rt=s.rt||{},RTN={bala:'⚡ Bala',blitz:'🔥 Blitz',rapida:'⏱️ Rápidas',problemas:'🧩 Problemas'};
+ const eh=(s.eh&&s.eh.length>1)?s.eh:[s.elo||800,s.elo||800],mn=Math.min(...eh),mx=Math.max(...eh),rg=Math.max(40,mx-mn);
+ const pts=eh.map((v,i)=>`${(i/(eh.length-1)*300).toFixed(1)},${(56-(v-mn)/rg*50).toFixed(1)}`).join(' ');
+ const gm=s.gm||{w:0,d:0,l:0},on=s.on||{w:0,d:0,l:0};
+ const ago=s.t?Math.round((Date.now()-s.t)/864e5):null;
+ return`<div class="pf">${o.head===false?'':`<div class="pf-h"><div class="pf-av">${e(s.av||'🧑‍🎓')}</div><div style="flex:1"><b style="font-size:1.15rem">${e(s.n)}</b>${s.g?` <span class="pf-mut">${e(s.g)}</span>`:''}<div style="font-weight:800;margin:2px 0 4px">${e(s.rk&&s.rk.ic||'')} ${e(s.rk&&s.rk.n||'')} · ${s.xp||0} XP</div><div class="pf-bar"><i style="width:${pct}%"></i></div>${s.nx?`<div class="pf-mut" style="margin-top:3px">Le faltan ${s.nx.xp-s.xp} XP para ${e(s.nx.n)}</div>`:''}</div></div>`}
+ <div class="pf-g"><div class="pf-s"><b>♟ ${s.elo||800}</b><span>ELO (máx. ${Math.max(s.emax||0,s.elo||800)})</span></div><div class="pf-s"><b>${(s.lec||[0,0])[0]}/${(s.lec||[0,0])[1]}</b><span>Lecciones</span></div><div class="pf-s"><b>${s.pz||0}</b><span>Ejercicios</span></div>
+  <div class="pf-s"><b>${on.w}·${on.d}·${on.l}</b><span>Online G·T·P</span></div><div class="pf-s"><b>${gm.w}·${gm.d}·${gm.l}</b><span>Vs máquina G·T·P</span></div><div class="pf-s"><b>🔥 ${s.st||0}</b><span>Días seguidos</span></div></div>
+ <h3>📈 Puntuaciones</h3><svg viewBox="0 0 300 62" preserveAspectRatio="none" style="width:100%;height:60px;background:#fff;border:2px solid #ece3cc;border-radius:10px"><polyline points="${pts}" fill="none" stroke="#2e7d5b" stroke-width="2.5" vector-effect="non-scaling-stroke" transform="translate(0,3)"/></svg>
+ <div>${Object.entries(RTN).map(([k,t])=>`<span class="pf-p">${t}: <b>${rt[k]&&rt[k].r?rt[k].r:'—'}</b>${rt[k]&&rt[k].n?` <small>(${rt[k].n})</small>`:''}</span>`).join('')}</div>
+ ${s.md&&s.md.length?`<h3>📚 Aprendizaje</h3>${s.md.map(m=>`<div class="pf-m"><span>${e(m[0])}</span><div><small>${e(m[1])}</small><div class="pf-bar"><i style="width:${m[3]?Math.round(m[2]/m[3]*100):0}%;background:${e(m[4]||'#2e9b5f')}"></i></div></div><b style="text-align:right">${m[2]}/${m[3]}</b></div>`).join('')}`:''}
+ <h3>🏅 Insignias (${(s.bd||[]).length}${s.bdT?'/'+s.bdT:''})</h3><div class="pf-bd">${(s.bd||[]).map(b=>`<span title="${e(b[1])}">${e(b[0])} ${e(b[1])}</span>`).join('')||'<span class="pf-mut" style="background:none">Aún ninguna</span>'}</div>
+ ${ago!==null?`<p class="pf-mut" style="margin:12px 0 0">Datos actualizados ${ago<=0?'hoy':ago===1?'ayer':'hace '+ago+' días'}.</p>`:''}</div>`;}
+/* torneos arena: empiezan y terminan solos según la hora (no hace falta la app del profe abierta) */
+const tIsArena=t=>!!t&&(!t.tipo||t.tipo==='arena');
+const tFin=t=>t?(t.fin||(t.inicio?t.inicio+(t.duracion||20)*60000:0)):0;
+function tEff(t,now){if(!t)return null;if(t.estado==='terminado')return'terminado';
+ if(tIsArena(t)){const f=tFin(t);if(f&&now>=f)return'terminado';if(t.estado==='activo'||(t.inicio&&now>=t.inicio))return'activo';return'espera';}
+ return t.estado||'espera';}
 /* claves: 3 números + 3 letras minúsculas (sin caracteres que se confunden) */
 function genClave(){const D='23456789',L='abcdefghjkmnpqrstuvwxyz',r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};let s='';for(let i=0;i<3;i++)s+=D[r(D.length)];for(let i=0;i<3;i++)s+=L[r(L.length)];return s;}
 const claveOK=c=>/^[0-9]{3}[a-z]{3}$/.test(c);
@@ -1918,14 +1990,14 @@ function playSound(pos,m){if(pos.inCheck())sound('check');else if(m.captured)sou
 
 // ================= Navegación =================
 let VIEW=0;let currentTab='inicio',currentArg=null,CUR_BOARD=null;
-const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['torneos','🏟️','Torneos'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
+const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
 function go(tab,arg){
  VIEW++;currentTab=tab;currentArg=arg;CUR_BOARD=null;window.scrollTo(0,0);stopSpeech();document.body.classList.remove('intrainer');fitHeader();
  $$('.modalbg').forEach(bg=>bg._close?bg._close(null):bg.remove());closeMenu();
- const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',escaner:'ejercicios',errores:'ejercicios',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio'};
+ const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'partidas',estudio:'estudios',escaner:'ejercicios',errores:'partidas',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
 }
 function alive(tok){return tok===VIEW;}
 function renderHeader(){
@@ -2312,11 +2384,11 @@ function temaStats(id){P.temas=P.temas||{};return P.temas[id]=P.temas[id]||{ok:0
 function temasTotal(){return Object.values(P.temas||{}).reduce((a,t)=>a+t.ok,0);}
 function viewExercises(m){
  m.innerHTML=`<div class="sectitle"><h2>🧩 Táctica por temas</h2><div class="btnrow" style="gap:6px"><span class="pill" style="background:#e8f1ff;color:#1e40af" title="Sube si aciertas y baja si fallas">🧩 Tu puntuación de problemas: <b>${(P.rt&&P.rt.problemas)?P.rt.problemas.r:'—'}</b></span><span class="pill">♾️ Ejercicios nuevos sin límite · ${temasTotal()} resueltos</span></div></div>
- <div class="grid g2" id="newtools" style="margin-bottom:16px"><div class="card mod" id="cEsc" style="cursor:pointer"><div class="mic" style="background:#2563eb">🔍</div><div style="flex:1"><h3>Escáner de amenazas</h3><p>Antes de mover: ¿qué te ataca? ¿qué puedes ganar? Stockfish lo revisa.</p></div></div><div class="card mod" id="cErr" style="cursor:pointer"><div class="mic" style="background:#7c3aed">🧠</div><div style="flex:1"><h3>Mis errores</h3><p>Repasa tus propios fallos con repetición espaciada.${mistDue().length?` <b>${mistDue().length} para hoy</b>`:''}</p></div></div></div>
+ <div class="grid g2" id="newtools" style="margin-bottom:16px"><div class="card mod" id="cEsc" style="cursor:pointer"><div class="mic" style="background:#2563eb">🔍</div><div style="flex:1"><h3>Escáner de amenazas</h3><p>Antes de mover: ¿qué te ataca? ¿qué puedes ganar? Stockfish lo revisa.</p></div></div></div>
  <div class="grid g3" id="temas"></div>
  <div class="sectitle" style="margin-top:26px"><h2 style="font-size:1.25rem">📘 Ejercicios clásicos</h2><span class="pill">${Object.keys(P.puzzles).length} / ${allPuzzles().length}</span></div><div class="grid g3" id="cats"></div>
  <div class="card" style="margin-top:16px"><h3>¿Cómo funcionan?</h3><p class="muted" style="margin:6px 0 0">En <b>Táctica por temas</b> la dificultad sube con cada acierto (y baja si fallas) y la app crea un ejercicio nuevo cada vez y comprueba que tenga una única solución: ¡nunca se acaban! Si te atascas usa 💡 <b>Pista</b> (mitad de XP) o 👀 <b>Solución</b> (sin XP y se pierde la racha).</p></div>`;
- $('#cEsc',m).onclick=()=>go('escaner',{});$('#cErr',m).onclick=()=>go('errores');
+ $('#cEsc',m).onclick=()=>go('escaner',{});
  TEMAS.forEach(t=>{const st=temaStats(t.id);const d=document.createElement('div');d.className='card mod';
   d.innerHTML=`<div class="mic" style="background:${t.color}">${t.icono}</div><div style="flex:1"><h3>${t.nombre}</h3><p>${t.que}</p><div class="btnrow" style="gap:6px"><span class="pill">✅ ${st.ok}</span><span class="pill">🔥 Récord ${st.best}</span><span class="pill">⬆️ Nivel ${(P.tnivel||{})[t.id]||1}</span><span class="pill">🏆 Récord nv ${trec(t.id).lvl}</span><span class="pill">+${t.xp} XP</span></div></div>`;
   d.onclick=()=>go('tema',t.id);$('#temas',m).appendChild(d);});
@@ -2490,21 +2562,34 @@ function viewPlay(m){
   const cfg=await gameSetup();if(!cfg)return;
   go('partida',{level:playCfg.level,color:cfg.color==='r'?(Math.random()<.5?'w':'b'):cfg.color,tc:cfg.tc,ev:cfg.ev,undo:cfg.undo,v960:cfg.v960});
  }
- const hs=(P.hist||[]).slice().reverse();
  const cont=P.cur&&P.cur.moves&&P.cur.moves.length?P.cur:null;
  if(cont){const bx=document.createElement('div');bx.className='card';bx.style.cssText='margin-top:16px;background:#fff8e6;border-color:#f2b134';bx.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:2rem">${BOTS[cont.level-1].emoji}</div><div style="flex:1;min-width:180px"><h3>Partida guardada</h3><div class="muted" style="font-weight:700">Nivel ${cont.level} · ${cont.color==='w'?'⚪':'⚫'} · ${Math.ceil(cont.moves.length/2)} jugadas · ${cont.date}</div></div><button class="btn acc" id="cont">▶ Continuar</button></div>`;m.appendChild(bx);$('#cont',bx).onclick=()=>go('partida',{level:cont.level,color:cont.color,resume:true});}
- const box=document.createElement('div');box.className='card';box.style.marginTop='16px';
- box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="flex:1">📜 Mis partidas</h3><button class="btn sm ghost" id="gimp">📥 Importar PGN</button></div><p class="muted" style="margin:4px 0 8px">Se guardan solas. Pulsa <b>Analizar</b> para ver tus errores y las mejores jugadas; con ⭐ una partida no se borra nunca.</p><div id="glist" style="display:flex;flex-direction:column;gap:8px"></div>`;
- m.appendChild(box);
- const gl=$('#glist',box);
- if(!hs.length)gl.innerHTML='<div class="muted" style="font-weight:700">Aún no hay partidas. ¡Juega una!</div>';
- hs.forEach(g=>{const b=botOf(g);const r=document.createElement('div');r.className='lrow';r.innerHTML=`<div class="ln">${g.res==='w'?'🏆':g.res==='d'?'🤝':g.res==='l'?'❌':'📥'}</div><div class="lt">${g.level?`Nivel ${g.level} · `:''}${esc(b.nombre)} · ${g.color==='w'?'⚪':'⚫'}<small>${g.date} · ${Math.ceil(g.moves.length/2)} jugadas${g.an&&g.an.acc?` · Precisión ${g.an.acc[g.color]}%`:''}</small></div><button class="btn sm ghost" data-a="star" title="Guardar para siempre">${g.keep?'⭐':'☆'}</button><button class="btn sm ghost" data-a="del" title="Borrar">🗑️</button><button class="btn sm" data-a="an">🔍 Analizar</button>`;
-  r.onclick=e=>{const t=e.target.closest('[data-a]');const act=t?t.dataset.a:'an';
-   if(act==='star'){g.keep=!g.keep;save();viewPlay((m.innerHTML='',m));}
-   else if(act==='del'){confirmModal('¿Borrar partida?','Se borrará de este dispositivo.','Borrar','Cancelar',true).then(ok=>{if(ok){P.hist=P.hist.filter(x=>x!==g);save();viewPlay((m.innerHTML='',m));}});}
-   else go('analisis',{id:g.id});};gl.appendChild(r);});
- $('#gimp',box).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
+ const sc=document.createElement('div');sc.className='card mod';sc.style.cssText='margin-top:16px;cursor:pointer';sc.innerHTML=`<div class="mic" style="background:#d4841c">📜</div><div style="flex:1"><h3>Mis partidas</h3><p>Todas tus partidas guardadas, listas para analizar, y «Aprender de mis errores».</p></div><span class="muted" style="font-size:1.4rem">›</span>`;sc.onclick=()=>go('partidas');m.appendChild(sc);
 }
+/* ===== Mis partidas: todas las partidas guardadas (máquina, online, con amigos, importadas) y «Aprender de mis errores» ===== */
+let MG_F='all';
+function viewMyGames(m){
+ const st=typeof mistStats==='function'?mistStats():{due:0,total:0};
+ const kind=g=>g.local?'local':g.online?'online':g.level?'bot':'imp';
+ const all=(P.hist||[]).slice().reverse(),hs=all.filter(g=>MG_F==='all'||kind(g)===MG_F);
+ const F=[['all','Todas'],['bot','🤖 Máquina'],['online','🌐 Online'],['local','👥 Con amigos'],['imp','📥 Importadas']];
+ m.innerHTML=`<div class="sectitle"><h2>📜 Mis partidas</h2><button class="btn ghost sm" id="gimp">📥 Importar PGN</button></div>
+ <div class="card mod" id="gerr" style="cursor:pointer;background:linear-gradient(135deg,#f3ecff,#fffdf8)"><div class="mic" style="background:#7c3aed">🧠</div><div style="flex:1"><h3>Aprender de mis errores</h3><p>Repasa los fallos de tus partidas analizadas con repetición espaciada.</p><div class="btnrow" style="gap:6px"><span class="pill">${st.due?'📌 '+st.due+' para repasar hoy':'🎉 Nada pendiente hoy'}</span><span class="pill">🗂️ ${st.total} guardados</span></div></div><span class="muted" style="font-size:1.4rem">›</span></div>
+ <div class="card" style="margin-top:16px"><div class="btnrow" style="gap:6px;margin-bottom:8px">${F.map(([k,t])=>`<button class="btn sm ${MG_F===k?'':'ghost'}" data-f="${k}">${t} <small>(${k==='all'?all.length:all.filter(g=>kind(g)===k).length})</small></button>`).join('')}</div>
+ <p class="muted" style="margin:4px 0 8px">Se guardan solas en este dispositivo (las 15 últimas). Pulsa <b>Analizar</b> para ver tus errores y las mejores jugadas; con ⭐ una partida no se borra nunca.</p><div id="glist" style="display:flex;flex-direction:column;gap:8px"></div></div>`;
+ $('#gerr',m).onclick=()=>go('errores');
+ $$('[data-f]',m).forEach(b=>b.onclick=()=>{MG_F=b.dataset.f;go('partidas');});
+ const gl=$('#glist',m);
+ if(!hs.length)gl.innerHTML='<div class="muted" style="font-weight:700">Aún no hay partidas aquí. ¡Juega una!</div>';
+ hs.forEach(g=>{const b=botOf(g);const r=document.createElement('div');r.className='lrow';r.innerHTML=`<div class="ln">${g.res==='w'?'🏆':g.res==='d'?'🤝':g.res==='l'?'❌':'📥'}</div><div class="lt">${g.level?`Nivel ${g.level} · `:''}${esc(g.online&&g.name?g.name:b.nombre)} · ${g.color==='w'?'⚪':'⚫'}<small>${g.date} · ${Math.ceil(g.moves.length/2)} jugadas${g.an&&g.an.acc?` · Precisión ${g.an.acc[g.color]}%`:''}</small></div><button class="btn sm ghost" data-a="star" title="Guardar para siempre">${g.keep?'⭐':'☆'}</button><button class="btn sm ghost" data-a="del" title="Borrar">🗑️</button><button class="btn sm" data-a="an">🔍 Analizar</button>`;
+  r.onclick=e=>{const t=e.target.closest('[data-a]');const act=t?t.dataset.a:'an';
+   if(act==='star'){g.keep=!g.keep;save();go('partidas');}
+   else if(act==='del'){confirmModal('¿Borrar partida?','Se borrará de este dispositivo.','Borrar','Cancelar',true).then(ok=>{if(ok){P.hist=P.hist.filter(x=>x!==g);save();go('partidas');}});}
+   else go('analisis',{id:g.id});};gl.appendChild(r);});
+ $('#gimp',m).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
+}
+
+
 
 // ---- configuración de partida: color, tiempo y barra de ventaja ----
 const TC_PRESETS=[[0,0,'Sin tiempo'],[1,0,'1 min'],[3,0,'3 min'],[5,0,'5 min'],[10,0,'10 min'],[15,0,'15 min'],[30,0,'30 min'],[3,2,'3 + 2'],[5,3,'5 + 3'],[10,5,'10 + 5']];
@@ -2779,12 +2864,15 @@ function showProfiles(first){
   <div class="entry"><button class="btn acc big" id="schoolin">🏫 ${onlLogged()?'Continuar como '+esc(ONL.acc.nombre):'Entrar con mi usuario del cole'}</button><div class="muted" style="font-weight:800;margin:12px 0 4px">o juega como invitado</div></div>
   <div class="profiles">${ps.map(p=>`<div class="prof" data-id="${p.id}"><button class="del" data-del="${p.id}" title="Borrar">✕</button><div class="pa">${p.avatar}</div><b>${esc(p.name)}</b><small>${RANKS[rankIdx(p.xp)].icono} ${RANKS[rankIdx(p.xp)].nombre} · ${p.xp} XP · ♟ ${p.elo||800}</small></div>`).join('')}
    <div class="prof" id="newp" style="border-style:dashed"><div class="pa">➕</div><b>Nuevo jugador</b><small>Invitado: sin cuenta del cole</small></div></div>
-  ${P?'<button class="btn ghost" id="cancelp">Volver</button>':''}</div>`;
+  ${onlLogged()&&!ONL.acc.guest?`<div style="margin-top:14px"><button class="btn red" id="logoutp">🚪 Cerrar sesión de ${esc(ONL.acc.nombre)}</button><p class="muted" style="font-size:.82rem;font-weight:700;margin:6px 0 0">Volverás a la pantalla de entrada con usuario y clave.</p></div>`:''}
+  ${P?'<button class="btn ghost" id="cancelp" style="margin-top:10px">Volver</button>':''}</div>`;
  $$('.prof[data-id]',m).forEach(el=>el.onclick=e=>{if(e.target.dataset.del)return;selectProfile(el.dataset.id);});
  $$('[data-del]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const p=DB.profiles[b.dataset.del];if(await confirmModal('¿Borrar jugador?',`Se borrará todo el progreso de <b>${esc(p.name)}</b>. No se puede deshacer.`,'Borrar','Cancelar',true)){delete DB.profiles[p.id];if(DB.current===p.id){DB.current=null;P=null;}save();showProfiles();}});
  $('#newp',m).onclick=newProfileModal;
  $('#schoolin',m).onclick=()=>onlLoginProfile();
  if(P)$('#cancelp',m).onclick=()=>go('inicio');
+ if($('#logoutp',m))$('#logoutp',m).onclick=async()=>{if(!(await confirmModal('¿Cerrar sesión?',`Se cerrará la sesión de <b>${esc(ONL.acc.nombre)}</b> en este dispositivo. Para volver a entrar necesitarás el usuario y la clave.`,'Cerrar sesión','Cancelar',true)))return;
+  try{await perfilSync(true);}catch(e){}await onlLogout();setTimeout(()=>location.reload(),400);};
 }
 function newProfileModal(){
  let av=AVATARS[Math.floor(Math.random()*AVATARS.length)];
@@ -2803,7 +2891,7 @@ function showSettings(){
  const S=DB.settings;const row=(k,t,d)=>`<div class="setrow"><div>${t}${d?`<div class="muted" style="font-size:.8rem;font-weight:700">${d}</div>`:''}</div><button class="switch ${S[k]?'on':''}" data-k="${k}"></button></div>`;
  const pcs=Object.keys(PIECESETS).map(k=>`<button class="psel ${S.pieces===k?'on':''}" data-p="${k}" title="${PIECENAMES[k]}"><span><img src="${pieceURL(k,'wN')}" alt=""><img src="${pieceURL(k,'bQ')}" alt=""></span><small>${PIECENAMES[k]}</small></button>`).join('')+`<button class="psel ${S.pieces==='unicode'?'on':''}" data-p="unicode" title="Texto"><span style="font-size:2rem;line-height:1">♘♛</span><small>Simples</small></button>`;
  const bds=Object.keys(BOARDS).map(k=>`<button class="bsel ${S.board===k?'on':''}" data-b="${k}" title="${BOARDS[k][2]}"><i style="background:linear-gradient(135deg,${BOARDS[k][0]} 50%,${BOARDS[k][1]} 50%)"></i><small>${BOARDS[k][2]}</small></button>`).join('');
- const html=`<div style="text-align:left"><b>♞ Piezas</b><div class="pickrow" id="pcs">${pcs}</div><b>🎨 Tablero</b><div class="pickrow" id="bds">${bds}</div></div>
+ const html=`<div class="mtop"><button class="btn ghost sm" id="setx" aria-label="Cerrar">✕ Cerrar</button></div><div style="text-align:left"><b>♞ Piezas</b><div class="pickrow" id="pcs">${pcs}</div><b>🎨 Tablero</b><div class="pickrow" id="bds">${bds}</div></div>
   ${row('sound','🔊 Sonido de piezas y efectos')}${row('tts','🗣️ Leer en voz alta las lecciones','Usa la voz en español del dispositivo')}${row('coords','🔤 Coordenadas en el tablero')}${row('dots','🟢 Mostrar jugadas posibles')}${row('unlockAll','👩‍🏫 Modo profesor','Desbloquea todos los niveles de la máquina')}
   ${installRowHTML()}
   <div class="btnrow" style="justify-content:center;margin-top:14px"><button class="btn ghost sm" id="exp">⬇️ Exportar progreso</button><button class="btn ghost sm" id="imp">⬆️ Importar progreso</button></div>
@@ -2812,6 +2900,7 @@ function showSettings(){
   <p class="muted" style="font-size:.7rem;margin:6px 0 0">Motor: ${SF.ok?'Stockfish 18 (GPLv3, © Chess.com / equipo Stockfish) activo en los niveles 5 a 7':'motor integrado (para Stockfish, sube la carpeta «stockfish» junto al HTML)'}. Piezas: cburnett y Merida (GPL), Modernas/“cardinal” (CC BY-NC-SA, sadsnake1), Celtas y Fantasía (MIT, M. Monge).</p>`;
  modal({title:'⚙️ Ajustes',html,buttons:[{t:'Cerrar'}]}).then(()=>{if(!P)return;if(CUR_BOARD)CUR_BOARD.render();else if($('#hstats'))go(currentTab,currentArg);});
  const bg=$$('.modalbg').pop();
+ $('#setx',bg).onclick=()=>bg._close&&bg._close(null);
  $$('.switch',bg).forEach(s=>s.onclick=()=>{S[s.dataset.k]=!S[s.dataset.k];s.classList.toggle('on',S[s.dataset.k]);save();if(s.dataset.k==='tts'&&!S.tts)stopSpeech();});
  $$('#pcs .psel',bg).forEach(b=>b.onclick=()=>{S.pieces=b.dataset.p;save();applyLook();$$('#pcs .psel',bg).forEach(x=>x.classList.toggle('on',x===b));if(CUR_BOARD)CUR_BOARD.render();});
  $$('#bds .bsel',bg).forEach(b=>b.onclick=()=>{S.board=b.dataset.b;save();applyLook();$$('#bds .bsel',bg).forEach(x=>x.classList.toggle('on',x===b));});
@@ -3031,7 +3120,7 @@ function moveExplain0(g,an,cl,i){
 }
 function viewAnalysis(m,{id}){
  const tok=VIEW;const g=(P.hist||[]).find(x=>x.id===id);
- const {board,body,under}=trainerShell(m,'🔍 Análisis de la partida',()=>go('jugar'));
+ const {board,body,under}=trainerShell(m,'🔍 Análisis de la partida',()=>go('partidas'));
  if(!g){body.innerHTML='<div class="fb bad">No encuentro esa partida.</div><button class="btn" id="bk">Volver</button>';$('#bk',body).onclick=()=>go('jugar');return;}
  board.interactive=false;board.orient=g.color;board.set(new E.Pos(g.start||undefined),{last:null});
  const bot=botOf(g);
@@ -3205,7 +3294,7 @@ function viewLab(m){
  </div>`;
  $('#lb1',m).onclick=()=>go('explorador');$('#lb0',m).onclick=()=>go('modulo','aperturas');$('#lb2',m).onclick=()=>go('tablero');
  $('#lb3',m).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
- $('#lb4',m).onclick=()=>go('jugar');}
+ $('#lb4',m).onclick=()=>go('partidas');}
 // ================= PGN, ESTUDIOS Y PARTIDAS GUARDADAS =================
 const NAGS={1:'!',2:'?',3:'!!',4:'??',5:'!?',6:'?!'};const NAGN={'!':1,'?':2,'!!':3,'??':4,'!?':5,'?!':6};
 const CALC={G:'g',R:'r',Y:'o',B:'b'},CALR={g:'G',r:'R',o:'Y',b:'B'};
@@ -3835,7 +3924,7 @@ function viewMistakes(m,arg){
   <div class="btnrow" style="margin-top:12px">${st.due?`<button class="btn acc" id="tr" style="font-size:1.1rem">▶ Repasar ahora (${Math.min(10,st.due)})</button>`:`<span class="pill">${st.total?'🎉 Nada pendiente hoy'+(st.next?' · próximo repaso: '+new Date(st.next).toLocaleDateString('es-ES',{day:'numeric',month:'short'}):''):'Aún no hay errores guardados'}</span>`}</div></div>
  ${tags.length?`<div class="card" style="margin-top:16px"><h3>📊 Tus fallos más habituales</h3><div style="display:grid;gap:10px;margin-top:10px">${tags.slice(0,5).map(k=>`<div><div style="display:flex;justify-content:space-between;font-weight:800"><span>${PATRONES[k].i} ${PATRONES[k].n}</span><span>${S[k]}</span></div><div class="pbar"><i style="width:${Math.round(S[k]/tot*100)}%;background:var(--acc)"></i></div><div class="muted" style="font-size:.85rem;font-weight:700;margin-top:2px">${PATRONES[k].tip}</div></div>`).join('')}</div></div>`:`<div class="card" style="margin-top:16px"><h3>¿Cómo se llena?</h3><p class="muted" style="margin:6px 0 0">1. Juega una partida y pulsa <b>🔍 Analizar</b>.<br>2. Tus errores graves se guardan solos.<br>3. También se guardan los fallos del <b>🔍 Escáner de amenazas</b>.</p></div>`}
  ${L.length?`<div class="card" style="margin-top:16px"><h3>🗂️ Mis posiciones</h3><div class="lessonlist" style="margin-top:8px">${L.slice(0,12).map(c=>`<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-size:1.3rem">${PATRONES[c.tag].i}</span><div style="flex:1"><b>${PATRONES[c.tag].n}</b><div class="muted" style="font-size:.8rem;font-weight:700">Jugaste ${E.sanES(c.san)} · mejor ${E.sanES(c.bestSan||'?')} · ${c.box>=5?'✅ dominada':'nivel '+(c.box+1)+'/6'}</div></div><button class="iconbtn sm" data-del="${c.id}" aria-label="Borrar">🗑️</button></div>`).join('')}</div></div>`:''}`;
- $('#goesc',m).onclick=()=>go('escaner',{});$('#goplay',m).onclick=()=>go('jugar');
+ $('#goesc',m).onclick=()=>go('escaner',{});$('#goplay',m).onclick=()=>go('partidas');
  const tr=$('#tr',m);if(tr)tr.onclick=()=>go('errores',{train:true});
  $$('[data-del]',m).forEach(b=>b.onclick=()=>{P.mist=mistList().filter(c=>c.id!==b.dataset.del);save();go('errores');});
 }
@@ -4322,9 +4411,24 @@ const ONL={acc:null,cache:null,cacheT:0};
 const onlLogged=()=>!!(FB.S.user&&ONL.acc);
 function onlFecha(ms){if(!ms)return'';const d=new Date(ms),n=new Date(),h=d.toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});const dd=Math.round((new Date(d).setHours(0,0,0,0)-new Date(n).setHours(0,0,0,0))/864e5);
  return dd===0?'Hoy '+h:dd===1?'Mañana '+h:dd===-1?'Ayer '+h:d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})+' '+h;}
-async function onlPublic(force){if(!force&&ONL.cache&&Date.now()-ONL.cacheT<25000)return ONL.cache;
+/* datos públicos (torneos, inscritos, salón de la fama, aviso): los publica la app del profe en Realtime Database («pub»)
+   y aquí se escuchan en directo. Así el alumnado NO gasta lecturas de Firestore. */
+const PUB={d:null,w:null,t:0,legacy:0};
+function pubBuild(d){d=d||{};const ts=Object.entries(d.t||{}).filter(([id,t])=>t&&typeof t==='object').map(([id,t])=>({...t,id}));
+ const hof=(Array.isArray(d.hof)?d.hof:Object.values(d.hof||{})).filter(Boolean).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
+ return{torneos:ts.sort((a,b)=>(a.inicio||0)-(b.inicio||0)),hof,cfg:d.cfg||{},ins:d.ins||{},pub:true};}
+async function onlPublic(force){
+ if(PUB.d&&PUB.d.seed)return pubBuild(PUB.d);
+ if(!force&&ONL.cache&&Date.now()-ONL.cacheT<25000)return ONL.cache;
+ try{const d=await pget('pub');if(d&&d.seed){PUB.d=d;PUB.t=Date.now();return pubBuild(d);}}catch(e){}
+ /* la app del profe aún no ha publicado (versión antigua): lectura clásica de Firestore */
  const [t,h,c]=await Promise.all([FB.query('torneos',{where:['estado','IN',['espera','activo']]}),FB.query('hof',{orderBy:['puntos','desc'],limit:10}),FB.get('config/main')]);
- ONL.cache={torneos:t.filter(x=>x.estado==='espera'||x.estado==='activo').sort((a,b)=>(a.inicio||0)-(b.inicio||0)),hof:h.sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10),cfg:c||{}};ONL.cacheT=Date.now();return ONL.cache;}
+ ONL.cache={torneos:t.filter(x=>x.estado==='espera'||x.estado==='activo').sort((a,b)=>(a.inicio||0)-(b.inicio||0)),hof:h.sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10),cfg:c||{},ins:{}};ONL.cacheT=Date.now();return ONL.cache;}
+/* un torneo concreto: de «pub» si sigue abierto; si ya lo cerró el profe, de Firestore (incluye la clasificación) */
+async function tGet(tid,fresh){let t=null;try{const d=await onlPublic();t=d.torneos.find(x=>x.id===tid)||null;}catch(e){}
+ if(t&&fresh){try{const x=await pget('pub/t/'+tid);if(x)t={...x,id:tid};}catch(e){}}
+ if(!t){try{t=await FB.get('torneos/'+tid);}catch(e){}}return t;}
+const insOf=(d,tid)=>(d&&d.ins&&d.ins[tid])||{};
 async function onlDoLogin(u,p){const s=await FB.login(u,p);try{localStorage.setItem('siurot_k',btoa(unescape(encodeURIComponent(u+'\n'+p))));}catch(e){}const d=await FB.get('users/'+s.uid);
  if(!d){FB.logout();throw {code:'BAJA'};}
  ONL.acc={uid:s.uid,alias:d.alias,nombre:d.nombre||d.alias,grupo:d.grupo||''};try{localStorage.setItem('siurot_acc',JSON.stringify(ONL.acc));}catch(e){}
@@ -4344,46 +4448,76 @@ async function onlLogin(){
 async function onlLogout(){try{if(FB.S.user)await RT.del('presence/'+myUid());}catch(e){}onlStop();try{localStorage.removeItem('siurot_k');}catch(e){}FB.logout();toast('Sesión cerrada');}
 async function onlLoginProfile(){if(!onlLogged()&&!(await onlLogin()))return;selectProfile(accountProfile().id);}
 async function onlJoin(t){if(!onlLogged())return toast('Primero entra con tu usuario','bad');
- try{const ex=await FB.get(`torneos/${t.id}/jugadores/${ONL.acc.uid}`);if(ex)return toast('Ya estás apuntado ✔️');
-  await FB.set(`torneos/${t.id}/jugadores/${ONL.acc.uid}`,{alias:ONL.acc.alias,nombre:ONL.acc.nombre,grupo:ONL.acc.grupo,puntos:0,partidas:0,fuera:false});toast('¡Apuntado a '+esc(t.nombre)+'! 🏟️','ok');return true;}
+ try{const d=await onlPublic();if(insOf(d,t.id)[ONL.acc.uid])return toast('Ya estás apuntado ✔️');
+  try{await FB.set(`torneos/${t.id}/jugadores/${ONL.acc.uid}`,{alias:ONL.acc.alias,nombre:ONL.acc.nombre,grupo:ONL.acc.grupo,puntos:0,partidas:0,fuera:false});}
+  catch(e){if(e.status!==403)throw e;const ex=await FB.get(`torneos/${t.id}/jugadores/${ONL.acc.uid}`).catch(()=>null);if(!ex)throw e;}   // 403 = ya existía
+  await RT.put(`pub/ins/${t.id}/${ONL.acc.uid}`,{n:ONL.acc.nombre,g:ONL.acc.grupo||'',a:ONL.acc.alias}).catch(()=>{});
+  if(PUB.d){PUB.d.ins=PUB.d.ins||{};(PUB.d.ins[t.id]=PUB.d.ins[t.id]||{})[ONL.acc.uid]={n:ONL.acc.nombre,g:ONL.acc.grupo||'',a:ONL.acc.alias};}
+  pubBump();toast('¡Apuntado a '+esc(t.nombre)+'! 🏟️','ok');return true;}
  catch(e){if(e.status===403){toast('El torneo no admite inscripciones ahora','bad');}else toast(FB.msg(e),'bad');}}
+/* desapuntarse de un torneo que aún no ha empezado */
+async function onlUnjoin(t){if(!onlLogged())return false;
+ if(!(await confirmModal('¿Desapuntarte?',`Dejarás de estar apuntado a «${esc(t.nombre)}». Puedes volver a apuntarte mientras no empiece.`,'Desapuntarme','Seguir apuntado',true)))return false;
+ try{await FB.del(`torneos/${t.id}/jugadores/${ONL.acc.uid}`);}catch(e){if(e.status===403){toast('Ya no puedes desapuntarte: el torneo ha empezado','bad');return false;}if(e.status!==404){toast(FB.msg(e),'bad');return false;}}
+ await RT.del(`pub/ins/${t.id}/${ONL.acc.uid}`).catch(()=>{});if(PUB.d&&PUB.d.ins&&PUB.d.ins[t.id])delete PUB.d.ins[t.id][ONL.acc.uid];pubBump();
+ toast('Te has desapuntado de '+esc(t.nombre));return true;}
+/* salir de un torneo en marcha: los puntos se quedan, pero ya no te emparejan */
+async function onlWithdraw(t){if(!onlLogged())return false;
+ if(!(await confirmModal('¿Salir del torneo?','Tus puntos se quedan en la clasificación, pero no jugarás más partidas. Si cambias de idea, puedes volver a entrar mientras siga abierto.','Salir del torneo','Seguir',true)))return false;
+ if(ON.arena&&ON.arena.tid===t.id)arenaLeave(true);
+ try{await RT.patch(`arena/${t.id}/p/${myUid()}`,{wait:null,sal:true});}catch(e){}
+ toast('Has salido de '+esc(t.nombre));return true;}
 /* tarjeta de la pantalla principal */
+const tPill=e=>e==='activo'?'🟢 ¡Ya está en marcha!':e==='terminado'?'🏁 Terminado':'⏳ En espera';
 async function homeOnline(m,tok){const box=$('#tcard',m);if(!box)return;
- try{const d=await onlPublic();if(!alive(tok)||!box.isConnected)return;
+ try{const d=await onlPublic();if(!alive(tok)||!box.isConnected)return;const now=RT.srv();
   const av=d.cfg.aviso?`<div class="card" style="background:#fff8e6;border-color:#f2b134;margin-bottom:12px">📣 <b>${esc(d.cfg.aviso)}</b></div>`:'';
-  const tc=d.torneos.map(t=>`<div class="card tcard ${t.estado}" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:12px;border:2px solid ${t.estado==='activo'?'#27ae60':'#f2b134'}"><div style="font-size:2rem">🏟️</div><div style="flex:1"><h3 style="margin:0">${esc(t.nombre)}</h3><div class="muted" style="font-weight:700">${t.estado==='activo'?'🟢 ¡Ya está en marcha!':'⏳ En espera · '+onlFecha(t.inicio)} · ${esc(t.ritmo||'3+0')}</div></div><button class="btn acc">${t.estado==='activo'?'Entrar':'Ver'}</button></div>`).join('');
-  box.innerHTML=av+tc;$$('.tcard',box).forEach((b,i)=>b.onclick=()=>{const t=d.torneos[i];t.estado==='activo'&&onlLogged()?go('arena',{tid:t.id}):go('torneos');});}catch(e){}}
+  const ts=d.torneos.map(t=>({t,e:tEff(t,now)})).filter(({t,e})=>e!=='terminado'||now-tFin(t)<3*3600e3);
+  const tc=ts.map(({t,e})=>`<div class="card tcard ${e}" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:12px;border:2px solid ${e==='activo'?'#27ae60':e==='terminado'?'#b8b8b8':'#f2b134'}"><div style="font-size:2rem">${e==='terminado'?'🏁':'🏟️'}</div><div style="flex:1"><h3 style="margin:0">${esc(t.nombre)}</h3><div class="muted" style="font-weight:700">${e==='espera'?tPill(e)+' · '+onlFecha(t.inicio):tPill(e)} · ${esc(t.ritmo||'3+0')}</div></div><button class="btn ${e==='terminado'?'ghost':'acc'}">${e==='activo'?'Entrar':e==='terminado'?'Resultados':'Ver'}</button></div>`).join('');
+  box.innerHTML=av+tc;$$('.tcard',box).forEach((b,i)=>b.onclick=()=>{const {t,e}=ts[i];if(e==='terminado')return go('arena',{tid:t.id,ver:1});e==='activo'&&onlLogged()?go('arena',{tid:t.id}):go('torneos');});}catch(e){}}
 /* pantalla Torneos */
-function viewTorneos(m){const tok=VIEW;let timer=null,paused=false;
- const onP=()=>{if(!alive(tok))return window.removeEventListener('onlpub',onP);if(!paused&&!$('.modalbg'))draw(true);};window.addEventListener('onlpub',onP);
+const tSig=d=>{const now=RT.srv();return(d&&d.torneos||[]).map(t=>t.id+':'+tEff(t,now)).join('|');};
+function viewTorneos(m){const tok=VIEW;let timer=null,paused=false,sig='',n5=0;PUB.lc=Date.now();pubCheck();   // al abrir, se comprueba si hay cambios
+ const onP=()=>{if(!alive(tok))return window.removeEventListener('onlpub',onP);if(!paused&&!$('.modalbg')&&!$('.pcard'))draw();};window.addEventListener('onlpub',onP);
  const draw=async(force)=>{if(!alive(tok))return clearInterval(timer);
   let d=null,err=false;try{d=await onlPublic(force);}catch(e){err=true;}if(!alive(tok))return;
   if(err){m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2></div><div class="card"><p>📡 Necesitas conexión a internet para ver los torneos.</p><button class="btn" id="rt">Reintentar</button></div>`;$('#rt',m).onclick=()=>draw(true);return;}
-  const me=onlLogged()?ONL.acc:null;
-  const acc=me?`<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:1.8rem">🧑‍🎓</div><div style="flex:1"><b>${esc(me.nombre)}</b><div class="muted">${me.guest?'Invitado del torneo':'Usuario: '+esc(me.alias)}${me.grupo?' · '+esc(me.grupo):''}</div></div><button class="btn ghost sm" id="lo">Salir</button></div>`
-   :`<div class="card" style="text-align:center"><p style="margin:0 0 10px">Estás como <b>invitado</b>: los invitados no pueden entrar en los torneos.<br>Entra con tu <b>usuario y clave</b> o, si no los recuerdas, pide unirte a un torneo en marcha.</p><button class="btn acc" id="li">🔑 Entrar</button></div>`;
-  const rows=await Promise.all(d.torneos.map(async t=>{let js=[],mine=false;if(me&&!me.guest){try{js=(await FB.list(`torneos/${t.id}/jugadores`));}catch(e){}}
-   js.sort((a,b)=>(b.puntos||0)-(a.puntos||0));mine=js.some(j=>j.id===me?.uid);return{t,js,mine};}));
-  if(!alive(tok))return;
-  const tn=rows.map(({t,js,mine})=>`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">🏟️ ${esc(t.nombre)}</h3><span class="pill">${t.estado==='activo'?'🟢 Activo':'⏳ En espera'}</span></div><div class="muted" style="font-weight:700;margin:4px 0 10px">${onlFecha(t.inicio)} · ${(t.tipo||'arena')==='arena'?`Arena ${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min`:`${t.tipo==='suizo'?'Suizo · '+(t.rondas||5)+' rondas':'Todos contra todos'} · ${esc(t.ritmo||'3+0')}`}${t.furia!==false?' · 🔥 Modo furia':''}</div>
-   ${t.estado==='activo'?(me&&(!me.guest||me.tid===t.id)?`<button class="btn acc big" data-ar="${t.id}">▶ Entrar al torneo</button>${(t.tipo||'arena')==='arena'?`<span class="pill" style="margin-left:8px">⏱️ ${fmtLeft((t.fin||0)-RT.srv())}</span>`:''}<button class="btn ghost sm" data-tv="${t.id}" style="margin-left:8px">📺 Ver partidas</button>`:'<div><p class="muted" style="margin:0 0 8px">Como invitado no puedes entrar al torneo.</p><button class="btn acc" data-ask="'+t.id+'">🙋 Pedir unirme</button> <button class="btn ghost" data-tv="'+t.id+'">📺 Ver partidas</button></div>'):me?(mine?'<div class="pill" style="background:#d9f5e3;color:#14703a">✔️ Estás apuntado</div>':`<button class="btn acc" data-j="${t.id}">Apuntarme</button>`):''}
-   ${me&&js.length&&t.estado!=='activo'?`<table style="width:100%;margin-top:12px;border-collapse:collapse"><tbody>${js.filter(j=>!j.fuera).slice(0,10).map((j,i)=>`<tr style="${j.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:3px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td class="muted">${esc(j.grupo||'')}</td><td style="text-align:right;padding-right:6px"><b>${j.puntos||0}</b> pts</td></tr>`).join('')}</tbody></table><div class="muted" style="margin-top:6px">${js.length} apuntados</div>`:''}</div>`).join('')||`<div class="card"><p class="muted" style="margin:0">Ahora mismo no hay torneos programados. ¡Vuelve pronto!</p></div>`;
-  const hof=`<div class="card"><h3>🏆 Salón de la fama · Top 10</h3>${d.hof.length?`<table style="width:100%;border-collapse:collapse">${d.hof.map((h,i)=>`<tr style="${me&&h.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(h.nombre)}</td><td class="muted">${esc(h.grupo||'')}</td><td style="text-align:right;padding-right:6px"><b>${h.puntos||0}</b> pts</td></tr>`).join('')}</table>`:'<p class="muted" style="margin:0">Aún no hay campeones: ¡puedes ser el primero!</p>'}</div>`;
-  m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2><button class="btn ghost sm" id="rf">↻ Actualizar</button></div>${d.cfg.aviso?`<div class="card" style="background:#fff8e6;border-color:#f2b134">📣 <b>${esc(d.cfg.aviso)}</b></div>`:''}${acc}${tn}${hof}`;
+  const me=onlLogged()?ONL.acc:null,now=RT.srv();sig=tSig(d);
+  const acc=me?'':`<div class="card" style="text-align:center"><p style="margin:0 0 10px">Estás como <b>invitado</b>: los invitados no pueden entrar en los torneos.<br>Entra con tu <b>usuario y clave</b> o, si no los recuerdas, pide unirte a un torneo en marcha.</p><button class="btn acc" id="li">🔑 Entrar</button></div>`;
+  const rows=d.torneos.map(t=>{const js=Object.entries(insOf(d,t.id)).map(([id,x])=>({id,...x}));return{t,e:tEff(t,now),js,mine:!!(me&&js.some(j=>j.id===me.uid))};})
+   .filter(r=>r.e!=='terminado'||now-tFin(r.t)<24*3600e3);
+  const info=t=>`${onlFecha(t.inicio)} · ${tIsArena(t)?`Arena ${esc(t.ritmo||'3+0')} · ${t.duracion||'?'} min`:`${t.tipo==='suizo'?'Suizo · '+(t.rondas||5)+' rondas':'Todos contra todos'} · ${esc(t.ritmo||'3+0')}`}${t.furia!==false?' · 🔥 Modo furia':''}`;
+  const acts=({t,e,mine})=>{
+   if(e==='terminado')return`<button class="btn ghost" data-res="${t.id}">🏆 Ver la clasificación final</button>`;
+   if(e==='activo'){if(me&&(!me.guest||me.tid===t.id))return`<button class="btn acc big" data-ar="${t.id}">▶ Entrar al torneo</button>${tIsArena(t)?`<span class="pill" style="margin-left:8px">⏱️ ${fmtLeft(tFin(t)-now)}</span>`:''}<button class="btn ghost sm" data-tv="${t.id}" style="margin-left:8px">📺 Ver partidas</button>${me&&!me.guest&&mine?`<div style="margin-top:8px"><button class="btn ghost sm" data-wd="${t.id}">🚪 Salir del torneo</button></div>`:''}`;
+    return'<div><p class="muted" style="margin:0 0 8px">Como invitado no puedes entrar al torneo.</p><button class="btn acc" data-ask="'+t.id+'">🙋 Pedir unirme</button> <button class="btn ghost" data-tv="'+t.id+'">📺 Ver partidas</button></div>';}
+   if(!me)return'';
+   return mine?`<div class="btnrow" style="align-items:center"><span class="pill" style="background:#d9f5e3;color:#14703a">✔️ Estás apuntado</span><button class="btn ghost sm" data-un="${t.id}">✖ Desapuntarme</button></div>`:`<button class="btn acc" data-j="${t.id}">Apuntarme</button>`;};
+  const tn=rows.map(r=>{const {t,e,js}=r;return`<div class="card" style="${e==='terminado'?'opacity:.92':''}"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">${e==='terminado'?'🏁':'🏟️'} ${esc(t.nombre)}</h3><span class="pill">${e==='activo'?'🟢 Activo':e==='terminado'?'🏁 Terminado':'⏳ En espera'}</span></div><div class="muted" style="font-weight:700;margin:4px 0 10px">${info(t)}</div>
+   ${acts(r)}
+   ${me&&js.length&&e==='espera'?`<div class="muted" style="font-weight:800;margin:12px 0 4px">${js.length} apuntado${js.length>1?'s':''}</div><div class="plwrap">${js.sort((a,b)=>String(a.n).localeCompare(String(b.n),'es')).map(j=>`<button class="chipp ${j.id===me.uid?'me':''}" data-pc="${j.id}" data-pn="${esc(j.n)}" data-pg="${esc(j.g||'')}">${esc(j.n)}</button>`).join('')}</div>`:''}</div>`;}).join('')||`<div class="card"><p class="muted" style="margin:0">Ahora mismo no hay torneos programados. ¡Vuelve pronto!</p></div>`;
+  const hof=`<div class="card"><h3>🏆 Salón de la fama · Top 10</h3>${d.hof.length?`<table style="width:100%;border-collapse:collapse">${d.hof.map((h,i)=>`<tr class="${me&&h.id?'tapr':''}" ${me&&h.id?`data-pc="${h.id}" data-pn="${esc(h.nombre)}" data-pg="${esc(h.grupo||'')}"`:''} style="${me&&h.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(h.nombre)}</td><td class="muted">${esc(h.grupo||'')}</td><td style="text-align:right;padding-right:6px"><b>${h.puntos||0}</b> pts</td></tr>`).join('')}</table>`:'<p class="muted" style="margin:0">Aún no hay campeones: ¡puedes ser el primero!</p>'}</div>`;
+  m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2><button class="btn ghost sm" id="rf">↻ Actualizar</button></div>${d.cfg.aviso?`<div class="card" style="background:#fff8e6;border-color:#f2b134">📣 <b>${esc(d.cfg.aviso)}</b></div>`:''}${acc}${tn}${me&&!me.guest?'<div id="thist"></div>':''}${hof}`;
   $('#rf',m).onclick=()=>draw(true);
+  if($('#thist',m)&&typeof tHistCard==='function')tHistCard($('#thist',m),tok);
   if($('#li',m))$('#li',m).onclick=async()=>{if(await onlLogin())draw(true);};
-  $$('[data-ask]',m).forEach(b=>b.onclick=()=>{clearInterval(timer);paused=true;guestUI(b.closest('.card'),{tid:b.dataset.ask,onBack:()=>{paused=false;draw(true);timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw(true);},45000);},onGranted:T=>arenaJoinGuest(T)});});
-  if($('#lo',m))$('#lo',m).onclick=async()=>{if(ONL.acc&&ONL.acc.guest){arenaLeave(true);await guestEnd();}else await onlLogout();draw();};
+  $$('[data-ask]',m).forEach(b=>b.onclick=()=>{clearInterval(timer);paused=true;guestUI(b.closest('.card'),{tid:b.dataset.ask,onBack:()=>{paused=false;draw(true);timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw();},30000);},onGranted:T=>arenaJoinGuest(T)});});
   $$('[data-ar]',m).forEach(b=>b.onclick=()=>go('arena',{tid:b.dataset.ar}));
+  $$('[data-res]',m).forEach(b=>b.onclick=()=>go('arena',{tid:b.dataset.res,ver:1}));
   $$('[data-tv]',m).forEach(b=>b.onclick=()=>openTV({tid:b.dataset.tv}));
-  $$('[data-j]',m).forEach(b=>b.onclick=async()=>{b.disabled=true;if(await onlJoin(d.torneos.find(t=>t.id===b.dataset.j)))draw(true);else b.disabled=false;});};
+  $$('[data-j]',m).forEach(b=>b.onclick=async()=>{b.disabled=true;if(await onlJoin(d.torneos.find(t=>t.id===b.dataset.j)))draw();else b.disabled=false;});
+  $$('[data-un]',m).forEach(b=>b.onclick=async()=>{if(await onlUnjoin(d.torneos.find(t=>t.id===b.dataset.un)))draw();});
+  $$('[data-wd]',m).forEach(b=>b.onclick=async()=>{if(await onlWithdraw(d.torneos.find(t=>t.id===b.dataset.wd)))draw();});
+  $$('[data-pc]',m).forEach(b=>b.onclick=()=>{if(typeof playerCard==='function')playerCard({id:b.dataset.pc,n:b.dataset.pn,g:b.dataset.pg});});};
  m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2></div><div class="card muted">Cargando…</div>`;
- draw();timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw(true);},45000);}
+ /* los datos llegan solos (escucha en directo); este repaso lento solo actualiza la cuenta atrás y el estado por la hora */
+ draw();timer=setInterval(async()=>{if(document.hidden||$('.modalbg')||paused)return;n5++;let d=null;try{d=await onlPublic();}catch(e){}
+  if(n5%6===0||(d&&tSig(d)!==sig))draw();},5000);}   // cada 5 s: si un torneo empieza o termina por la hora, se redibuja al momento
 
 /* ===== Solicitar entrada a un torneo (invitado temporal) ===== */
 async function guestUI(box,{onBack,onGranted,tid}){
  const tall='width:100%;height:52px;font-size:1.15rem;padding:0 16px;border:2px solid #d9cdb0;border-radius:14px;box-sizing:border-box;margin:6px 0;background:#fff';
- let ts=[];try{ts=(await onlPublic(true)).torneos.filter(t=>t.estado==='activo'&&(!tid||t.id===tid));}catch(e){}
+ let ts=[];try{const now=RT.srv();ts=(await onlPublic(true)).torneos.filter(t=>tEff(t,now)==='activo'&&(!tid||t.id===tid));}catch(e){}
  if(!ts.length){box.innerHTML=`<p style="font-weight:800;margin:0 0 12px">Ahora mismo no hay ningún torneo en marcha.</p><button class="btn ghost" id="gb" style="width:100%;height:48px">← Volver</button>`;$('#gb',box).onclick=onBack;return;}
  box.innerHTML=`<p style="font-weight:800;margin:0 0 6px;color:#1f5c43">🙋 Solicitar entrada al torneo</p><p class="muted" style="margin:0 0 8px;font-size:.9rem">Escribe tu nombre. El profe te dará paso y jugarás como invitado.</p>
   <input id="ga" maxlength="18" placeholder="Tu nombre (ej. Lucía M.)" autocomplete="off" style="${tall}">${ts.length>1?`<select id="gt" style="${tall}">${ts.map(t=>`<option value="${t.id}">${esc(t.nombre)}</option>`).join('')}</select>`:''}
@@ -4411,7 +4545,7 @@ const normN=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u0
 async function guestUnique(tid,alias,mine){
  const used=new Set();
  try{const p=await RT.get(`arena/${tid}/p`)||{};Object.entries(p).forEach(([id,x])=>{if(x&&id!==(FB.S.user&&FB.S.user.uid)){used.add(normN(x.n));used.add(normN(x.a));}});}catch(e){}
- try{(await FB.list(`torneos/${tid}/jugadores`)).forEach(j=>{used.add(normN(j.nombre));used.add(normN(j.alias));});}catch(e){}
+ try{Object.values(insOf(await onlPublic(),tid)).forEach(j=>{used.add(normN(j.n));used.add(normN(j.a));});}catch(e){}
  try{(await onlPublic()).hof.forEach(h=>{used.add(normN(h.nombre));used.add(normN(h.alias));});}catch(e){}
  if(mine&&!used.has(normN(mine)))used.add('__x');
  let c=alias,n=1;while(used.has(normN(c))&&n<99){n++;c=alias+n;}return c;}
@@ -4434,22 +4568,42 @@ async function splashLoginGate(s){
    $('#sl-guest',g).onclick=()=>finish('guest');};
   main();});}
 
-/* ===== Cambios del admin en directo (sin recargar): el admin marca «pub/v» y aquí se escucha ===== */
-const PUB={v:undefined,es:null,last:0};
-function pubChanged(v){if(v===undefined)return;if(PUB.v===undefined){PUB.v=v;return;}if(v===PUB.v)return;PUB.v=v;ONL.cache=null;window.dispatchEvent(new Event('onlpub'));}
-const pubFetch=()=>fetch(RT.B+'pub/v.json').then(r=>r.ok?r.json():undefined).then(pubChanged).catch(()=>{});
-function pubWatch(){
- try{if(window.EventSource){const es=new EventSource(RT.B+'pub/v.json');PUB.es=es;
-  es.addEventListener('put',e=>{PUB.last=Date.now();try{pubChanged(JSON.parse(e.data).data);}catch(x){}});
-  es.addEventListener('keep-alive',()=>{PUB.last=Date.now();});}}catch(e){}
- setInterval(()=>{if(document.hidden)return;if(PUB.es&&PUB.es.readyState===1&&Date.now()-PUB.last<70000)return;pubFetch();},12000);
- document.addEventListener('visibilitychange',()=>{if(!document.hidden)pubFetch();});
- pubFetch();}
+/* ===== Cambios del admin sin recargar: cada 15 s se mira solo la marca «pub/v» (unos bytes); si ha cambiado, se descarga «pub».
+   (La conexión en directo se reserva para el buzón de retos, la partida y el arena: así nunca hay más de una por móvil.) ===== */
+let pubFT=null;function pubFire(){clearTimeout(pubFT);pubFT=setTimeout(()=>{ONL.cache=null;window.dispatchEvent(new Event('onlpub'));},250);}
+async function pubCheck(force){if(PUB.busy)return;PUB.busy=true;
+ try{const v=await pget('pub/v');if(force||!PUB.d||v!==PUB.v){const d=await pget('pub');PUB.v=d&&d.v!==undefined?d.v:v;PUB.d=d||{};PUB.t=Date.now();pubFire();}}catch(e){}PUB.busy=false;}
+const pubBump=()=>{RT.put('pub/v',RT.SV).catch(()=>{});};   // avisa a los demás (p. ej. al apuntarse)
+function pubCtl(){if(document.hidden)return;const want=!(typeof ON!=='undefined'&&ON.inGame)&&!(typeof currentTab!=='undefined'&&currentTab==='arena');
+ if(want&&Date.now()-(PUB.lc||0)>=15000){PUB.lc=Date.now();pubCheck();}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){PUB.lc=Date.now();pubCheck();}});
+/* portada: si un torneo empieza o termina por la hora, la tarjeta cambia sola */
+let homeSig='';setInterval(async()=>{if(typeof currentTab==='undefined'||currentTab!=='inicio'||document.hidden)return;try{const d=await onlPublic();const sg=tSig(d);if(sg!==homeSig){const first=!homeSig;homeSig=sg;if(!first)homeOnline(document,VIEW);}}catch(e){}},5000);
 window.addEventListener('onlpub',()=>{
  if(typeof currentTab==='undefined')return;
  if(currentTab==='inicio'&&typeof homeOnline==='function')homeOnline(document,VIEW);
- if(ON&&ON.arena&&ON.arena.refT)ON.arena.refT();});
-setTimeout(pubWatch,1200);
+ if(ON&&ON.arena&&ON.arena.refT)ON.arena.refT(true);});
+setTimeout(()=>{pubCtl();setInterval(pubCtl,2000);},900);
+/* ===== Historial de torneos (lo guarda la app del profe al cerrar cada torneo en Realtime Database: sin lecturas de Firestore) ===== */
+const HIST={mine:null,t:0,all:null};
+const histT=async tid=>{const K='siurot_ht_'+tid;try{const c=JSON.parse(localStorage.getItem(K)||'null');if(c)return c;}catch(e){}   // un torneo cerrado ya no cambia: se guarda en el móvil
+ const h=await RT.get('hist/t/'+tid);if(h){try{localStorage.setItem(K,JSON.stringify(h));}catch(e){}}return h;};
+async function tHistCard(box,tok){if(!box||!onlLogged()||ONL.acc.guest)return;
+ try{if(!HIST.mine||Date.now()-HIST.t>60000){HIST.mine=await RT.get('hist/u/'+myUid())||{};HIST.t=Date.now();}}catch(e){HIST.mine=HIST.mine||{};}
+ if(!alive(tok)||!box.isConnected)return;
+ const l=Object.entries(HIST.mine).map(([id,x])=>({id,...x})).sort((a,b)=>(b.f||0)-(a.f||0));
+ box.innerHTML=`<div class="card"><h3 style="margin:0 0 6px">📜 Mis torneos</h3>${l.length?l.slice(0,12).map(x=>`<div class="pl tap" data-th="${x.id}"><div style="font-size:1.4rem">${x.pos===1?'🥇':x.pos===2?'🥈':x.pos===3?'🥉':'🏁'}</div><div style="flex:1"><b>${esc(x.n||'Torneo')}</b><div class="muted" style="font-size:.8rem">${x.f?new Date(x.f).toLocaleDateString('es-ES',{day:'numeric',month:'short'}):''} · ${x.pos}º de ${x.np||'?'} · ${x.p||0} puntos</div></div><span class="muted">›</span></div>`).join(''):'<p class="muted" style="margin:0">Aún no has terminado ningún torneo.</p>'}
+  <div class="btnrow" style="margin-top:8px"><button class="btn ghost sm" id="thall">🏆 Ver todos los torneos terminados</button></div></div>`;
+ $$('[data-th]',box).forEach(b=>b.onclick=()=>tHistView(b.dataset.th));
+ $('#thall',box).onclick=async()=>{let all={};try{all=await FB.req(RT.B+'hist/i.json?orderBy=%22f%22&limitToLast=25&auth='+encodeURIComponent(await FB.tok()))||{};}catch(e){}
+  const L=Object.entries(all).map(([id,x])=>({id,...x})).sort((a,b)=>(b.f||0)-(a.f||0)).slice(0,25);
+  const pr=modal({title:'🏆 Torneos terminados',html:L.length?L.map(x=>`<div class="pl tap" data-th2="${x.id}" style="text-align:left"><div style="flex:1"><b>${esc(x.n||'Torneo')}</b><div class="muted" style="font-size:.8rem">${x.f?new Date(x.f).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}):''} · ${x.np||0} jugadores · ${esc(x.r||'')}</div></div><span class="muted">›</span></div>`).join(''):'<p class="muted">Todavía no hay torneos terminados.</p>',buttons:[{t:'Cerrar',cls:'ghost',v:null}],dismiss:true});
+  const root=$$('.modalbg').pop();if(root){$('.modal',root).classList.add('wide');$$('[data-th2]',root).forEach(b=>b.onclick=()=>tHistView(b.dataset.th2));}};}
+async function tHistView(tid){let h=null;try{h=await histT(tid);}catch(e){}
+ if(!h)return toast('No se encuentra ese torneo','bad');
+ const rk=(h.c||[]).map((x,i)=>({id:x.u||'c'+i,pid:x.u||'',n:x.n,g:x.g,pts:x.p,w:x.w,d:x.d,l:x.l}));
+ modal({title:'🏆 '+esc(h.n||'Torneo'),html:`<p class="muted" style="text-align:center;margin:0">${h.f?new Date(h.f).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}):''} · ${esc(h.r||'')} · ${rk.length} jugadores</p>${rk.length?podiumHTML(rk,myUid()):'<p class="muted">Sin resultados.</p>'}<p class="muted" style="font-size:.8rem;margin:10px 0 0;text-align:center">Toca un jugador para ver su perfil.</p>`,buttons:[{t:'Cerrar',cls:'ghost',v:null}],dismiss:true});
+ const root=$$('.modalbg').pop();if(root){$('.modal',root).classList.add('wide');pcBind(root);}}
 /* ===== Jugar online: presencia, retos, emparejamiento y partida (Realtime Database por REST) ===== */
 const ON={arena:null,pres:null,inb:null,search:null,wait:null,inGame:false,tc:'3+0',busy:false,v960:false,fr:null,col:'r'};
 const ON_TC=['1+0','3+0','5+0','10+0','3+2','10+5'];
@@ -4462,11 +4616,22 @@ const INV_K='siurot_inv';const invGet=()=>{try{return JSON.parse(localStorage.ge
 const myUid=()=>ONL.acc&&ONL.acc.uid;
 const myElo=()=>(typeof P!=='undefined'&&P&&P.elo)||800;
 async function presTick(){if(!onlLogged()||document.hidden)return;
- try{const r=await RT.put('presence/'+myUid(),{n:ONL.acc.nombre,g:ONL.acc.grupo||'',e:myElo(),s:ON.inGame?'jugando':'libre',t:RT.SV});if(r&&typeof r.t==='number')RT.off=r.t-Date.now();}catch(e){}}
-function onlStart(){if(!onlLogged()||ON.pres||ONL.acc.guest)return;presTick();ON.pres=setInterval(presTick,20000);ON.inb=setInterval(inboxTick,3500);}
-function onlStop(){arenaLeave(true);clearInterval(ON.pres);clearInterval(ON.inb);ON.pres=ON.inb=null;if(ON.search)ON.search.stop();}
+ try{const v={n:ONL.acc.nombre,g:ONL.acc.grupo||'',e:myElo(),s:ON.inGame?'jugando':'libre',t:RT.SV};
+  if(!ON.offT||Date.now()-ON.offT>600000){const r=await RT.put('presence/'+myUid(),v);if(r&&typeof r.t==='number'){RT.off=r.t-Date.now();ON.offT=Date.now();}}   // la hora del servidor, cada 10 min
+  else await RT.putS('presence/'+myUid(),v);}catch(e){}}
+/* buzón de retos: se ESCUCHA en directo (no llega nada si nadie te escribe = casi 0 datos). Durante una partida o en el arena
+   esa conexión se cierra (allí manda la suya) y el buzón se mira cada 15 s solo para contestar «ocupado». */
+function inboxCtl(){if(!onlLogged()||ONL.acc.guest||!ON.pres){if(ON.ibw){ON.ibw.close();ON.ibw=null;}return;}
+ const want=!ON.inGame&&currentTab!=='arena'&&!(ON.entering&&Date.now()-ON.entering<6000);
+ if(want&&!ON.ibw)ON.ibw=rtWatch('inbox/'+myUid(),{poll:5000,onData:d=>inboxHandle(d)});
+ else if(!want&&ON.ibw){ON.ibw.close();ON.ibw=null;}
+ if(!want&&!document.hidden&&Date.now()-(ON.ibLast||0)>15000){ON.ibLast=Date.now();inboxTick();}}
+async function inboxHandle(m){if(!m||typeof m!=='object')return;ON.ibSeen=ON.ibSeen||new Set();
+ for(const id of Object.keys(m)){const x=m[id];if(ON.ibSeen.has(id))continue;ON.ibSeen.add(id);RT.del(`inbox/${myUid()}/${id}`).catch(()=>{});if(x&&typeof x==='object')await onMsg(x);}}
+function onlStart(){if(!onlLogged()||ON.pres||ONL.acc.guest)return;presTick();ON.pres=setInterval(presTick,20000);ON.inb=setInterval(inboxCtl,1000);muteLoad();setTimeout(perfilSync,4000);ON.pfT=setInterval(perfilSync,120000);}
+function onlStop(){arenaLeave(true);clearInterval(ON.pres);clearInterval(ON.inb);clearInterval(ON.pfT);ON.pres=ON.inb=null;if(ON.ibw){ON.ibw.close();ON.ibw=null;}ON.mutes=null;ON.fr=null;if(ON.search)ON.search.stop();}
 async function inboxTick(){if(document.hidden||!onlLogged()||ON.busy)return;ON.busy=true;
- try{const m=await RT.get('inbox/'+myUid());if(m)for(const id of Object.keys(m)){const x=m[id];RT.del(`inbox/${myUid()}/${id}`).catch(()=>{});if(x&&typeof x==='object')await onMsg(x);}}catch(e){}
+ try{const m=await RT.get('inbox/'+myUid());await inboxHandle(m);}catch(e){}
  ON.busy=false;}
 function openWait(html,onCancel){const p=modal({title:'🌐 Online',html:`<p style="text-align:center;font-weight:800">${html}</p><div style="text-align:center"><span class="thinking"><i></i><i></i><i></i></span></div>`,buttons:[{t:'Cancelar',cls:'ghost',v:false}],dismiss:false});
  const bg=$$('.modalbg').pop();let done=false;p.then(v=>{if(!done){done=true;onCancel&&onCancel();}});
@@ -4477,10 +4642,11 @@ async function onMsg(x){
  if(x.k==='rush'){if(ON.wait){ON.wait.close();ON.wait=null;}if(ON.search)ON.search.stop();return go('rushduel',{rid:x.rid});}
  if(x.k==='game'){if(ON.wait){ON.wait.close();ON.wait=null;}return enterGame(x.gid);}
  if(x.k==='no'||x.k==='busy'){if(ON.wait){ON.wait.close();ON.wait=null;}return toast(x.k==='busy'?`${esc(x.fn||'Tu rival')} está ocupado ahora`:`${esc(x.fn||'Tu rival')} no puede jugar ahora`,'bad');}
+ if(x.k==='reto'&&isMuted(x.from)){RT.post('inbox/'+x.from,{k:'busy',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});return;}   // silenciado: no le llegan sus retos
  if(x.k==='reto'&&x.tc==='corr'){const l=invGet();if(!l.some(i=>i.from===x.from&&i.t===x.t)){l.push({from:x.from,fn:x.fn,fe:x.fe,t:x.t,v:x.v||0,col:x.col||'r'});invSet(l);}sound('ok');toast(`📨 ${esc(x.fn)} te invita a una partida a distancia. Mírala en «Jugar online».`,'ok');return;}
  if(x.k==='reto'){
-  if(ON.inGame||ON.reto||ON.search||['ogame','contrarreloj','rushduel','partida','local2'].includes(currentTab)){RT.post('inbox/'+x.from,{k:'busy',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});return;}
-  ON.reto=true;sound('ok');
+  if(ON.inGame||ON.reto||ON.search||ON.arena||['ogame','contrarreloj','rushduel','partida','local2','arena'].includes(currentTab)){RT.post('inbox/'+x.from,{k:'busy',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});return;}
+  ON.reto=true;sound('ok');try{navigator.vibrate&&navigator.vibrate([180,80,180]);}catch(e){}
   const v=await modal({title:'⚔️ ¡Te han retado!',html:`<p style="text-align:center"><b>${esc(x.fn)}</b> (ELO ${x.fe||'?'}) te reta a ${String(x.tc).startsWith('rush:')?'una':'una partida de'} <b>${tcTxtO(x.tc)}</b>${x.v?' · <b>🔀 Chess960</b>':''}.${x.col&&x.col!=='r'&&!String(x.tc).startsWith('rush:')?`<br>${esc(x.fn)} quiere jugar con <b>${colTxt(x.col)}</b>: tú llevarás ${x.col==='w'?'⚫ negras':'⚪ blancas'}.`:''}</p>`,buttons:[{t:'No, gracias',cls:'ghost',v:false},{t:'¡Aceptar!',v:true}],dismiss:false});
   ON.reto=false;
   if(!v)return RT.post('inbox/'+x.from,{k:'no',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});
@@ -4496,7 +4662,8 @@ async function createGame(W,B,tc,notifyId,o){o=o||{};if(String(tc).startsWith('r
   else RT.put('live/'+gid,{wn:W.n,bn:B.n,tc,t:RT.SV}).catch(()=>{});
   if(notifyId)await RT.post('inbox/'+notifyId,{k:'game',gid,from:myUid(),fn:ONL.acc.nombre,corr:corr?1:0,t:RT.SV});enterGame(gid);}
  catch(e){toast(FB.msg(e),'bad');}}
-function enterGame(gid){if(ON.search){ON.search.stop();}if(ON.wait){ON.wait.close();ON.wait=null;}try{localStorage.setItem('siurot_og',gid);}catch(e){}go('ogame',{gid});}
+function enterGame(gid){ON.entering=Date.now();if(ON.arena&&ON.arena.w){ON.arena.w.close();ON.arena.w=null;}if(ON.ibw){ON.ibw.close();ON.ibw=null;}   // una sola conexión en directo por móvil
+ if(ON.search){ON.search.stop();}if(ON.wait){ON.wait.close();ON.wait=null;}try{localStorage.setItem('siurot_og',gid);}catch(e){}go('ogame',{gid});}
 async function sendReto(opp,tcF){if(ON.wait||ON.search)return;const tc=tcF||ON.tc;
  if(tc==='corr'){try{await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960?1:0,col:ON.col,t:RT.SV});toast(`📨 Invitación enviada a ${esc(opp.n)}. Cuando la acepte, la partida aparecerá aquí.`,'ok');}catch(e){toast(FB.msg(e),'bad');}return;}
  try{const r=await RT.post('inbox/'+opp.id,{k:'reto',from:myUid(),fn:ONL.acc.nombre,fe:myElo(),tc,v:ON.v960&&!String(tc).startsWith('rush:')?1:0,col:String(tc).startsWith('rush:')?'r':ON.col,t:RT.SV});
@@ -4507,13 +4674,14 @@ async function sendReto(opp,tcF){if(ON.wait||ON.search)return;const tc=tcF||ON.t
 async function quickMatch(){if(ON.search||ON.wait)return;if(ON.tc==='corr')return toast('Las partidas a distancia se juegan retando a un compañero o amigo','bad');const uid=myUid(),tc=ON.tc+(ON.v960&&!String(ON.tc).startsWith('rush:')?'|960':'');
  const w=openWait(`🔎 Buscando rival de <b>${tcTxtO(ON.tc)}</b>${ON.v960?' · Chess960':''}…`,()=>S.stop());
  const S={dead:false,stop(){if(S.dead)return;S.dead=true;clearInterval(S.iv);ON.search=null;RT.del('seeks/'+uid).catch(()=>{});w.close();}};ON.search=S;
- try{await RT.put('seeks/'+uid,{n:ONL.acc.nombre,e:myElo(),tc,t:RT.SV});}catch(e){S.stop();return toast(FB.msg(e),'bad');}
+ const mu=Object.keys(ON.mutes||{}).filter(isMuted).join(',');
+ try{await RT.put('seeks/'+uid,{n:ONL.acc.nombre,e:myElo(),tc,t:RT.SV,...(mu?{mu}:{})});}catch(e){S.stop();return toast(FB.msg(e),'bad');}
  let n=0;const t0=Date.now();
  S.iv=setInterval(async()=>{if(S.dead)return;n++;
   if(Date.now()-t0>120000){S.stop();return toast('Ahora mismo no hay rivales. Prueba a retar a alguien conectado.','bad',4200);}
   if(n%3===0)RT.patch('seeks/'+uid,{t:RT.SV}).catch(()=>{});
   try{const all=await RT.get('seeks')||{};if(S.dead)return;const now=RT.srv();
-   const o=Object.entries(all).find(([id,s])=>id!==uid&&s&&s.tc===tc&&now-(s.t||0)<18000);
+   const o=Object.entries(all).find(([id,s])=>id!==uid&&s&&s.tc===tc&&now-(s.t||0)<18000&&!isMuted(id)&&!String(s.mu||'').split(',').includes(uid));
    if(o&&uid<o[0]){S.dead=true;clearInterval(S.iv);ON.search=null;RT.del('seeks/'+uid).catch(()=>{});w.close();
     const wMe=Math.random()<.5,me={id:uid,n:ONL.acc.nombre,e:myElo()},op={id:o[0],n:o[1].n,e:o[1].e};await createGame(wMe?me:op,wMe?op:me,tc.split('|')[0],o[0],{v:tc.endsWith('|960')});}}catch(e){}},2000);}
 /* ---------- sala ---------- */
@@ -4542,7 +4710,7 @@ function viewOnline(m){const tok=VIEW;let timer=null,first=true;
   const list=Object.entries(pres).filter(([id,p])=>id!==me&&p&&now-(p.t||0)<55000).map(([id,p])=>({id,...p,fr:!!fr[id]})).sort((a,b)=>(b.fr-a.fr)||(a.s==='jugando')-(b.s==='jugando')||String(a.n).localeCompare(b.n,'es'));
   const onIds=new Set(list.map(p=>p.id));const offFr=Object.entries(fr).filter(([id])=>!onIds.has(id)).map(([id,x])=>({id,...x}));
   const hist=(P.hist||[]).filter(g=>g.online&&!g.local).slice(-5).reverse();
-  const row=p=>`<div class="pl ${p.s==='jugando'?'':'tap'}" data-pr="${p.id}" title="${p.s==='jugando'?'Está jugando':'Pulsa para retar'}"><span class="pdot ${p.s==='jugando'?'busy':''}"></span><div style="flex:1"><b>${p.fr?'⭐ ':''}${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span><div class="muted" style="font-size:.8rem">♟ ${p.e||800} · ${p.s==='jugando'?'jugando':'libre'}</div></div><button class="btn sm ghost" data-fs="${p.id}" title="${p.fr?'Quitar de amigos':'Añadir a amigos'}">${p.fr?'⭐':'☆'}</button><button class="btn sm ${p.s==='jugando'?'ghost':''}" data-r="${p.id}" ${p.s==='jugando'?'disabled':''}>⚔️ Retar</button></div>`;
+  const row=p=>`<div class="pl ${p.s==='jugando'?'':'tap'}" data-pr="${p.id}" title="Pulsa para ver su perfil"><span class="pdot ${p.s==='jugando'?'busy':''}"></span><div style="flex:1"><b>${p.fr?'⭐ ':''}${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span><div class="muted" style="font-size:.8rem">♟ ${p.e||800} · ${p.s==='jugando'?'jugando':'libre'}${isMuted(p.id)?' · 🔕 silenciado':''}</div></div><button class="btn sm ghost" data-fs="${p.id}" title="${p.fr?'Quitar de amigos':'Añadir a amigos'}">${p.fr?'⭐':'☆'}</button><button class="btn sm ${p.s==='jugando'?'ghost':''}" data-r="${p.id}" ${p.s==='jugando'?'disabled':''}>⚔️ Retar</button></div>`;
   m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2><span class="pill">🟢 ${list.length+1} conectados</span></div><div class="onl">
   ${og?`<div class="card" style="background:#fff3c4;border-color:#e8a317"><b>♟ Tienes una partida en curso</b><div class="btnrow" style="margin-top:8px"><button class="btn acc" id="back2g">Volver a la partida</button></div></div>`:''}
   ${inv.length?`<div class="card" style="border:2px solid #7c3aed;background:#f5f0ff"><h3 style="margin:0 0 6px">📨 Te invitan a partidas a distancia</h3>${inv.map((x,i)=>`<div class="pl"><div style="flex:1"><b>${esc(x.fn)}</b> <span class="muted">ELO ${x.fe||'?'}${x.v?' · 🔀 Chess960':''}</span></div><button class="btn sm ghost" data-ino="${i}">No</button><button class="btn sm" data-iok="${i}">Aceptar</button></div>`).join('')}</div>`:''}
@@ -4552,26 +4720,28 @@ function viewOnline(m){const tok=VIEW;let timer=null,first=true;
    <div class="muted" style="font-weight:800;margin:4px 0 6px">⚡ Batalla de contrarreloj</div><div class="btnrow" style="gap:6px;margin-bottom:8px">${[1,2,3].map(d=>`<button class="btn sm ${ON.tc==='rush:'+d?'':'ghost'}" data-tc="rush:${d}">${d} min</button>`).join('')}</div>
    <div class="btnrow" style="gap:6px;margin-bottom:12px">${String(ON.tc).startsWith('rush:')?'<p class="muted" style="margin:0;font-size:.88rem">⚡ <b>Batalla de contrarreloj:</b> los dos resolvéis los mismos ejercicios a la vez. Gana quien más acierte (si empatáis, quien conserve más vidas).</p>':''}<button class="btn sm ${ON.v960?'':'ghost'}" style="${String(ON.tc).startsWith('rush:')?'display:none':''}" id="v960" title="Las piezas de atrás empiezan en orden aleatorio">🔀 Chess960 ${ON.v960?'✔':''}</button></div>
    ${ON.tc==='corr'?'<p class="muted" style="margin:0;font-size:.88rem">📨 <b>A distancia:</b> sin reloj, cada uno juega cuando puede (por ejemplo, una jugada al día). Pulsa en un compañero o en un amigo para invitarle.</p>':'<button class="btn acc big" id="qm" style="width:100%">'+(String(ON.tc).startsWith('rush:')?'⚡ Buscar rival de contrarreloj':'⚔️ Jugar online')+'</button><p class="muted" style="margin:8px 0 0;font-size:.85rem">Te empareja con otro jugador que busque el mismo ritmo. El color se sortea.</p>'}</div>
-  <div class="card"><h3 style="margin:0 0 2px">👥 Conectados ahora</h3><p class="muted" style="margin:0 0 6px;font-size:.85rem">Pulsa en un compañero para retarle. Con ☆ lo añades a tus amigos: saldrán siempre arriba.</p>${list.length?list.map(row).join(''):'<p class="muted" style="margin:0">No hay nadie más conectado ahora. Cuando entren tus compañeros aparecerán aquí.</p>'}
-   ${offFr.length?`<div class="muted" style="font-weight:800;margin:12px 0 4px">⭐ Amigos desconectados</div>${offFr.map(p=>`<div class="pl"><span class="pdot" style="background:#c9c9c9"></span><div style="flex:1"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span></div><button class="btn sm ghost" data-fx="${p.id}" title="Quitar de amigos">⭐</button><button class="btn sm" data-dist="${p.id}">📨 Invitar a distancia</button></div>`).join('')}`:''}</div>
+  <div class="card"><h3 style="margin:0 0 2px">👥 Conectados ahora</h3><p class="muted" style="margin:0 0 6px;font-size:.85rem">Pulsa en un compañero para ver su perfil, añadirlo a amigos o silenciarlo. Con ⚔️ le retas directamente. Tus amigos ⭐ salen siempre arriba.</p>${list.length?list.map(row).join(''):'<p class="muted" style="margin:0">No hay nadie más conectado ahora. Cuando entren tus compañeros aparecerán aquí.</p>'}
+   ${offFr.length?`<div class="muted" style="font-weight:800;margin:12px 0 4px">⭐ Amigos desconectados</div>${offFr.map(p=>`<div class="pl tap" data-pr="${p.id}"><span class="pdot" style="background:#c9c9c9"></span><div style="flex:1"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span></div><button class="btn sm ghost" data-fx="${p.id}" title="Quitar de amigos">⭐</button><button class="btn sm" data-dist="${p.id}">📨 Invitar a distancia</button></div>`).join('')}`:''}</div>
   <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:1.8rem">📺</div><div style="flex:1"><b>Partidas en directo</b><div class="muted" style="font-size:.85rem">Mira cómo juegan tus compañeros ahora mismo.</div></div><button class="btn ghost" id="tv">Ver</button></div>
-  ${hist.length?`<div class="card"><h3 style="margin:0 0 6px">📜 Mis últimas partidas online</h3>${hist.map(g=>`<div class="pl"><div style="flex:1"><b>${g.res==='w'?'🏆':g.res==='d'?'🤝':'❌'} ${esc(g.name||'')}</b><div class="muted" style="font-size:.8rem">${g.date} · ${Math.ceil(g.moves.length/2)} jugadas</div></div><button class="btn sm ghost" data-an="${g.id}">🔍 Analizar</button></div>`).join('')}</div>`:''}</div>`;
+  ${hist.length?`<div class="card"><h3 style="margin:0 0 6px">📜 Mis últimas partidas online</h3>${hist.map(g=>`<div class="pl ${g.ou?'tap':''}" ${g.ou?`data-hc="${g.ou}" data-hn="${esc(String(g.name||'').replace(/^.*vs /,''))}"`:''}><div style="flex:1"><b>${g.res==='w'?'🏆':g.res==='d'?'🤝':'❌'} ${esc(g.name||'')}</b><div class="muted" style="font-size:.8rem">${g.date} · ${Math.ceil(g.moves.length/2)} jugadas</div></div><button class="btn sm ghost" data-an="${g.id}">🔍 Analizar</button></div>`).join('')}</div>`:''}</div>`;
   $$('[data-tc]',m).forEach(b=>b.onclick=()=>{ON.tc=b.dataset.tc;draw();});
   $$('[data-col]',m).forEach(b=>b.onclick=()=>{ON.col=b.dataset.col;draw();});
   $('#v960',m).onclick=()=>{ON.v960=!ON.v960;draw();};
   if($('#qm',m))$('#qm',m).onclick=quickMatch;
   $('#tv',m).onclick=()=>openTV({});
   if($('#back2g',m))$('#back2g',m).onclick=()=>go('ogame',{gid:og});
-  $$('[data-an]',m).forEach(b=>b.onclick=()=>go('analisis',{id:+b.dataset.an}));
+  $$('[data-an]',m).forEach(b=>b.onclick=e=>{e.stopPropagation();go('analisis',{id:+b.dataset.an});});
   $$('[data-cg]',m).forEach(b=>b.onclick=()=>{corrCache.t=0;go('ogame',{gid:b.dataset.cg});});
   $$('[data-iok]',m).forEach(b=>b.onclick=async()=>{const l=invGet(),x=l[+b.dataset.iok];if(!x)return;invSet(l.filter(y=>y!==x));const wMe=accWhite(x.col),meP={id:myUid(),n:ONL.acc.nombre,e:myElo()},op={id:x.from,n:x.fn,e:x.fe};corrCache.t=0;await createGame(wMe?meP:op,wMe?op:meP,'corr',x.from,{v:x.v});});
   $$('[data-ino]',m).forEach(b=>b.onclick=()=>{const l=invGet(),x=l[+b.dataset.ino];invSet(l.filter(y=>y!==x));if(x)RT.post('inbox/'+x.from,{k:'no',from:myUid(),fn:ONL.acc.nombre,t:RT.SV}).catch(()=>{});draw();});
   $$('[data-fs]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const p=list.find(x=>x.id===b.dataset.fs);if(p){await frToggle(p);draw();}});
-  $$('[data-fx]',m).forEach(b=>b.onclick=async()=>{const p=offFr.find(x=>x.id===b.dataset.fx);if(p){await frToggle(p);draw();}});
-  $$('[data-dist]',m).forEach(b=>b.onclick=()=>{const p=offFr.find(x=>x.id===b.dataset.dist);if(p)sendReto({id:p.id,n:p.n},'corr');});
-  $$('[data-pr]',m).forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.pr);if(!p)return;if(p.s==='jugando'&&ON.tc!=='corr')return toast(esc(p.n)+' está jugando ahora');sendReto({id:p.id,n:p.n});});};
+  $$('[data-fx]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const p=offFr.find(x=>x.id===b.dataset.fx);if(p){await frToggle(p);draw();}});
+  $$('[data-dist]',m).forEach(b=>b.onclick=e=>{e.stopPropagation();const p=offFr.find(x=>x.id===b.dataset.dist);if(p)sendReto({id:p.id,n:p.n},'corr');});
+  $$('[data-r]',m).forEach(b=>b.onclick=e=>{e.stopPropagation();const p=list.find(x=>x.id===b.dataset.r);if(!p)return;if(p.s==='jugando'&&ON.tc!=='corr')return toast(esc(p.n)+' está jugando ahora');sendReto({id:p.id,n:p.n});});
+  $$('[data-pr]',m).forEach(b=>b.onclick=()=>{const p=list.find(x=>x.id===b.dataset.pr)||offFr.find(x=>x.id===b.dataset.pr);if(p)playerCard({id:p.id,n:p.n,g:p.g},{onChange:draw});});
+  $$('[data-hc]',m).forEach(b=>b.onclick=e=>{e.stopPropagation();playerCard({id:b.dataset.hc,n:b.dataset.hn},{onChange:draw});});};
  m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2></div><div class="card muted">Cargando…</div>`;
- draw();timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw();},8000);}
+ draw();timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg')&&!$('.pcard'))draw();},15000);}
 /* ---------- partida ---------- */
 async function viewOnGame(m,{gid}){
  const tok=VIEW;let G=null;try{G=await RT.get('games/'+gid);}catch(e){}
@@ -4581,16 +4751,18 @@ async function viewOnGame(m,{gid}){
  const oc=color==='w'?'b':'w',oppN=color==='w'?G.bn:G.wn,oppE=color==='w'?G.be:G.we;
  const corr=G.tc==='corr';const pos=new E.Pos(G.f0||undefined);let over=false,pending=null,drawAsked=false,flagSent=false,myTk=null,tkSeen=null;const tkDone=new Set();const sans=[];
  ON.inGame=true;presTick();
- const leave=()=>{clearInterval(poll);clearInterval(clkT);document.removeEventListener('visibilitychange',onVis);if(ON.inGame){ON.inGame=false;presTick();}};
+ let gw=null,lastEv=Date.now();
+ const leave=()=>{clearInterval(poll);clearInterval(clkT);if(gw){gw.close();gw=null;}document.removeEventListener('visibilitychange',onVis);if(ON.inGame){ON.inGame=false;presTick();}};
  /* aviso de posibles ayudas: cuenta las veces que se sale de la pestaña durante la partida (solo lo ve el profe) */
  let fxN=0;const onVis=()=>{if(!document.hidden||over||corr||pos.played.length<2)return;fxN++;RT.patch('games/'+gid,{['fx/'+color]:fxN}).catch(()=>{});
   if(G.ar)RT.get(`arena/${G.ar}/p/${myUid()}/fx`).then(v=>RT.patch(`arena/${G.ar}/p/${myUid()}`,{fx:(+v||0)+1})).catch(()=>{});};
  document.addEventListener('visibilitychange',onVis);
  const ar=G.ar||null;if(ar&&!ON.arena)arenaEnsure(ar).catch(()=>{});
  const {board,body,under}=trainerShell(m,ar?'🏟️ Arena':'🌐 Partida online',async()=>{if(!over&&!corr&&!(await confirmModal('¿Salir de la sala?','La partida sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir')))return;leave();go('online');});
- body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b>${esc(oppN)}</b><div class="muted" style="font-size:.85rem">ELO ${oppE||800} · ${corr?'📨 A distancia (sin reloj): juega cuando quieras':'⏱️ '+tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div>${G.f0?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div></div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
+ body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b class="tapn" id="oppn" title="Ver su perfil">${esc(oppN)}</b><div class="muted" style="font-size:.85rem">ELO ${oppE||800} · ${corr?'📨 A distancia (sin reloj): juega cuando quieras':'⏱️ '+tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div>${G.f0?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div></div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
  under.innerHTML=`${ar&&G.fu?'<button class="btn sm" id="fury" style="background:#e8590c;color:#fff;font-weight:900" title="Antes de tu primer movimiento: tu tiempo se divide a la mitad y, si ganas, +1 punto">🔥 Modo furia</button>':''}<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="tkb" title="Pedir al rival deshacer tu última jugada">↩️ Deshacer</button><button class="btn ghost sm" id="drw">🤝 Pedir tablas</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
  const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
+ $('#oppn',body).onclick=()=>playerCard({id:color==='w'?G.b:G.w,n:oppN});
  const sTop=document.createElement('div'),sBot=document.createElement('div');sTop.className=sBot.className='pstrip';bc.insertBefore(sTop,bd);bc.insertBefore(sBot,$('#under',m));
  board.orient=color;board.movable=color;board.interactive=true;board.premoveOK=true;board.set(pos,{last:null});
  const fmtT=ms=>{ms=Math.max(0,ms);if(ms<20000)return(ms/1000).toFixed(1);const s=Math.ceil(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -4610,28 +4782,30 @@ async function viewOnGame(m,{gid}){
   for(let i=plies();i<ms.length;i++){const mv=pos.fromUci(ms[i]);if(!mv)break;sans.push(pos.san(mv));pos.play(mv);lastMv=mv;changed=true;}
   if(changed){board.hl=[];board.arrows=[];board.set(pos,{last:lastMv,anim:true});playSound(pos,lastMv);}
   board.interactive=!over;if(changed&&!over&&pos.turn===color&&board.premove)board.runPremove();return changed;}
- function finish(res,why){if(over)return;over=true;board.interactive=false;board.pickSq=null;clearInterval(clkT);clearInterval(poll);panel();document.removeEventListener('visibilitychange',onVis);
+ function finish(res,why){if(over)return;over=true;board.interactive=false;board.pickSq=null;clearInterval(clkT);clearInterval(poll);if(gw){gw.close();gw=null;}panel();document.removeEventListener('visibilitychange',onVis);
   RT.del('live/'+gid).catch(()=>{});if(corr){RT.del(`mygames/${myUid()}/${gid}`).catch(()=>{});RT.del(`mygames/${color==='w'?G.b:G.w}/${gid}`).catch(()=>{});}
   try{localStorage.removeItem('siurot_og');}catch(e){}
-  if(why==='torneo'){ON.inGame=false;presTick();RT.patch(`arena/${ar}/p/${myUid()}`,{busy:null,bt:null,wait:null,hb:RT.SV}).catch(()=>{});sound('ok');
+  if(why==='torneo'){ON.inGame=false;presTick();RT.patch(`arena/${ar}/p/${myUid()}`,{busy:null,bt:null,wait:null}).catch(()=>{});sound('ok');
    setTimeout(async()=>{if(!alive(tok))return;await modal({title:'⏱️ ¡Se acabó el tiempo del torneo!',html:'<div class="bigicon">🏁</div><p style="text-align:center">La partida en curso se ha detenido y no puntúa.<br>¡Vamos a ver la clasificación!</p>',buttons:[{t:'Ver resultados',v:1}],dismiss:false});go('arena',{tid:ar});},400);return;}
   const sc=res==='1/2-1/2'?.5:((res==='1-0')===(color==='w')?1:0);
   const why2={mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición',time:'Se acabó el tiempo',resign:'Abandono',draw:'Tablas acordadas'}[why]||why||'';
   const d=eloUpdate(oppE||800,sc,24,'online',tcCat(G.tc));const xp=sc===1?20:sc===.5?8:5;addXP(xp,sc===1?'Victoria online':sc===.5?'Tablas online':'Partida online');
-  let hid=0;try{if(pos.played.length>=2){hid=Date.now();P.hist=P.hist||[];P.hist.push({id:hid,date:today(),level:0,color,res:sc===1?'w':sc===.5?'d':'l',moves:pos.played.map(x=>E.uci(x)),online:true,name:(ar?'🏟️ ':corr?'📨 ':'🌐 ')+'vs '+oppN,tc:G.tc,start:G.f0||undefined});pruneHist();save();}}catch(e){}
+  const oppId=color==='w'?G.b:G.w,rk=sc===1?'w':sc===.5?'d':'l';
+  try{P.onl=P.onl||{w:0,d:0,l:0};P.onl[rk]++;P.vs=P.vs||{};const v=P.vs[oppId]=P.vs[oppId]||{w:0,d:0,l:0};v[rk]++;v.n=oppN;}catch(e){}   // para el perfil y el «cara a cara»
+  let hid=0;try{if(pos.played.length>=2){hid=Date.now();P.hist=P.hist||[];P.hist.push({id:hid,date:today(),level:0,color,res:rk,moves:pos.played.map(x=>E.uci(x)),online:true,name:(ar?'🏟️ ':corr?'📨 ':'🌐 ')+'vs '+oppN,ou:oppId,tc:G.tc,start:G.f0||undefined});pruneHist();}save();}catch(e){}
   const bonus=(ar&&sc===1&&furyOn(color)&&ownMoves()>=4)?1:0;const arP=ar?recordArena(ar,gid,sc,color==='w'?G.b:G.w,bonus):null;
   if(sc===1){confetti(50);sound('win');}else sound(sc===.5?'ok':'bad');
   ON.inGame=false;presTick();
   const icon=sc===1?'🏆':sc===.5?'🤝':'💪',title=sc===1?'¡Has ganado!':sc===.5?'Tablas':'Has perdido';
   setTimeout(async()=>{if(!alive(tok))return;const ai=arP?await arP:null;if(!alive(tok))return;
-   if(ar){const left=(ON.arena&&ON.arena.T.fin||0)-RT.srv();
+   if(ar){const left=(ON.arena?tFin(ON.arena.T):0)-RT.srv();
     const v=await modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p><p style="font-size:1.2rem"><b>${ai&&!ai.dup?'+'+ai.val+' puntos'+(ai.dbl?' 🔥 (¡doble!)':'')+(ai.bonus?' · 🔥 ¡bonus furia!':''):''}</b></p>`,buttons:[{t:'Salir del torneo',cls:'ghost',v:'s'},{t:left>ARENA_MIN_LEFT?'▶ Seguir jugando':'Ver clasificación',v:'c'}],dismiss:false});
-    if(!alive(tok))return;if(v==='s'){arenaLeave();go('torneos');}else{if(left>ARENA_MIN_LEFT&&ON.arena){await arenaSearch(true);}go('arena',{tid:ar});}return;}
-   modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p>`,buttons:[{t:'Salir',cls:'ghost',v:'s'},...(hid?[{t:'🔍 Analizar',cls:'ghost',v:'a'}]:[]),{t:'🔁 Revancha',v:'r'}],dismiss:false}).then(v=>{if(v==='a')return go('analisis',{id:hid});if(v==='r'){ON.tc=G.tc;ON.col=color==='w'?'b':'w';go('online');setTimeout(()=>sendReto({id:color==='w'?G.b:G.w,n:oppN}),400);}else go('online');});},600);}
+    if(!alive(tok)||v==null)return;if(v==='s'){arenaLeave();go('torneos');}else{if(left>ARENA_MIN_LEFT&&ON.arena){await arenaSearch(true);}go('arena',{tid:ar});}return;}
+   modal({title,html:`<div class="bigicon">${icon}</div><p>${why2}.</p><p>${eloTag(d)} → <b>${P.elo}</b></p>`,buttons:[{t:'Salir',cls:'ghost',v:'s'},...(hid?[{t:'🔍 Analizar',cls:'ghost',v:'a'}]:[]),{t:'🔁 Revancha',v:'r'}],dismiss:false}).then(v=>{if(v==null||!alive(tok))return;if(v==='a')return go('analisis',{id:hid});if(v==='r'){ON.tc=G.tc;ON.col=color==='w'?'b':'w';go('online');setTimeout(()=>sendReto({id:color==='w'?G.b:G.w,n:oppN}),400);}else go('online');});},600);}
  function afterLocal(mv,mover){const s=pos.status();let end=null;
   if(s&&s!=='jaque'){end={res:s==='mate'?(mover==='w'?'1-0':'0-1'):'1/2-1/2',why:s};}
   return end;}
- async function writeMove(upd){pending=upd;try{await RT.patch('games/'+gid,upd);pending=null;}catch(e){}}
+ async function writeMove(upd){pending=upd;try{await RT.patchS('games/'+gid,upd);if(pending===upd)pending=null;if(!pending&&gw&&gw.data)process(gw.data);}catch(e){}}
  board.onMove=(mv,anim)=>{if(over||pos.turn!==color)return;
   const mover=pos.turn,pl=plies(),tick=pl>=2&&!corr,el=tick?Math.max(0,RT.srv()-(G.ts||0)):0;let rem=((G.clk&&G.clk[mover])||0)-el;
   if(rem<=0&&!corr)return;if(G.ti&&pl>=2&&!furyOn(mover))rem+=G.ti;
@@ -4655,19 +4829,19 @@ async function viewOnGame(m,{gid}){
   let k=L-1;while(k>=0&&byOf(k)!==by)k--;if(k<0)return;
   const nm=ms.slice(0,k).join(' ');
   try{await RT.patch('games/'+gid,{moves:nm,turn:by,ts:RT.SV,draw:'',tk:null,tkr:{id,r:'ok'}});tkDone.add(id);G.ts=RT.srv();G.turn=by;applyTakeback(nm);toast('↩️ Jugada deshecha');}catch(e){toast(FB.msg(e),'bad');}}
- let polling=false;
- async function tick(){if(polling||!alive(tok)){if(!alive(tok))leave();return;}polling=true;
-  try{if(pending)await writeMove(pending);
-   const g=await RT.get('games/'+gid);
-   if(g&&g.tk&&tkDone.has(g.tk.id)){polling=false;return;}   // respuesta antigua, anterior a deshacer
-   if(g&&alive(tok)&&!over){const n=(g.moves||'').split(' ').filter(Boolean).length;if(n>=plies()&&!pending){G=g;sync();}else if(n<plies()&&!pending&&g.tkr&&g.tkr.r==='ok'&&!tkDone.has(g.tkr.id)){tkDone.add(g.tkr.id);G=g;applyTakeback(g.moves||'');}
-    if(g.tkr&&myTk&&g.tkr.id===myTk){toast(g.tkr.r==='ok'?'↩️ '+oppN+' acepta: repite tu jugada':'↩️ '+oppN+' no acepta deshacer',g.tkr.r==='ok'?'ok':'bad');myTk=null;panel();}
-    if(g.st==='end'){G=g;sync();finish(g.res,g.why);}
-    else if(g.tk&&g.tk.by===oc&&g.tk.id!==tkSeen){tkSeen=g.tk.id;answerTk(g.tk.id);}
-    else if(g.draw===oc&&!drawAsked){drawAsked=true;modal({title:'🤝 Tablas',html:`<p style="text-align:center"><b>${esc(oppN)}</b> te ofrece tablas.</p>`,buttons:[{t:'No',cls:'ghost',v:false},{t:'Aceptar',v:true}],dismiss:false}).then(v=>{if(over)return;if(v)setEnd('1/2-1/2','draw');else{RT.patch('games/'+gid,{draw:''}).catch(()=>{});drawAsked=false;}});}
-    panel();}}catch(e){}
-  polling=false;}
- const poll=setInterval(tick,1000);
+ /* la partida llega en directo (solo los cambios); si la conexión en directo falla, se lee cada 1,5 s */
+ function process(g0){if(!g0||!alive(tok)||over)return;const g=JSON.parse(JSON.stringify(g0));lastEv=Date.now();
+  if(g.tk&&tkDone.has(g.tk.id))return;   // respuesta antigua, anterior a deshacer
+  const n=(g.moves||'').split(' ').filter(Boolean).length;if(n>=plies()&&!pending){G=g;sync();}else if(n<plies()&&!pending&&g.tkr&&g.tkr.r==='ok'&&!tkDone.has(g.tkr.id)){tkDone.add(g.tkr.id);G=g;applyTakeback(g.moves||'');}
+  if(g.tkr&&myTk&&g.tkr.id===myTk){toast(g.tkr.r==='ok'?'↩️ '+oppN+' acepta: repite tu jugada':'↩️ '+oppN+' no acepta deshacer',g.tkr.r==='ok'?'ok':'bad');myTk=null;panel();}
+  if(g.st==='end'){G=g;sync();finish(g.res,g.why);return;}
+  else if(g.tk&&g.tk.by===oc&&g.tk.id!==tkSeen){tkSeen=g.tk.id;answerTk(g.tk.id);}
+  else if(g.draw===oc&&!drawAsked){drawAsked=true;modal({title:'🤝 Tablas',html:`<p style="text-align:center"><b>${esc(oppN)}</b> te ofrece tablas.</p>`,buttons:[{t:'No',cls:'ghost',v:false},{t:'Aceptar',v:true}],dismiss:false}).then(v=>{if(over)return;if(v)setEnd('1/2-1/2','draw');else{RT.patch('games/'+gid,{draw:''}).catch(()=>{});drawAsked=false;}});}
+  panel();}
+ gw=rtWatch('games/'+gid,{auth:false,poll:1500,hideMs:60000,onData:g=>{if(g&&!pending)process(g);}});
+ /* reintenta una jugada que no llegó a enviarse; y si toca al rival y no llega nada en 10 s, comprueba (por si la conexión se quedó muda) */
+ const poll=setInterval(()=>{if(!alive(tok)){leave();return;}if(over)return;if(pending)writeMove(pending);
+  else if(gw&&pos.turn!==color&&Date.now()-lastEv>10000){lastEv=Date.now();gw.refresh();}},1500);
  const clkT=setInterval(()=>{if(!alive(tok)){leave();return;}paint();if(!over&&arFinF()&&RT.srv()>=arFinF()){if(G.st!=='end'){G.st='end';G.res='*';G.why='torneo';RT.patch('games/'+gid,{st:'end',res:'*',why:'torneo',draw:''}).catch(()=>{});}finish('*','torneo');return;}if(over||flagSent||corr)return;
   for(const c of['w','b']){if(plies()>=2&&pos.turn===c&&remain(c)<=0){flagSent=true;const o=c==='w'?'b':'w';
    if(!canMate(o))setEnd('1/2-1/2','material');else setEnd(c==='w'?'0-1':'1-0','time');break;}}},200);
@@ -4689,39 +4863,55 @@ const ARENA_WAIT_MS=10000,ARENA_ELO=100,ARENA_MIN_LEFT=20000;
 const arenaVal=(sc,streak)=>{const d=streak>=2;return sc===1?(d?4:2):sc===.5?(d?2:1):0;};
 const fmtLeft=ms=>{ms=Math.max(0,ms);const s=Math.floor(ms/1000);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 async function arenaEnsure(tid){if(ON.arena&&ON.arena.tid===tid)return ON.arena;
- const T=await FB.get('torneos/'+tid);if(!T||T.estado!=='activo'){toast('Este torneo no está activo','bad');return null;}
+ const T=await tGet(tid,true);if(!T||tEff(T,RT.srv())!=='activo'){toast(T&&tEff(T,RT.srv())==='terminado'?'Este torneo ya ha terminado':'Este torneo no está en marcha','bad');return null;}
  return arenaJoin(T);}
+/* el arena escucha en directo la clasificación (solo llegan los cambios); durante tu partida esa conexión se cierra.
+   La señal de «sigo aquí» va aparte (ahb/) para no mandar avisos a todos cada pocos segundos. */
 async function arenaJoin(T){
  if(ON.arena)arenaLeave(true);
  const uid=myUid(),path=`arena/${T.id}/p/${uid}`;
  const me=await RT.get(path);
- const base={n:ONL.acc.nombre,g:ONL.acc.grupo||'',a:ONL.acc.alias,e:myElo(),hb:RT.SV};if(ONL.acc.guest)base.guest=true;
- if(!me)await RT.put(path,{...base,pts:0,pa:0,w:0,d:0,l:0,streak:0,wait:null,busy:null});else await RT.patch(path,base);
- if(!ONL.acc.guest)FB.get(`torneos/${T.id}/jugadores/${uid}`).then(x=>{if(!x)onlJoin(T);}).catch(()=>{});
- const A={tid:T.id,T,snap:{},entered:null,onSnap:null,busy2:false};ON.arena=A;
- A.hbT=setInterval(()=>{if(ON.arena===A&&!document.hidden&&A.T.estado==='activo')RT.patch(`arena/${A.tid}/p/${uid}`,{hb:RT.SV,e:myElo()}).catch(()=>{});},5000);
- A.loopT=setInterval(arenaTick,2500);
- A.refT=async()=>{try{const t=await FB.get('torneos/'+A.tid);if(t){A.T=t;if(t.estado!=='activo'){clearInterval(A.hbT);clearInterval(A.loopT);if(ONL.acc&&ONL.acc.guest){setTimeout(()=>{guestEnd();if(A.onSnap)A.onSnap();},4000);}if(A.onSnap)A.onSnap();}else if(A.onSnap)A.onSnap();}}catch(e){}};A.tT=setInterval(A.refT,15000);
- arenaTick();return A;}
-function arenaLeave(silent){const A=ON.arena;if(!A)return;const wasGuest=ONL.acc&&ONL.acc.guest;clearInterval(A.hbT);clearInterval(A.loopT);clearInterval(A.tT);ON.arena=null;
- if(onlLogged())RT.patch(`arena/${A.tid}/p/${myUid()}`,{wait:null}).catch(()=>{});if(wasGuest&&!silent)setTimeout(guestEnd,600);if(!silent)toast(wasGuest?'Has salido del torneo':'Has salido de la búsqueda');}
+ const base={n:ONL.acc.nombre,g:ONL.acc.grupo||'',a:ONL.acc.alias,e:myElo(),sal:null};if(ONL.acc.guest)base.guest=true;
+ if(!me)await RT.put(path,{...base,sal:null,pts:0,pa:0,w:0,d:0,l:0,streak:0,wait:null,busy:null});else await RT.patch(path,base);
+ const hb=()=>RT.putS(`ahb/${T.id}/${uid}`,RT.SV).catch(()=>{});hb();
+ if(!ONL.acc.guest){onlPublic().then(d=>{if(!insOf(d,T.id)[uid])onlJoin(T);}).catch(()=>{});}
+ const A={tid:T.id,T,snap:me?{[uid]:me}:{},hb:{},entered:null,onSnap:null,busy2:false,w:null};ON.arena=A;
+ const live=()=>ON.arena===A&&tEff(A.T,RT.srv())==='activo';
+ A.hbT=setInterval(()=>{if(live()&&!document.hidden)hb();},15000);
+ A.ctlT=setInterval(()=>{if(ON.arena!==A)return;const want=!ON.inGame&&!(ON.entering&&Date.now()-ON.entering<6000)&&!document.hidden&&tEff(A.T,RT.srv())!=='terminado';
+  if(want&&!A.w)A.w=rtWatch(`arena/${A.tid}/p`,{poll:4000,onData:d=>{A.snap=d||{};arenaTick();}});
+  else if(!want&&A.w){A.w.close();A.w=null;}},1000);
+ A.loopT=setInterval(()=>arenaTick(true),3000);
+ A.refT=async(quick)=>{try{let t=null;const d=await onlPublic();t=d.torneos.find(x=>x.id===A.tid);
+   if(!quick||!t){const x=await pget('pub/t/'+A.tid).catch(()=>undefined);if(x)t={...x,id:A.tid};else if(x===null&&d.pub)t={...A.T,estado:'terminado'};}
+   if(t){A.T=t;if(tEff(t,RT.srv())==='terminado'){if(ONL.acc&&ONL.acc.guest){setTimeout(()=>{guestEnd();if(A.onSnap)A.onSnap();},4000);}}if(A.onSnap)A.onSnap();}}catch(e){}};
+ A.tT=setInterval(()=>A.refT(false),20000);
+ return A;}
+function arenaLeave(silent){const A=ON.arena;if(!A)return;const wasGuest=ONL.acc&&ONL.acc.guest;clearInterval(A.hbT);clearInterval(A.loopT);clearInterval(A.tT);clearInterval(A.ctlT);if(A.w){A.w.close();A.w=null;}ON.arena=null;
+ if(onlLogged()){RT.patch(`arena/${A.tid}/p/${myUid()}`,{wait:null}).catch(()=>{});RT.del(`ahb/${A.tid}/${myUid()}`).catch(()=>{});}if(wasGuest&&!silent)setTimeout(guestEnd,600);if(!silent)toast(wasGuest?'Has salido del torneo':'Has salido de la búsqueda');}
 async function arenaSearch(on){const A=ON.arena;if(!A)return;
- if(on&&A.T.fin&&A.T.fin-RT.srv()<ARENA_MIN_LEFT)return toast('Ya no quedan partidas por empezar','bad');
- A.force=true;try{await RT.patch(`arena/${A.tid}/p/${myUid()}`,{wait:on?RT.SV:null,hb:RT.SV});if(A.snap[myUid()])A.snap[myUid()].wait=on?RT.srv():null;if(A.onSnap)A.onSnap();}catch(e){toast(FB.msg(e),'bad');}}
-async function arenaTick(){const A=ON.arena;if(!A||A.busy2||document.hidden||!onlLogged()||A.T.estado!=='activo')return;
- // ahorro: durante una partida no hace falta leer la clasificación; sin buscar rival, cada 5 s en vez de 2,5 s
- if(ON.inGame)return;A.tk=(A.tk||0)+1;const meS=A.snap&&A.snap[myUid()];if(!(meS&&meS.wait)&&A.tk%2&&!A.force)return;A.force=false;
+ if(on&&tFin(A.T)&&tFin(A.T)-RT.srv()<ARENA_MIN_LEFT)return toast('Ya no quedan partidas por empezar','bad');
+ try{await RT.patch(`arena/${A.tid}/p/${myUid()}`,{wait:on?RT.SV:null,sal:null});RT.put(`ahb/${A.tid}/${myUid()}`,RT.SV).catch(()=>{});if(A.snap[myUid()])A.snap[myUid()].wait=on?RT.srv():null;if(A.onSnap)A.onSnap();if(on)arenaTick(true);}catch(e){toast(FB.msg(e),'bad');}}
+async function arenaTick(timer){const A=ON.arena;if(!A||A.busy2||document.hidden||!onlLogged()||tEff(A.T,RT.srv())!=='activo')return;
+ if(ON.inGame)return;
+ const uid=myUid(),all=A.snap||{},me=all[uid]||{},now=RT.srv();
+ if(timer&&!isArenaT(A.T)){A.tk=(A.tk||0)+1;if(A.tk%2===1){try{const r=await RT.get(`arena/${A.tid}/r`)||{};A.round=r.n||0;A.rbye=r.bye||null;if(A.onSnap)A.onSnap();}catch(e){}}}
+ if(timer&&!A.w){return;}           // sin conexión en directo todavía: se espera a la primera foto
  A.busy2=true;
- try{const all=await RT.get(`arena/${A.tid}/p`)||{};if(ON.arena!==A)return;A.snap=all;const uid=myUid(),me=all[uid]||{},now=RT.srv();
+ try{
   if(me.fuera){A.out=true;}
   else if(me.busy&&me.busy!==A.entered&&now-(me.bt||0)<480000){A.entered=me.busy;const g=await RT.get('games/'+me.busy);if(g&&g.st==='play'){if(ON.wait){ON.wait.close();ON.wait=null;}if(!isArenaT(A.T))$$('.modalbg').forEach(b=>b._close&&b._close(null));enterGame(me.busy);return;}}
-  else if(me.wait&&isArenaT(A.T))await arenaPair(A,all,now);
-  if(!isArenaT(A.T)){try{A.round=await RT.get(`arena/${A.tid}/r/n`)||0;A.rbye=await RT.get(`arena/${A.tid}/r/bye`)||null;}catch(e){}}
+  else if(me.wait&&isArenaT(A.T)&&(timer||!A.pT||Date.now()-A.pT>2500)){A.pT=Date.now();await arenaPair(A,all,now);}
   if(A.onSnap)A.onSnap();}catch(e){}
  finally{A.busy2=false;}}
+async function arenaHB(A,maxAge){if(A.hbAt&&Date.now()-A.hbAt<(maxAge||2500))return A.hb;try{A.hb=await RT.get(`ahb/${A.tid}`)||{};A.hbAt=Date.now();}catch(e){}return A.hb||{};}
 async function arenaPair(A,all,now){
- if(A.T.fin&&A.T.fin-now<ARENA_MIN_LEFT)return;
- const free=Object.entries(all).filter(([id,p])=>p&&p.wait&&!p.fuera&&now-(p.hb||0)<20000&&(!p.busy||now-(p.bt||0)>=480000)).map(([id,p])=>({id,e:p.e||800,w:now-p.wait,last:p.last||'',n:p.n,g:p.g}));
+ if(tFin(A.T)&&tFin(A.T)-now<ARENA_MIN_LEFT)return;
+ if(A.lastPair&&Date.now()-A.lastPair<5000)return;   // tras emparejar, espera a que llegue la foto nueva
+ const waiting=Object.entries(all).filter(([id,p])=>p&&p.wait&&!p.fuera&&!p.sal&&(!p.busy||now-(p.bt||0)>=480000));
+ if(waiting.length<2)return;
+ const hb=await arenaHB(A);
+ const free=waiting.filter(([id,p])=>now-(hb[id]||0)<40000).map(([id,p])=>({id,e:p.e||800,w:now-p.wait,last:p.last||'',n:p.n,g:p.g}));
  if(free.length<2)return;
  if(free.map(x=>x.id).sort()[0]!==myUid())return;           // solo el «director» (menor uid) empareja
  free.sort((a,b)=>b.w-a.w);const used=new Set(),pairs=[];
@@ -4729,69 +4919,98 @@ async function arenaPair(A,all,now){
   for(const b of free){if(b.id===a.id||used.has(b.id))continue;const d=Math.abs(a.e-b.e),ok=d<=ARENA_ELO||Math.max(a.w,b.w)>=ARENA_WAIT_MS;if(!ok)continue;
    const sc=d+((a.last===b.id||b.last===a.id)?1000:0);if(sc<bs){bs=sc;best=b;}}
   if(best){used.add(a.id);used.add(best.id);pairs.push([a,best]);}}
+ if(pairs.length)A.lastPair=Date.now();
  for(const [a,b] of pairs){const wA=Math.random()<.5,W=wA?a:b,B=wA?b:a,t=tcObj(A.T.ritmo||'3+0'),gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-  try{await RT.put('games/'+gid,{w:W.id,b:B.id,wn:W.n,bn:B.n,we:W.e,be:B.e,tc:A.T.ritmo||'3+0',tb:t.m*60000,ti:t.i*1000,moves:'',clk:{w:t.m*60000,b:t.m*60000},ts:RT.SV,turn:'w',st:'play',draw:'',res:'',why:'',ar:A.tid,af:A.T.fin||0,fu:A.T.furia===false?0:1});
+  try{await RT.put('games/'+gid,{w:W.id,b:B.id,wn:W.n,bn:B.n,we:W.e,be:B.e,tc:A.T.ritmo||'3+0',tb:t.m*60000,ti:t.i*1000,moves:'',clk:{w:t.m*60000,b:t.m*60000},ts:RT.SV,turn:'w',st:'play',draw:'',res:'',why:'',ar:A.tid,af:tFin(A.T)||0,fu:A.T.furia===false?0:1});
+   [a,b].forEach(x=>{if(A.snap[x.id])Object.assign(A.snap[x.id],{busy:gid,bt:now,wait:null});});   // para no emparejarlos otra vez con una foto antigua
    await Promise.all([a,b].map(x=>RT.patch(`arena/${A.tid}/p/${x.id}`,{busy:gid,bt:RT.SV,wait:null})));RT.put('live/'+gid,{wn:W.n,bn:B.n,tc:A.T.ritmo||'3+0',ar:A.tid,t:RT.SV}).catch(()=>{});}catch(e){}}}
 async function recordArena(tid,gid,sc,oppId,bonus){
  const path=`arena/${tid}/p/${myUid()}`;let me={};try{me=await RT.get(path)||{};}catch(e){}
  if(me.lg===gid)return{val:0,streak:me.streak||0,dup:true};
  bonus=bonus||0;const arT=!ON.arena||isArenaT(ON.arena.T);const val=arenaVal(sc,arT?(me.streak||0):0)+bonus,streak=sc===1?(me.streak||0)+1:0;
- try{await RT.patch(path,{pts:(me.pts||0)+val,pa:(me.pa||0)+1,w:(me.w||0)+(sc===1?1:0),d:(me.d||0)+(sc===.5?1:0),l:(me.l||0)+(sc===0?1:0),streak,lg:gid,last:oppId,busy:null,bt:null,hb:RT.SV,e:myElo(),['vs/'+oppId]:((me.vs&&me.vs[oppId])||0)+sc});}catch(e){}
+ try{await RT.patch(path,{pts:(me.pts||0)+val,pa:(me.pa||0)+1,w:(me.w||0)+(sc===1?1:0),d:(me.d||0)+(sc===.5?1:0),l:(me.l||0)+(sc===0?1:0),streak,lg:gid,last:oppId,busy:null,bt:null,e:myElo(),['vs/'+oppId]:((me.vs&&me.vs[oppId])||0)+sc});}catch(e){}
  return{val,streak,bonus,dbl:arT&&(me.streak||0)>=2&&sc===1};}
 /* orden: puntos; en empate, resultados directos entre los empatados; luego victorias y menos partidas */
 function arenaRank(rows){const by={};rows.forEach(r=>(by[r.pts||0]=by[r.pts||0]||[]).push(r));
  return Object.keys(by).map(Number).sort((a,b)=>b-a).flatMap(k=>{const g=by[k];if(g.length>1){const ids=new Set(g.map(x=>x.id));g.forEach(x=>{x.h2h=0;Object.entries(x.vs||{}).forEach(([o,v])=>{if(ids.has(o))x.h2h+=v;});});}
   return g.sort((a,b)=>(b.h2h||0)-(a.h2h||0)||(b.w||0)-(a.w||0)||(a.pa||0)-(b.pa||0)||String(a.n).localeCompare(String(b.n),'es'));});}
+/* fila que se puede tocar para abrir la tarjeta del jugador (solo alumnado con cuenta; los invitados no tienen perfil) */
+const pcAttr=r=>r&&r.pid&&!r.guest?`class="tapr" data-pc="${esc(r.pid)}" data-pn="${esc(r.n||'')}" data-pg="${esc(r.g||'')}"`:'';
+const pcBind=root=>$$('[data-pc]',root).forEach(b=>b.onclick=e=>{e.stopPropagation();if(typeof playerCard==='function')playerCard({id:b.dataset.pc,n:b.dataset.pn,g:b.dataset.pg});});
 function podiumHTML(rk,uid){
  const blk=(r,i)=>{if(!r)return'<div style="flex:1"></div>';const h=[120,88,66][i],col=['#f6c445','#c9ced6','#d99a62'][i];
-  return`<div style="flex:1;text-align:center;min-width:0"><div style="font-size:${i?1.9:2.4}rem">${['🥇','🥈','🥉'][i]}</div><div style="font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${r.id===uid?'color:#14703a':''}">${esc(r.n)}</div><div class="muted" style="font-size:.8rem">${esc(r.g||'')}</div><div style="margin-top:6px;height:${h}px;background:${col};border-radius:12px 12px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-size:1.5rem;font-weight:900;box-shadow:inset 0 -6px 0 rgba(0,0,0,.08)">${r.pts||0}</div></div>`;};
+  return`<div style="flex:1;text-align:center;min-width:0" ${pcAttr(r)}><div style="font-size:${i?1.9:2.4}rem">${['🥇','🥈','🥉'][i]}</div><div style="font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${r.id===uid?'color:#14703a':''}">${esc(r.n)}</div><div class="muted" style="font-size:.8rem">${esc(r.g||'')}</div><div style="margin-top:6px;height:${h}px;background:${col};border-radius:12px 12px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-size:1.5rem;font-weight:900;box-shadow:inset 0 -6px 0 rgba(0,0,0,.08)">${r.pts||0}</div></div>`;};
  const rest=rk.slice(3);
  return`<div style="display:flex;gap:8px;align-items:flex-end;margin:10px 0 0">${blk(rk[1],1)}${blk(rk[0],0)}${blk(rk[2],2)}</div>
- ${rest.length?`<table style="width:100%;border-collapse:collapse;margin-top:12px">${rest.map((r,i)=>`<tr style="${r.id===uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px;width:34px">${i+4}</td><td>${esc(r.n)} <span class="muted">${esc(r.g||'')}</span></td><td class="muted" style="font-size:.8rem">${r.w||0}G ${r.d||0}T ${r.l||0}P</td><td style="text-align:right;padding-right:6px"><b>${r.pts||0}</b></td></tr>`).join('')}</table>`:''}`;}
+ ${rest.length?`<table style="width:100%;border-collapse:collapse;margin-top:12px">${rest.map((r,i)=>`<tr ${pcAttr(r)} style="${r.id===uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px;width:34px">${i+4}</td><td>${esc(r.n)} <span class="muted">${esc(r.g||'')}</span></td><td class="muted" style="font-size:.8rem">${r.w||0}G ${r.d||0}T ${r.l||0}P</td><td style="text-align:right;padding-right:6px"><b>${r.pts||0}</b></td></tr>`).join('')}</table>`:''}`;}
 /* pantalla del arena */
-async function viewArena(m,{tid}){const tok=VIEW;
+/* clasificación final (sin entrar al torneo): del arena si aún existe; si el profe ya lo cerró, de lo guardado */
+async function arenaFinalRank(T){let rk=null;
+ try{const all=await RT.get(`arena/${T.id}/p`);if(all)rk=arenaRank(Object.entries(all).filter(([i,p])=>p&&!p.fuera&&((p.pa||0)>0||(p.pts||0)>0)).map(([i,p])=>({id:i,pid:i,...p})));}catch(e){}
+ if((!rk||!rk.length)&&T.clasif&&T.clasif.length)rk=T.clasif.map((x,i)=>({id:x.u||'c'+i,pid:x.u||'',n:x.n,g:x.g,pts:x.p,w:x.w,d:x.d,l:x.l}));
+ if(!rk||!rk.length){try{const h=await RT.get('hist/t/'+T.id);if(h&&h.c)rk=h.c.map((x,i)=>({id:x.u||'c'+i,pid:x.u||'',n:x.n,g:x.g,pts:x.p,w:x.w,d:x.d,l:x.l}));}catch(e){}}
+ return rk||[];}
+async function viewArenaFinal(m,T,tok){const uid=myUid();
+ m.innerHTML=`<div class="sectitle"><h2>🏆 ${esc(T.nombre)}</h2><span class="pill">🏁 Terminado</span></div><div class="card muted">Cargando la clasificación…</div>`;
+ const rk=await arenaFinalRank(T);if(!alive(tok))return;
+ const pos=rk.findIndex(r=>r.id===uid);
+ m.innerHTML=`<div class="sectitle"><h2>🏆 ${esc(T.nombre)}</h2><span class="pill">🏁 Terminado</span></div>
+ <div class="card" style="background:linear-gradient(135deg,#fff3c4,#fffdf8);text-align:center"><h3 style="margin:0">¡Podio final!</h3>${pos>=0?`<p style="margin:6px 0 0;font-weight:800">${pos<3?'🎉 ¡Enhorabuena! Has quedado ':'Has quedado '}<b>${pos+1}º</b> con <b>${rk[pos].pts||0}</b> puntos</p>`:''}${rk.length?podiumHTML(rk,uid):'<p class="muted">No hay resultados de este torneo.</p>'}<p class="muted" style="font-size:.8rem;margin:10px 0 0">Toca un jugador para ver su perfil. En caso de empate cuentan los resultados entre los empatados.</p></div>
+ <div class="btnrow"><button class="btn acc" id="leave">← Volver a Torneos</button></div>`;
+ pcBind(m);$('#leave',m).onclick=()=>go('torneos');}
+/* pantalla del arena */
+async function viewArena(m,{tid,ver}={}){const tok=VIEW;
  m.innerHTML=`<div class="sectitle"><h2>🏟️ Arena</h2></div><div class="card muted">Entrando al torneo…</div>`;
  if(!onlLogged()){toast('Entra primero con tu usuario','bad');return go('torneos');}
+ if(!(ON.arena&&ON.arena.tid===tid)){const T0=await tGet(tid,true);if(!alive(tok))return;
+  if(!T0){toast('No se encuentra el torneo','bad');return go('torneos');}
+  if(tEff(T0,RT.srv())==='terminado')return viewArenaFinal(m,T0,tok);
+  if(ver&&tEff(T0,RT.srv())!=='activo')return go('torneos');}
  let A;try{A=await arenaEnsure(tid);}catch(e){toast(FB.msg(e),'bad');return go('torneos');}
- if(!A||!alive(tok))return go('torneos');
+ if(!A||!alive(tok))return alive(tok)?go('torneos'):undefined;
  const uid=myUid();let tmr=null;
  const draw=()=>{if(!alive(tok)){clearInterval(tmr);if(ON.arena===A)A.onSnap=null;return;}
-  const T=A.T,now=RT.srv(),left=(T.fin||0)-now,all=A.snap||{},me=all[uid]||{};
-  const rows=Object.entries(all).filter(([id,p])=>p&&!p.fuera&&now-(p.hb||0)<60000||(p&&(p.pts||0)>0&&!p.fuera)).map(([id,p])=>({id,...p})).sort((a,b)=>(b.pts||0)-(a.pts||0)||(a.pa||0)-(b.pa||0));
-  const stOf=p=>p.busy&&now-(p.bt||0)<480000?'♟ jugando':p.wait?'🔎 buscando':now-(p.hb||0)<20000?'libre':'💤';
-  const sw=!isArenaT(T);const ended=T.estado!=='activo',timeUp=!sw&&left<=0;
-  if(ended||timeUp){let rk=A.final?arenaRank(Object.entries(A.final).filter(([i,p])=>p&&!p.fuera&&((p.pa||0)>0||(p.pts||0)>0)).map(([i,p])=>({id:i,...p}))):null;
-   if((!rk||!rk.length)&&T.clasif&&T.clasif.length)rk=T.clasif.map((x,i)=>({id:'c'+i,n:x.n,g:x.g,pts:x.p,w:x.w,d:x.d,l:x.l}));
-   if(!rk){m.innerHTML=`<div class="sectitle"><h2>🏟️ ${esc(T.nombre)}</h2><span class="pill">⏱️ ¡Tiempo!</span></div><div class="card" style="text-align:center"><div style="font-size:3rem">🏁</div><p style="font-weight:800">¡Se acabó el tiempo!<br>Calculando la clasificación…</p><span class="thinking"><i></i><i></i><i></i></span></div>`;return;}
+  const T=A.T,now=RT.srv(),left=tFin(T)-now,all=A.snap||{},me=all[uid]||{},hb=A.hb||{};
+  const rows=Object.entries(all).filter(([id,p])=>p&&!p.fuera&&(now-(hb[id]||0)<60000||id===uid||p.wait||p.busy||(p.pts||0)>0||(p.pa||0)>0)).map(([id,p])=>({id,pid:p.guest?'':id,...p})).sort((a,b)=>(b.pts||0)-(a.pts||0)||(a.pa||0)-(b.pa||0));
+  const stOf=p=>p.sal?'🚪 se fue':p.busy&&now-(p.bt||0)<480000?'♟ jugando':p.wait?'🔎 buscando':now-(hb[p.id]||0)<40000||p.id===uid?'libre':'💤';
+  const sw=!isArenaT(T);const ended=tEff(T,now)==='terminado',timeUp=!sw&&left<=0;
+  if(ended||timeUp){let rk=A.final?arenaRank(Object.entries(A.final).filter(([i,p])=>p&&!p.fuera&&((p.pa||0)>0||(p.pts||0)>0)).map(([i,p])=>({id:i,pid:p.guest?'':i,...p}))):null;
+   if((!rk||!rk.length)&&T.clasif&&T.clasif.length)rk=T.clasif.map((x,i)=>({id:x.u||'c'+i,pid:x.u||'',n:x.n,g:x.g,pts:x.p,w:x.w,d:x.d,l:x.l}));
+   if(!rk){m.innerHTML=`<div class="sectitle"><h2>🏟️ ${esc(T.nombre)}</h2><span class="pill">⏱️ ¡Tiempo!</span></div><div class="card" style="text-align:center"><div style="font-size:3rem">🏁</div><p style="font-weight:800">¡Se acabó el tiempo!<br>Calculando la clasificación…</p><span class="thinking"><i></i><i></i><i></i></span></div>`;
+    if(!A.fin1){A.fin1=true;setTimeout(async()=>{try{A.final=await RT.get(`arena/${A.tid}/p`)||A.snap||{};}catch(e){A.final=A.snap||{};}draw();},2500);}return;}
    if(!A.cel){A.cel=true;confetti(90);sound('win');setTimeout(()=>{confetti(60);sound('win');},1100);}
-   const pos=rk.findIndex(r=>r.id===uid),mp=A.final&&A.final[uid]?A.final[uid].pts||0:0;
+   const pos=rk.findIndex(r=>r.id===uid);
    m.innerHTML=`<div class="sectitle"><h2>🏆 ${esc(T.nombre)}</h2><span class="pill">🏁 Terminado</span></div>
    <div class="card" style="background:linear-gradient(135deg,#fff3c4,#fffdf8);text-align:center"><h3 style="margin:0">¡Podio final!</h3>${pos>=0?`<p style="margin:6px 0 0;font-weight:800">${pos<3?'🎉 ¡Enhorabuena! Has quedado ':'Has quedado '}<b>${pos+1}º</b> con <b>${rk[pos].pts||0}</b> puntos${pos<3?'':'. ¡Gracias por jugar!'}</p>`:''}${podiumHTML(rk,uid)}<p class="muted" style="font-size:.8rem;margin:10px 0 0">En caso de empate cuentan los resultados entre los jugadores empatados.</p></div>
    <div class="btnrow"><button class="btn acc" id="leave">← Volver a Torneos</button></div>`;
-   $('#leave',m).onclick=()=>{arenaLeave(true);go('torneos');};return;}
+   pcBind(m);$('#leave',m).onclick=()=>{arenaLeave(true);go('torneos');};return;}
   const searching=!!me.wait;
   const rLeft=(T.inicioReal||0)+60000-now,nR=sw?(T.tipo==='rr'?(T.rondasRR||'?'):(T.rondas||5)):0;
   const swBtn=me.fuera?'<p class="err" style="font-weight:800">Has sido descalificado por el profe.</p>':me.busy&&now-(me.bt||0)<480000?'<button class="btn acc big" id="goplay" style="width:100%">♟ Volver a tu partida</button>'
-   :!A.round?`<p style="font-weight:800;text-align:center;margin:0">⏳ ${rLeft>0?'La ronda 1 empieza en <b id="rcd">'+fmtLeft(rLeft)+'</b>':'Preparando la ronda 1…'}<br><span class="muted" style="font-weight:700">Quédate en esta pantalla: la partida se abrirá sola.</span></p>`
+   :!A.round?`<p style="font-weight:800;text-align:center;margin:0">⏳ ${T.inicioReal&&rLeft>0?'La ronda 1 empieza en <b id="rcd">'+fmtLeft(rLeft)+'</b>':'Preparando la ronda 1…'}<br><span class="muted" style="font-weight:700">Quédate en esta pantalla: la partida se abrirá sola.</span></p>`
    :A.rbye===uid?`<p style="font-weight:800;text-align:center;margin:0">😴 En la ronda ${A.round} descansas: te llevas 2 puntos.</p>`
    :`<p style="font-weight:800;text-align:center;margin:0">⏳ Esperando a que terminen las demás partidas de la ronda ${A.round}…<br><span class="muted" style="font-weight:700">La siguiente partida se abrirá sola.</span></p>`;
   const btn=ended?'':sw?swBtn:me.fuera?'<p class="err" style="font-weight:800">Has sido descalificado por el profe.</p>':me.busy&&now-(me.bt||0)<480000?'<button class="btn acc big" id="goplay" style="width:100%">♟ Volver a tu partida</button>':searching?'<button class="btn ghost big" id="stop" style="width:100%">✖ Dejar de buscar</button><p class="muted" style="margin:6px 0 0;text-align:center"><span class="thinking"><i></i><i></i><i></i></span> Buscando rival de ELO parecido…</p>':timeUp?'<p style="font-weight:800;text-align:center">⏱️ ¡Tiempo! Ya no empiezan partidas nuevas.</p>':'<button class="btn acc big" id="srch" style="width:100%">🔎 Buscar partida</button>';
   const top=rows.slice(0,10),mine=rows.findIndex(r=>r.id===uid);
-  m.innerHTML=`<div class="sectitle"><h2>🏟️ ${esc(T.nombre)}</h2><span class="pill" id="cd">${ended?'Terminado':sw?`${TIPO_TXT[T.tipo]} · Ronda ${A.round||0} de ${nR}`:timeUp?'⏱️ ¡Tiempo!':'⏱️ '+fmtLeft(left)}</span></div>
-  <div class="card" style="background:linear-gradient(135deg,#d9f5e3,#fffdf8)"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div style="font-size:2.2rem">🏆</div><div style="flex:1"><div class="muted" style="font-weight:800">Tus puntos</div><div style="font-size:2rem;font-weight:900">${me.pts||0}${(me.streak||0)>=2?' <span title="Racha: puntos dobles">🔥×2</span>':(me.streak||0)===1?' <small class="muted">🔥</small>':''}</div></div><div class="muted" style="font-weight:700;text-align:right">${me.pa||0} partidas<br>${me.w||0}G · ${me.d||0}T · ${me.l||0}P</div></div>${btn}
-  ${ended?'<p class="muted" style="margin:8px 0 0">El profe ha cerrado el torneo. ¡Mira el salón de la fama en Torneos!</p>':''}</div>
-  <div class="card"><h3 style="margin:0 0 6px">📊 Clasificación en directo <span class="muted" style="font-weight:700">(${rows.length} jugadores)</span></h3><table style="width:100%;border-collapse:collapse">${top.map((r,i)=>`<tr style="${r.id===uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(r.n)} <span class="muted">${esc(r.g||'')}</span>${(r.streak||0)>=2?' 🔥':''}</td><td class="muted" style="font-size:.8rem">${stOf(r)}</td><td style="text-align:right;padding-right:6px"><b>${r.pts||0}</b></td></tr>`).join('')||'<tr><td class="muted">Todavía no hay jugadores.</td></tr>'}${mine>=10?`<tr style="background:#e8f6ee;font-weight:800"><td style="padding:4px 6px">${mine+1}</td><td>${esc(me.n)}</td><td></td><td style="text-align:right;padding-right:6px"><b>${me.pts||0}</b></td></tr>`:''}</table>
+  m.innerHTML=`<div class="sectitle"><h2>🏟️ ${esc(T.nombre)}</h2><span class="pill" id="cd">${sw?`${TIPO_TXT[T.tipo]} · Ronda ${A.round||0} de ${nR}`:'⏱️ '+fmtLeft(left)}</span></div>
+  <div class="card" style="background:linear-gradient(135deg,#d9f5e3,#fffdf8)"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div style="font-size:2.2rem">🏆</div><div style="flex:1"><div class="muted" style="font-weight:800">Tus puntos</div><div style="font-size:2rem;font-weight:900">${me.pts||0}${(me.streak||0)>=2&&!sw?' <span title="Racha: puntos dobles">🔥×2</span>':(me.streak||0)===1&&!sw?' <small class="muted">🔥</small>':''}</div></div><div class="muted" style="font-weight:700;text-align:right">${me.pa||0} partidas<br>${me.w||0}G · ${me.d||0}T · ${me.l||0}P</div></div>${btn}</div>
+  <div class="card"><h3 style="margin:0 0 6px">📊 Clasificación en directo <span class="muted" style="font-weight:700">(${rows.length} jugadores)</span></h3><table style="width:100%;border-collapse:collapse">${top.map((r,i)=>`<tr ${pcAttr(r)} style="${r.id===uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(r.n)} <span class="muted">${esc(r.g||'')}</span>${(r.streak||0)>=2&&!sw?' 🔥':''}</td><td class="muted" style="font-size:.8rem">${stOf(r)}</td><td style="text-align:right;padding-right:6px"><b>${r.pts||0}</b></td></tr>`).join('')||'<tr><td class="muted">Todavía no hay jugadores.</td></tr>'}${mine>=10?`<tr style="background:#e8f6ee;font-weight:800"><td style="padding:4px 6px">${mine+1}</td><td>${esc(me.n)}</td><td></td><td style="text-align:right;padding-right:6px"><b>${me.pts||0}</b></td></tr>`:''}</table>
   <p class="muted" style="font-size:.82rem;margin:8px 0 0">Victoria 2 · Tablas 1 · Derrota 0.${sw?' Las partidas se emparejan solas en cada ronda.':' Con 2 victorias seguidas, ¡puntos dobles!'}</p>${T.furia!==false?'<p style="font-size:.82rem;margin:6px 0 0;color:#c2410c;font-weight:700">🔥 Modo furia: en la partida, antes de tu primer movimiento, púlsalo. Tu tiempo se divide a la mitad y, si ganas, ¡+1 punto!</p>':''}</div>
-  <div class="btnrow"><button class="btn ghost sm" id="leave">← Salir del torneo</button><button class="btn ghost sm" id="tvb">📺 Ver partidas del torneo</button></div>`;
+  <div class="btnrow"><button class="btn ghost sm" id="back">← Volver</button>${!ONL.acc.guest?'<button class="btn ghost sm" id="wd">🚪 Salir del torneo</button>':''}<button class="btn ghost sm" id="tvb">📺 Ver partidas del torneo</button></div>`;
+  pcBind(m);
   $('#tvb',m).onclick=()=>openTV({tid:A.tid});
   if($('#srch',m))$('#srch',m).onclick=()=>arenaSearch(true);
   if($('#stop',m))$('#stop',m).onclick=()=>arenaSearch(false);
   if($('#goplay',m))$('#goplay',m).onclick=()=>{const g=me.busy;enterGame(g);};
-  $('#leave',m).onclick=()=>{arenaLeave();go('torneos');};};
+  $('#back',m).onclick=()=>{if(me.wait)arenaSearch(false);go('torneos');};
+  if($('#wd',m))$('#wd',m).onclick=async()=>{if(await onlWithdraw(A.T))go('torneos');};};
  A.onSnap=draw;draw();
+ let hbN=0;arenaHB(A,0).then(()=>{if(alive(tok))draw();});
  tmr=setInterval(()=>{if(!alive(tok)){clearInterval(tmr);return;}
-  if(!isArenaT(A.T)){const rc=$('#rcd',m);if(rc){const l=(A.T.inicioReal||0)+60000-RT.srv();rc.textContent=fmtLeft(l);}if(A.T.estado!=='activo'&&!A.fin1){A.fin1=true;draw();}return;}
-  if((A.T.fin||0)-RT.srv()<=0&&!A.fin1){A.fin1=true;if((A.snap[uid]||{}).wait)arenaSearch(false);setTimeout(async()=>{try{A.final=await RT.get(`arena/${A.tid}/p`)||{};}catch(e){A.final=A.final||A.snap||{};}draw();},2500);}const cd=$('#cd',m);if(cd&&A.T.estado==='activo'){const left=(A.T.fin||0)-RT.srv();cd.textContent=left<=0?'⏱️ ¡Tiempo!':'⏱️ '+fmtLeft(left);}},1000);}
+  if(++hbN%15===0&&!ON.inGame&&!document.hidden)arenaHB(A,10000).then(()=>{if(alive(tok)&&!$('.modalbg')&&!$('.pcard'))draw();});   // quién sigue conectado (cada 15 s)
+  if(!isArenaT(A.T)){const rc=$('#rcd',m);if(rc){const l=(A.T.inicioReal||0)+60000-RT.srv();rc.textContent=fmtLeft(l);}if(tEff(A.T,RT.srv())==='terminado'&&!A.fin1){A.fin1=true;A.final=null;setTimeout(async()=>{try{A.final=await RT.get(`arena/${A.tid}/p`)||A.snap||{};}catch(e){A.final=A.snap||{};}draw();},1500);}return;}
+  if(tFin(A.T)-RT.srv()<=0&&!A.fin1){if((A.snap[uid]||{}).wait)arenaSearch(false);draw();}
+  const cd=$('#cd',m);if(cd){const left=tFin(A.T)-RT.srv();if(left>0)cd.textContent='⏱️ '+fmtLeft(left);}},1000);}
 
 async function arenaJoinGuest(T){await arenaJoin(T);go('arena',{tid:T.id});}
 
@@ -4800,7 +5019,7 @@ async function openTV({tid}={}){
  if($('.tvov'))return;
  const ov=document.createElement('div');ov.className='tvov';document.body.appendChild(ov);
  let tname='',alive2=true,focus=null;const B={};   // gid -> {el,board,pos,g,done}
- if(tid){try{const t=await FB.get('torneos/'+tid);if(t)tname=t.nombre;}catch(e){}}
+ if(tid){try{const t=await tGet(tid);if(t)tname=t.nombre;}catch(e){}}
  ov.innerHTML=`<div class="tvbar"><b>📺 Partidas en directo${tname?' · '+esc(tname):''}</b><span class="muted" id="tvn" style="color:#cfe9db"></span><span style="flex:1"></span><button class="btn sm ghost" id="tvx">✕ Cerrar</button></div><div class="tvgrid" id="tvg"><p class="tvempty">Buscando partidas…</p></div>`;
  const close=()=>{alive2=false;clearInterval(iv);ov.remove();window.removeEventListener('resize',layout);if(location.hash.startsWith('#tv'))history.replaceState(null,'',location.pathname+location.search);};
  ov._close=close;$('#tvx',ov).onclick=close;
@@ -4833,9 +5052,58 @@ async function openTV({tid}={}){
   await Promise.all(Object.entries(B).map(async([id,o])=>{try{const g=await pget('games/'+id);if(g){if(!o.g||g.f0!==o.g.f0)o.pos=new E.Pos(g.f0||undefined);o.g=g;if(g.st==='end'&&!o.done)o.done=Date.now();paint(o);}}catch(e){}}));
   const n=Object.keys(B).length;const ee=$('.tvempty',grid);if(n&&ee)ee.remove();if(!n&&!ee)grid.innerHTML='<p class="tvempty">Ahora mismo no hay partidas en juego. Esta pantalla se actualiza sola.</p>';
   $('#tvn',ov).textContent=n?`${n} partida${n>1?'s':''} · toca una para verla en grande`:'';layout();}
- const iv=setInterval(()=>{if(!document.hidden)tick();},2000);
+ const iv=setInterval(()=>{if(!document.hidden)tick();},2500);
  const ck=setInterval(()=>{if(!alive2)return clearInterval(ck);Object.values(B).forEach(paint);},500);
  tick();}
+
+/* ================= PERFIL PÚBLICO, TARJETA DE JUGADOR, AMIGOS Y SILENCIAR ================= */
+/* silenciar: sus retos no te llegan (se le contesta «ocupado»). Se guarda en tu cuenta (mutes/), vale en cualquier dispositivo */
+async function muteLoad(){if(!onlLogged()||ONL.acc.guest)return;try{ON.mutes=await RT.get('mutes/'+myUid())||{};}catch(e){ON.mutes=ON.mutes||{};}}
+const isMuted=id=>{const u=ON.mutes&&ON.mutes[id];return !!u&&(u<0||u>Date.now());};
+async function muteSet(id,ms){ON.mutes=ON.mutes||{};const until=ms==null?null:ms<0?-1:Date.now()+ms;
+ try{if(until===null){await RT.del(`mutes/${myUid()}/${id}`);delete ON.mutes[id];}else{await RT.put(`mutes/${myUid()}/${id}`,until);ON.mutes[id]=until;}return true;}catch(e){toast(FB.msg(e),'bad');return false;}}
+const muteTxt=id=>{const u=ON.mutes&&ON.mutes[id];if(!isMuted(id))return'';return u<0?'para siempre':'hasta las '+new Date(u).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+(new Date(u).toDateString()!==new Date().toDateString()?' de mañana':'');};
+/* resumen del progreso que se sube a perfil/{uid} (solo si cambia, como mucho cada 2 minutos). Realtime Database: no gasta lecturas */
+function perfilSum(){if(!P)return null;const r=rankIdx(P.xp),nx=RANKS[r+1];
+ const gm={w:0,d:0,l:0};Object.values(P.games||{}).forEach(g=>{gm.w+=g.w||0;gm.d+=g.d||0;gm.l+=g.l||0;});
+ let on=P.onl;if(!on){on={w:0,d:0,l:0};(P.hist||[]).filter(h=>h.online&&!h.local).forEach(h=>{on[h.res==='w'?'w':h.res==='d'?'d':'l']++;});}
+ const rt={};Object.entries(P.rt||{}).forEach(([k,c])=>{if(c)rt[k]={r:c.r,n:c.n};});
+ const lec=Object.keys(P.lessons||{}).length,totL=MODULES.reduce((a,md)=>a+md.lecciones.length,0);
+ return{v:1,n:ONL.acc.nombre,g:ONL.acc.grupo||'',av:P.avatar||'🧑‍🎓',xp:P.xp||0,rk:{n:RANKS[r].nombre,ic:RANKS[r].icono},rx:RANKS[r].xp,nx:nx?{n:nx.nombre,xp:nx.xp}:null,
+  elo:P.elo||800,emax:Math.max(P.eloMax||0,P.elo||800),eh:(P.eloHist||[]).slice(-30),rt,lec:[lec,totL],pz:Object.keys(P.puzzles||{}).length+(typeof temasTotal==='function'?temasTotal():0),
+  gm,on,st:(P.days&&P.days.streak)||0,rd:Object.keys(P.retos||{}).length,
+  md:MODULES.map(md=>{const p=modProgress(md);return[md.icono,md.nombre,p.done,p.total,md.color];}),
+  bd:BADGES.filter(b=>P.badges&&P.badges[b.id]).map(b=>[b.icono,b.nombre]),bdT:BADGES.length};}
+async function perfilSync(force){try{if(!onlLogged()||ONL.acc.guest||!P||P.cuenta!==ONL.acc.alias)return;
+ const s=perfilSum();if(!s)return;const j=JSON.stringify(s),K='siurot_pf_'+myUid();let last=null;try{last=JSON.parse(localStorage.getItem(K)||'null');}catch(e){}
+ if(!force&&last&&last.j===j&&Date.now()-last.t<6*3600e3)return;
+ await RT.putS('perfil/'+myUid(),{...s,t:RT.SV});try{localStorage.setItem(K,JSON.stringify({j,t:Date.now()}));}catch(e){}}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof onlLogged==='function'&&onlLogged())perfilSync();});
+/* tarjeta de jugador: progreso + amigo + retar + silenciar (desde cualquier lista: conectados, torneos, salón de la fama, rival…) */
+async function playerCard(p,o){o=o||{};if(!p||!p.id)return;if(!onlLogged()){toast('Entra con tu usuario del cole para ver perfiles','bad');return;}
+ const me=p.id===myUid(),guest=ONL.acc.guest;
+ const html=`<div id="pcact"></div><div id="pcprog" style="margin-top:6px"><p class="muted">Cargando…</p></div>`;
+ const pr=modal({title:(me?'🙋 Tú: ':'🧑‍🎓 ')+esc(p.n||'Jugador'),html,buttons:[{t:'Cerrar',cls:'ghost',v:null}],dismiss:true});
+ const root=$$('.modalbg').pop();if(root){root.classList.add('pcard');const md=$('.modal',root);if(md)md.classList.add('wide');}
+ let closed=false;pr.then(()=>{closed=true;if(o.onChange)o.onChange();});
+ const [s,pres,fr]=await Promise.all([RT.get('perfil/'+p.id).catch(()=>null),me||guest?null:RT.get('presence/'+p.id).catch(()=>null),me||guest?{}:frLoad()]);
+ if(closed||!root)return;
+ const now=RT.srv(),online=pres&&now-(pres.t||0)<55000,busy=online&&pres.s==='jugando';
+ const vs=P&&P.vs&&P.vs[p.id];
+ const act=()=>{const isFr=!!(fr&&fr[p.id]),mu=isMuted(p.id);const a=$('#pcact',root);if(!a)return;
+  a.innerHTML=me?'':`<div class="muted" style="font-weight:800;margin:0 0 8px">${online?(busy?'🟠 Jugando ahora':'🟢 Conectado'):'⚪ Desconectado'}${p.g||(s&&s.g)?' · '+esc(p.g||s.g):''}${s?' · ♟ ELO '+(s.elo||800):''}</div>
+   ${vs?`<div class="pill" style="margin-bottom:8px">⚔️ Tú contra ${esc(p.n||'')}: <b>${vs.w}</b> ganadas · <b>${vs.d}</b> tablas · <b>${vs.l}</b> perdidas</div>`:''}
+   ${guest?'':`<div class="btnrow" style="gap:6px">${online&&!busy?`<button class="btn sm acc" id="pcr">⚔️ Retar (${tcTxtO(ON.tc==='corr'?'3+0':ON.tc)})</button>`:''}${!online?'<button class="btn sm" id="pcd">📨 Invitar a distancia</button>':''}
+    <button class="btn sm ${isFr?'':'ghost'}" id="pcf">${isFr?'⭐ Es tu amigo':'☆ Añadir a amigos'}</button><button class="btn sm ghost" id="pcm">${mu?'🔔 Quitar silencio':'🔕 Silenciar'}</button></div>
+    ${mu?`<p class="muted" style="margin:6px 0 0;font-size:.85rem">🔕 Silenciado ${muteTxt(p.id)}: no te llegan sus retos.</p>`:''}`}`;
+  if($('#pcr',a))$('#pcr',a).onclick=()=>{root._close&&root._close(null);sendReto({id:p.id,n:p.n},ON.tc==='corr'?'3+0':ON.tc);};
+  if($('#pcd',a))$('#pcd',a).onclick=()=>{root._close&&root._close(null);sendReto({id:p.id,n:p.n},'corr');};
+  if($('#pcf',a))$('#pcf',a).onclick=async()=>{await frToggle({id:p.id,n:p.n||(s&&s.n)||'',g:p.g||(s&&s.g)||''});act();};
+  if($('#pcm',a))$('#pcm',a).onclick=async()=>{if(isMuted(p.id)){if(await muteSet(p.id,null))toast('🔔 Ya puedes recibir sus retos');return act();}
+   const k=await modal({title:'🔕 Silenciar a '+esc(p.n||''),html:'<p style="margin:0">No recibirás sus retos durante:</p>',buttons:[{t:'30 minutos',v:18e5},{t:'1 hora',v:36e5},{t:'8 horas',v:288e5},{t:'24 horas',v:864e5},{t:'Siempre',v:-1},{t:'Cancelar',cls:'ghost',v:null}],dismiss:true});
+   if(k!=null&&await muteSet(p.id,k))toast('🔕 '+esc(p.n||'')+' silenciado '+muteTxt(p.id));act();};};
+ act();
+ const pg=$('#pcprog',root);if(pg)pg.innerHTML=profileHTML(s?{...s,n:s.n||p.n}:null);}
 // ================= PWA: instalación y actualizaciones =================
 const IS_STANDALONE=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
 const IS_IOS=/iphone|ipad|ipod/i.test(navigator.userAgent)&&!window.MSStream;
