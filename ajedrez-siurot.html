@@ -2576,9 +2576,9 @@ function viewPlay(m){
  <div class="card" id="l2c" style="display:flex;align-items:center;gap:14px;cursor:pointer;margin-bottom:14px;border:2px solid #7c3aed;background:#f5f0ff"><div style="font-size:2.2rem">👥</div><div style="flex:1"><h3 style="margin:0">Jugar con un amigo</h3><div class="muted" style="font-weight:700">En este mismo dispositivo, por turnos · también Chess960</div></div><span class="btn sm">Jugar</span></div>
  <div class="grid g3" id="bots"></div>
  <p class="muted" style="font-weight:700">Pulsa un nivel para empezar la partida. Gana a un nivel para desbloquear el siguiente; la primera victoria contra cada nivel da XP extra.</p>`;
- BOTS.filter(b=>b.n<=maxBot()).forEach(b=>{const g=P.games[b.n]||{w:0,d:0,l:0};const lk=b.n>unlocked;const d=document.createElement('div');d.className='card bot'+(lk?' locked':'')+(playCfg.level===b.n?' selected':'');
+ BOTS.filter(b=>b.n<=maxBot()).forEach(b=>{const g=P.games[b.n]||{w:0,d:0,l:0};const lk=b.n>unlocked;const d=document.createElement('div');d.className='card bot'+(lk?' locked':'');
   d.innerHTML=`<div class="be">${b.emoji}</div><h3>Nivel ${b.n} · ${b.nombre}</h3><div class="muted" style="font-size:.9rem">${b.desc}</div><div class="rec">🏆 ${g.w} · 🤝 ${g.d} · ❌ ${g.l} · +${b.xp} XP</div><div class="rec">♟ ELO ≈ ${ELO_BOT[b.n]}</div>`;
-  d.onclick=()=>{if(lk){toast('🔒 Gana al nivel '+(b.n-1)+' para desbloquearlo');return;}playCfg.level=b.n;$$('#bots .bot',m).forEach(x=>x.classList.remove('selected'));d.classList.add('selected');startG();};$('#bots',m).appendChild(d);});
+  d.onclick=()=>{if(lk){toast('🔒 Gana al nivel '+(b.n-1)+' para desbloquearlo');return;}playCfg.level=b.n;startG();};$('#bots',m).appendChild(d);});
   $('#l2c',m).onclick=async()=>{const c=await localSetup();if(c)go('local2',c);};
   async function startG(){
   const cfg=await gameSetup();if(!cfg)return;
@@ -4911,7 +4911,10 @@ async function viewOnGame(m,{gid}){
  $('#resign',under).onclick=async()=>{if(over)return;if(await confirmModal('¿Rendirte?','La partida contará como derrota.','Me rindo','Seguir jugando',true))setEnd(color==='w'?'0-1':'1-0','resign');};
  sync();board.interactive=!over&&G.st!=='end';panel();if(G.st==='end')finish(G.res,G.why);
 }
-if(typeof window!=='undefined')window.addEventListener('pagehide',()=>{if(onlLogged()&&FB.S.user){try{fetch('https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/presence/'+myUid()+'.json?auth='+encodeURIComponent(FB.S.user.idToken),{method:'DELETE',keepalive:true});}catch(e){}}});
+/* presencia: si la app no está a la vista (otra app, pantalla apagada, cerrada) NO puede contestar retos → se borra al instante; al volver reaparece */
+function presGone(){if(onlLogged()&&!ONL.acc.guest&&FB.S.user){try{fetch('https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/presence/'+myUid()+'.json?auth='+encodeURIComponent(FB.S.user.idToken),{method:'DELETE',keepalive:true});}catch(e){}}}
+if(typeof window!=='undefined'){window.addEventListener('pagehide',presGone);document.addEventListener('freeze',presGone);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)presGone();else if(onlLogged()&&!ONL.acc.guest&&ON.pres)presTick();});}
 setTimeout(()=>{if(onlLogged())onlStart();},1500);
 
 /* ================= ARENA (torneo automático) ================= */
