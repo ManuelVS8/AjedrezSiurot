@@ -79,6 +79,11 @@ main{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
 .hello .bgk{position:absolute;right:-10px;bottom:-40px;font-size:11rem;opacity:.12;line-height:1}
 .hello p{opacity:.92}
 .quick{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px}
+.rdot{position:absolute;top:-3px;right:-3px;min-width:14px;height:14px;padding:0 3px;border-radius:999px;background:#e11d48;border:2px solid #fff;box-sizing:border-box;color:#fff;font:900 .6rem/10px system-ui,sans-serif;text-align:center;font-style:normal;animation:rpulse 1.6s ease-in-out infinite;pointer-events:none}
+.rdot:empty{width:14px;padding:0}
+@keyframes rpulse{50%{transform:scale(1.18)}}
+.burger,.qbtn,.ditem{position:relative}
+.ditem .rdot{top:50%;right:14px;margin-top:-7px}
 .qbtn{background:#fff;border:2px solid var(--line);border-radius:16px;padding:14px;text-align:left;box-shadow:0 3px 0 var(--line);transition:transform .1s}
 .qbtn:hover{transform:translateY(-2px)}
 .qbtn .qi{font-size:1.8rem}
@@ -2014,6 +2019,7 @@ function go(tab,arg){
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
  ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ try{invDots();}catch(e){}
 }
 function alive(tok){return tok===VIEW;}
 function renderHeader(){
@@ -2947,7 +2953,7 @@ function openMenu(){
  const bg=document.createElement('div');bg.className='drawerbg';
  const cur=({modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'jugar',estudio:'estudios',explorador:'laboratorio',tablero:'laboratorio'})[currentTab]||currentTab;
  bg.innerHTML=`<div class="drawer"><div class="dh"><b>♞ Ajedrez Siurot</b><button class="iconbtn sm" id="dclose" aria-label="Cerrar">✕</button></div>${TABS.map(([id,ic,t])=>`<button class="ditem ${cur===id?'on':''}" data-tab="${id}"><span>${ic}</span>${t}</button>`).join('')}<hr><button class="ditem" id="dacc"><span>${onlLogged()?'🚪':'🏫'}</span>${onlLogged()?'Cerrar sesión · '+esc(ONL.acc.nombre):'Entrar con usuario del cole'}</button><button class="ditem" id="dset"><span>⚙️</span>Ajustes</button></div>`;
- document.body.appendChild(bg);
+ document.body.appendChild(bg);try{invDots();}catch(e){}
  bg.addEventListener('pointerdown',e=>{if(e.target===bg)closeMenu();});
  $('#dclose',bg).onclick=closeMenu;
  $$('.ditem[data-tab]',bg).forEach(b=>b.onclick=async()=>{const t=b.dataset.tab;closeMenu();if($('#back')&&currentTab==='partida'&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;if((currentTab==='ogame')&&!(await confirmModal('¿Salir de la partida?','La partida online sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir jugando')))return;go(t);});
@@ -4630,7 +4636,12 @@ const tcTxtO=k=>{if(k==='corr')return'📨 a distancia';if(String(k).startsWith(
 const accWhite=col=>col==='w'?false:col==='b'?true:Math.random()<.5;   // col = color que pide quien reta
 const colTxt=c=>c==='w'?'⚪ blancas':c==='b'?'⚫ negras':'🎲 color al azar';
 const pget=p=>fetch(RT.B+p+'.json').then(r=>r.ok?r.json():null);   // lectura pública (partidas en directo)
-const INV_K='siurot_inv';const invGet=()=>{try{return JSON.parse(localStorage.getItem(INV_K)||'[]');}catch(e){return[];}};const invSet=l=>{try{localStorage.setItem(INV_K,JSON.stringify(l.slice(-20)));}catch(e){}};
+const invK=()=>'siurot_inv_'+(ONL.acc&&ONL.acc.uid||'');
+const invGet=()=>{if(!(ONL.acc&&ONL.acc.uid)||ONL.acc.guest)return[];try{return JSON.parse(localStorage.getItem(invK())||'[]').filter(i=>!i.t||typeof i.t!=='number'||RT.srv()-i.t<7*864e5);}catch(e){return[];}};
+const invSet=l=>{try{localStorage.setItem(invK(),JSON.stringify(l.slice(-20)));}catch(e){}invDots();};
+/* punto rojo: invitaciones a distancia sin contestar (en el botón del menú ☰, en «Online» del menú y en «Jugar online» de la portada) */
+function invDots(){const n=invGet().length;
+ [['#burger'],['.ditem[data-tab=online]'],['.qbtn[data-go=online]']].forEach(([sel])=>$$(sel).forEach(el=>{let d=el.querySelector(':scope>.rdot');if(n&&!d){d=document.createElement('i');d.className='rdot';el.appendChild(d);}else if(!n&&d)d.remove();if(d)d.textContent=n>1?n:'';}));}
 const myUid=()=>ONL.acc&&ONL.acc.uid;
 const myElo=()=>(typeof P!=='undefined'&&P&&P.elo)||800;
 async function presTick(){if(!onlLogged()||document.hidden)return;
