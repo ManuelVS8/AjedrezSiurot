@@ -2020,8 +2020,16 @@ function playSound(pos,m){if(pos.inCheck())sound('check');else if(m.captured)sou
 
 // ================= Navegación =================
 let VIEW=0;let currentTab='inicio',currentArg=null,CUR_BOARD=null;
+// historial de pantallas: "atrás" vuelve a la pantalla de la que venías
+const NAV=[];let BACKING=false;const NAV_SKIP=new Set(['partida','local2','contrarreloj','rushduel','ogame','arena']);
+function goBack(fb){
+ while(NAV.length){const e=NAV.pop();if(e.tab===currentTab&&e.arg===currentArg)continue;BACKING=true;try{go(e.tab,e.arg);}finally{BACKING=false;}return;}
+ if(typeof fb==='function')fb();else go(fb||'inicio');
+}
 const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
 function go(tab,arg){
+ if(!BACKING&&P&&VIEW>0&&currentTab!==tab&&!NAV_SKIP.has(currentTab)){NAV.push({tab:currentTab,arg:currentArg});if(NAV.length>40)NAV.shift();}
+ if(tab==='inicio')NAV.length=0;
  VIEW++;currentTab=tab;currentArg=arg;CUR_BOARD=null;window.scrollTo(0,0);stopSpeech();document.body.classList.remove('intrainer');fitHeader();
  $$('.modalbg').forEach(bg=>bg._close?bg._close(null):bg.remove());closeMenu();
  const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'partidas',estudio:'estudios',escaner:'ejercicios',errores:'partidas',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio'};
@@ -2116,7 +2124,7 @@ function viewLearn(m){
 function viewModule(m,id){
  const mod=MODULES.find(x=>x.id===id);
  m.innerHTML=`<div class="sectitle"><div style="display:flex;align-items:center;gap:12px"><button class="backbtn pconly" id="back">← Volver</button><h2>${mod.icono} ${mod.nombre}</h2></div><span class="pill">${modProgress(mod).done}/${mod.lecciones.length}</span></div>${mod.id==='mates'?MATE_AVISO:''}<div class="lessonlist" id="ll"></div>`;
- $('#back',m).onclick=()=>go('aprender');
+ $('#back',m).onclick=()=>goBack('aprender');
  mod.lecciones.forEach((l,i)=>{const st=P.lessons[lessonKey(mod.id,l.id)];const r=document.createElement('div');r.className='lrow'+(st?' done':'');
   r.innerHTML=`<div class="ln">${st?'✓':i+1}</div><div class="lt">${l.titulo}<div class="muted" style="font-size:.8rem;font-weight:700">${l.pasos.length} pasos · +${l.xp} XP</div></div>${st?starsHTML(st.stars):'<span class="pill">Nueva</span>'}`;
   r.onclick=()=>go('leccion',{mod:mod.id,l:l.id});$('#ll',m).appendChild(r);});
@@ -2207,7 +2215,7 @@ function bfsPar(fen,stars){
 // ================= LECCIÓN =================
 function viewLesson(m,{mod:modId,l:lid}){
  const tok=VIEW;const mod=MODULES.find(x=>x.id===modId),les=mod.lecciones.find(x=>x.id===lid);
- const {board,body,under,nav,speakBtn}=trainerShell(m,les.titulo,()=>go('modulo',modId));let speakTxt='';const say=t=>{if(modId!=='tactica'||idx===0)speak(t);};
+ const {board,body,under,nav,speakBtn}=trainerShell(m,les.titulo,()=>goBack(()=>go('modulo',modId)));let speakTxt='';const say=t=>{if(modId!=='tactica'||idx===0)speak(t);};
  if(speakBtn){speakBtn.classList.remove('hidden');speakBtn.onclick=()=>speak(speakTxt,true);}
  let idx=0,mistakes=0,stepDone=[];let timers=[];
  const later=(fn,ms)=>{const t=setTimeout(()=>{if(alive(tok))fn();},ms);timers.push(t);};
@@ -2435,7 +2443,7 @@ function goalText(pz){return pz.goal==='mate'?`Da <b>jaque mate en ${pz.n}</b>.`
 function viewTema(m,arg){
  const id=typeof arg==='object'?arg.id:arg,from=typeof arg==='object'?arg.from:null;
  const tok=VIEW;const T=THEME_OF(id);const st=temaStats(id);P.tnivel=P.tnivel||{};
- const {board,body,under,nav}=trainerShell(m,T.icono+' '+T.nombre,()=>from?go('modulo',from):go('ejercicios'));
+ const {board,body,under,nav}=trainerShell(m,T.icono+' '+T.nombre,()=>goBack(()=>from?go('modulo',from):go('ejercicios')));
  let pz=null,runner=null,solved=false,failed=false,rated=false,penal=false;const tr=trec(id);
  const lvl=()=>P.tnivel[id]||1;
  nav.innerHTML=`<span class="pill" id="lvl"></span><span class="pill" id="rec"></span><span style="flex:1"></span><button class="btn sm" id="nx">Siguiente →</button>`;
@@ -2500,7 +2508,7 @@ function untilTomorrow(){const n=new Date(),t=new Date(n);t.setHours(24,0,0,0);c
 function viewDaily(m,opts){
  const tok=VIEW;const date=today();P.retos=P.retos||{};const done=P.retos[date];const practice=!!(opts&&opts.practica)||!!done;
  const list=retoPuzzles(date);let i=0,t0=Date.now();const res=done?done.res.slice():[null,null,null,null,null];const cur=practice?[null,null,null,null,null]:res;
- const {board,body,under,nav}=trainerShell(m,'📆 Reto diario',()=>go('retos'));
+ const {board,body,under,nav}=trainerShell(m,'📆 Reto diario',()=>goBack('retos'));
  nav.innerHTML=`<button class="btn ghost sm" id="sol">👀 Mostrar solución</button><span style="flex:1"></span><button class="btn sm" id="nx" disabled>Siguiente →</button>`;
  body.innerHTML=`<div class="btnrow" style="align-items:center"><span class="pill">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</span>${practice?'<span class="pill">🔁 Repaso (sin XP)</span>':'<span class="pill">⏱ <b id="tm">0:00</b></span>'}</div>
   <div class="dots" id="dts" style="gap:8px"></div><div class="btnrow" style="align-items:center" id="top"></div><div class="steptext" id="goal"></div><div id="fb"></div>
@@ -2544,7 +2552,7 @@ function viewDaily(m,opts){
 }
 function viewPuzzle(m,{cat,id}){
  const tok=VIEW;const C=CATS.find(c=>c.id===cat),list=PUZZLES[cat];let i=list.findIndex(p=>p.id===id);if(i<0)i=0;const pz=list[i];
- const {board,body,under,nav}=trainerShell(m,C.nombre,()=>go('ejercicios'));
+ const {board,body,under,nav}=trainerShell(m,C.nombre,()=>goBack('ejercicios'));
  const pos=new E.Pos(pz.fen);
  body.innerHTML=`<div class="btnrow" style="align-items:center">${turnHTML(pos.turn)}<span class="pill">${pz.tema}</span></div>
   <div class="steptext">${cat==='tactica'?'Encuentra la mejor jugada: ¡gana material!':`Da <b>jaque mate en ${cat==='mate1'?1:2}</b>.`}</div><div id="fb"></div>${cat!=='tactica'?MATE_AVISO:''}
@@ -2662,7 +2670,7 @@ function viewGame(m,{level,color,resume,tc,ev,undo,v960}){
  const clk={w:tc?tc.m*60000:0,b:tc?tc.m*60000:0};
  if(resumed&&tc&&P.cur.clk){clk.w=P.cur.clk.w;clk.b=P.cur.clk.b;}
  const tcTxt=tc?` · ⏱️ ${tc.m}${tc.i?'+'+tc.i:' min'}`:'';
- const {board,body,under}=trainerShell(m,`Nivel ${level} · ${bot.nombre}`,async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;clearInterval(timer);go('jugar');});
+ const {board,body,under}=trainerShell(m,`Nivel ${level} · ${bot.nombre}`,async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','Si sales ahora, la partida no contará.','Salir','Seguir jugando')))return;clearInterval(timer);goBack('jugar');});
  body.innerHTML=`<div class="botcard"><div class="be">${bot.emoji}</div><div><b>${bot.nombre}</b><div class="muted" style="font-size:.85rem">${bot.desc}${tcTxt}</div>${prac?'<div style="font-size:.8rem;font-weight:800;color:#b45309">↩️ Práctica con deshacer · no suma XP ni ELO</div>':''}${start?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div></div></div>
   <div class="movelist" id="ml"></div><div id="fb"></div>`;
  under.innerHTML=`<button class="btn ghost sm" id="hint"><span>💡 Pista (<b id="hn">3</b>)</span></button>${prac?'<button class="btn ghost sm" id="undo">↶ Deshacer</button>':''}<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="evt" title="Barra de ventaja">📊</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
@@ -2795,7 +2803,7 @@ function viewRush(m,arg){
  const duelId=arg.duel||null;let D=null,meK='a',opK='b',start=0;
  let surv=!!arg.surv;let dur=surv?0:(arg.dur||3),score=0,lives=surv?1:3,left=dur*60,running=false,finished=false,timerId=null,syncId=null,n=0,streak=0,bestStreak=0;let base=Date.now();
  const rec0={best:surv?(P.rushBestS||0):(P[RUSH_K(dur)]||0),streak:P.rushStreak||0,pz:(P.rt&&P.rt.problemas&&P.rt.problemas.max)||0};let liveRec=false,liveStreak=false;
- const {board,body,under}=trainerShell(m,duelId?'⚔️ Batalla de contrarreloj':'⚡ Contrarreloj',async()=>{if(running&&!(await confirmModal('¿Salir?','Se terminará la partida de contrarreloj.','Salir','Seguir')))return;clearInterval(timerId);clearInterval(syncId);if(running){running=false;if(duelId)RT.patch(`rush/${duelId}/${meK}`,{s:score,l:0,d:1}).catch(()=>{});}go(duelId?'online':'retos');});
+ const {board,body,under}=trainerShell(m,duelId?'⚔️ Batalla de contrarreloj':'⚡ Contrarreloj',async()=>{if(running&&!(await confirmModal('¿Salir?','Se terminará la partida de contrarreloj.','Salir','Seguir')))return;clearInterval(timerId);clearInterval(syncId);if(running){running=false;if(duelId)RT.patch(`rush/${duelId}/${meK}`,{s:score,l:0,d:1}).catch(()=>{});}goBack(duelId?'online':'retos');});
  const draw0=()=>{body.innerHTML=`<div class="rushhud"><div class="timer" id="tm">${surv?'♾️':dur+':00'}</div><div class="lives" id="lv">${surv?'':'❤️❤️❤️'}</div><div style="margin-left:auto;text-align:right"><div class="muted" style="font-weight:800;font-size:.8rem">ACIERTOS</div><div class="score" id="sc">0</div></div></div>
   ${duelId?'<div class="rushopp" id="op"></div>':''}<div class="btnrow" id="tb"></div><div class="steptext" id="goal">¡Rápido!</div><div id="fb"></div><div class="muted" style="font-weight:700">🏅 ${surv?'Récord de supervivencia':'Récord en '+dur+' min'}: ${rec0.best}</div>`;};draw0();
  const fb=()=>$('#fb',body);const setFb=(h,c)=>{const f=fb();if(f)f.innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';};
@@ -2960,7 +2968,7 @@ function initBack(){
   const mb=$$('.modalbg').pop();if(mb){if(mb._dismiss&&mb._close)mb._close(null);return;}
   const back=$('#back');
   if(back)back.click();
-  else if(P&&currentTab!=='inicio')go('inicio');
+  else if(P&&currentTab!=='inicio')goBack('inicio');
  });
 }
 function closeMenu(){const d=$('.drawerbg');if(d)d.remove();}
@@ -3029,7 +3037,7 @@ function viewLocal2(m,{wn,bn,tc,flip,v960}){
  const tok=VIEW;const start=v960?E.fen960():undefined;const pos=new E.Pos(start);let over=false;const sans=[];
  const clk={w:tc?tc.m*60000:0,b:tc?tc.m*60000:0};let last=Date.now();
  const names={w:wn,b:bn};
- const {board,body,under}=trainerShell(m,'👥 Partida entre dos',async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','La partida no se guardará.','Salir','Seguir jugando')))return;clearInterval(timer);go('jugar');});
+ const {board,body,under}=trainerShell(m,'👥 Partida entre dos',async()=>{if(!over&&pos.played.length>1&&!(await confirmModal('¿Salir de la partida?','La partida no se guardará.','Salir','Seguir jugando')))return;clearInterval(timer);goBack('jugar');});
  body.innerHTML=`<div class="botcard"><div class="be">👥</div><div><b>${esc(wn)} vs ${esc(bn)}</b><div class="muted" style="font-size:.85rem">${tc?`⏱️ ${tc.m}${tc.i?'+'+tc.i:' min'} · `:''}Mismo dispositivo · sin XP ni ELO</div>${start?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div></div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
  under.innerHTML=`<button class="btn ghost sm" id="undo">↶ Deshacer</button><button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="drw">🤝 Tablas</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
  const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
@@ -3238,9 +3246,10 @@ function explorerTree(){if(_xtree)return _xtree;const T=new Map();
   for(const san of ln.moves){const m=p.fromSan(san);if(!m)break;const nd=node(k);const u=E.uci(m);if(!nd.next.has(u))nd.next.set(u,{san:p.san(m),names:new Set(),ls:[]});const nx=nd.next.get(u);nx.names.add(ln.name);if(ln.mod)nx.ls.push(ln);
    p.play(m);k=bookKey(p);node(k).names.add(ln.name);}}
  _xtree=T;return T;}
+function bestArrow(r,q){try{const k=Object.keys(r.lines).sort()[0];const L=r.lines[k];const u=(Array.isArray(L.pv)?L.pv:String(L.pv).split(' '))[0];const mm=q.fromUci(u);if(mm&&CUR_BOARD){CUR_BOARD.arrows=[[mm.from,mm.to,'g']];CUR_BOARD.render();}}catch(e){}}
 function viewExplorer(m){
  const tok=VIEW;const T=explorerTree();let pos=new E.Pos();const sans=[];let seq=0,lastName='';
- const {board,body,under}=trainerShell(m,'📖 Explorador de aperturas',()=>go('laboratorio'));
+ const {board,body,under}=trainerShell(m,'📖 Explorador de aperturas',()=>goBack('laboratorio'));
  under.innerHTML='<button class="btn ghost sm" id="x0">⏮ Inicio</button><button class="btn ghost sm" id="x1">◀ Atrás</button><button class="btn ghost sm" id="xf">🔄 Girar</button>';
  board.orient='w';board.interactive=true;board.premoveOK=false;
  function play(mv){pos.play(mv);sans.push(mv);board.movable=pos.turn;board.set(pos,{last:mv,anim:true});playSound(pos,mv);draw();}
@@ -3248,9 +3257,10 @@ function viewExplorer(m){
  async function engine(){const my=++seq,box=$('#xsf',body);if(!box)return;
   if(!SF.ok){box.innerHTML='<p class="muted" style="margin:0">Stockfish no está disponible en este dispositivo.</p>';return;}
   box.innerHTML='<p class="muted" style="margin:0">Stockfish está pensando…</p>';
+  board.arrows=[];board.render();
   const fen=pos.fen(),turn=pos.turn;const r=await SF.go(fen,{ms:700,multipv:3,info:true});if(my!==seq||!alive(tok))return;
   if(!r||!r.lines){box.innerHTML='<p class="muted" style="margin:0">Sin jugadas.</p>';return;}
-  const q=new E.Pos(fen);
+  const q=new E.Pos(fen);bestArrow(r,q);
   box.innerHTML=Object.keys(r.lines).sort().map(k=>{const L=r.lines[k];const u=(Array.isArray(L.pv)?L.pv:String(L.pv).split(' '))[0];const mm=q.fromUci(u);if(!mm)return'';const san=q.san(mm);
    let cp=L.t==='cp'?L.v:(L.v>0?10000-L.v*10:-10000-L.v*10);if(turn==='b')cp=-cp;
    return `<button class="xmv" data-u="${u}"><b>${E.sanES(san)}</b><span class="pill" style="margin-left:auto">${evTxt(cp)}</span></button>`;}).join('');
@@ -3276,7 +3286,7 @@ function viewExplorer(m){
 /* ================= TABLERO DE ANÁLISIS LIBRE (pegar FEN o PGN, reproducir, Stockfish) ================= */
 function viewBoardAn(m){
  const tok=VIEW;let start;let line=[];let cur=0;let pos=new E.Pos();let seq=0;let engOn=true;
- const {board,body,under}=trainerShell(m,'🔍 Tablero de análisis',()=>go('laboratorio'));
+ const {board,body,under}=trainerShell(m,'🔍 Tablero de análisis',()=>goBack('laboratorio'));
  under.innerHTML='<button class="btn ghost sm" id="b0">⏮</button><button class="btn ghost sm" id="b1">◀</button><button class="btn sm" id="b2">▶</button><button class="btn ghost sm" id="b3">⏭</button><button class="btn ghost sm" id="bf">🔄 Girar</button>';
  board.orient='w';board.interactive=true;board.premoveOK=false;
  body.innerHTML=`<div class="card" style="padding:10px 12px"><div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:4px">PEGA UNA POSICIÓN (FEN) O UNA PARTIDA (PGN)</div><textarea id="tx" placeholder="Ej.: rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1&#10;o una partida: 1. e4 e5 2. Nf3 Nc6 …" style="width:100%;min-height:70px;padding:8px;border:2px solid var(--line);border-radius:10px;font-family:monospace;font-size:.82rem"></textarea>
@@ -3290,12 +3300,14 @@ function viewBoardAn(m){
  function pgn(){const p=new E.Pos(start);let s='',num=p.full,first=true;for(const u of line){const mv=p.fromUci(u);if(!mv)break;if(p.turn==='w')s+=num+'. ';else if(first)s+=num+'... ';s+=p.san(mv)+' ';if(p.turn==='b')num++;p.play(mv);first=false;}
   return (start?`[SetUp "1"]\n[FEN "${start}"]\n\n`:'')+s.trim()+' *';}
  async function engine(){const my=++seq,box=$('#sf',body);if(!box)return;
-  if(!engOn){box.innerHTML='<p class="muted" style="margin:0">Apagado.</p>';return;}
+  if(!engOn){board.arrows=[];board.render();box.innerHTML='<p class="muted" style="margin:0">Apagado.</p>';return;}
   if(!SF.ok){box.innerHTML='<p class="muted" style="margin:0">Stockfish no está disponible en este dispositivo.</p>';return;}
   const st=pos.status();if(st&&st!=='jaque'){box.innerHTML=`<p style="margin:0;font-weight:800">${{mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición'}[st]||''}</p>`;return;}
   box.innerHTML='<p class="muted" style="margin:0">Pensando…</p>';
+  board.arrows=[];board.render();
   const fen=pos.fen(),turn=pos.turn;const r=await SF.go(fen,{ms:900,multipv:3,info:true});if(my!==seq||!alive(tok))return;
   if(!r||!r.lines){box.innerHTML='<p class="muted" style="margin:0">Sin respuesta.</p>';return;}
+  bestArrow(r,new E.Pos(fen));
   box.innerHTML=Object.keys(r.lines).sort().map(k=>{const L=r.lines[k];const pv=Array.isArray(L.pv)?L.pv:String(L.pv).split(' ');const q=new E.Pos(fen);const sans=[];
    for(const u of pv.slice(0,7)){const mm=q.fromUci(u);if(!mm)break;sans.push(E.sanES(q.san(mm)));q.play(mm);}
    let cp=L.t==='cp'?L.v:(L.v>0?10000-L.v*10:-10000-L.v*10);if(turn==='b')cp=-cp;
@@ -3834,7 +3846,7 @@ function mistStats(){
 // ================= VISTA: ESCÁNER =================
 function viewScanner(m,arg){
  arg=arg||{};const tok=VIEW;const seed0=arg.seed!=null?arg.seed:(Date.now()%100000);const total=arg.total||5;
- const {board,body,under,nav}=trainerShell(m,'🔍 Escáner de amenazas',()=>arg.back?arg.back():go('ejercicios'));
+ const {board,body,under,nav}=trainerShell(m,'🔍 Escáner de amenazas',()=>arg.back?arg.back():goBack('ejercicios'));
  P.scan=P.scan||{n:0,perfect:0,rounds:0,miss:{risk:0,targets:0,move:0}};
  let n=0,pos,truth,sel,step,stars=0,tot=[],miss={risk:0,targets:0,move:0},busy=false;
  under.innerHTML='';
@@ -5078,7 +5090,7 @@ async function viewArena(m,{tid,ver}={}){const tok=VIEW;
   if($('#srch',m))$('#srch',m).onclick=()=>arenaSearch(true);
   if($('#stop',m))$('#stop',m).onclick=()=>arenaSearch(false);
   if($('#goplay',m))$('#goplay',m).onclick=()=>{const g=me.busy;enterGame(g);};
-  $('#back',m).onclick=()=>{if(me.wait)arenaSearch(false);go('torneos');};
+  $('#back',m).onclick=()=>{if(me.wait)arenaSearch(false);goBack('torneos');};
   if($('#wd',m))$('#wd',m).onclick=async()=>{if(await onlWithdraw(A.T))go('torneos');};};
  A.onSnap=draw;draw();
  let hbN=0;arenaHB(A,0).then(()=>{if(alive(tok))draw();});
