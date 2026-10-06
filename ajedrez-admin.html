@@ -93,8 +93,8 @@ details.box>div{padding:0 14px 14px}
 .proj .x{position:fixed;right:14px;top:14px}
 .sheetov{position:fixed;inset:0;background:#fff;z-index:70;overflow:auto;padding:12px}.sheetov .bar2{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:0;width:190mm;max-width:100%;margin:0 auto}
-.cd{border:1px dashed #888;padding:8mm 7mm;height:52mm;display:flex;flex-direction:column;justify-content:center;gap:2mm;page-break-inside:avoid}
-.cd b.t{font-size:11pt;color:#1f5a41}.cd .nm{font-size:13pt;font-weight:800}.cd .cr{font-size:15pt;font-family:ui-monospace,Consolas,monospace;font-weight:800;letter-spacing:.06em}.cd .u{font-size:8.5pt;color:#555}
+.cd{border:1px dashed #888;padding:1.5mm 3mm;height:14.5mm;display:flex;flex-direction:column;justify-content:center;gap:.6mm;page-break-inside:avoid;overflow:hidden;line-height:1.15}
+.cd .nm{font-size:10.5pt;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cd .gp{font-weight:600;color:#555}.cd .cl{font-size:8.5pt;color:#555;white-space:nowrap}.cd .cr{font-size:11pt;color:#000;font-family:ui-monospace,Consolas,monospace;font-weight:800;letter-spacing:.03em}
 @media print{body>*:not(.sheetov){display:none!important}.sheetov{position:static;padding:0}.sheetov .bar2{display:none}.cards{width:190mm}@page{size:A4;margin:10mm}}
 @media(max-width:640px){.cards{grid-template-columns:1fr}}
 @media(min-width:700px){.tiles{grid-template-columns:repeat(3,1fr)}}
@@ -135,6 +135,7 @@ const FB=(()=>{
   signAnon:()=>post(AUTH+'signUp'+K,{returnSecureToken:true}).then(pack),
   signUp:(a,pw)=>post(AUTH+'signUp'+K,{email:emailOf(a),password:pw,returnSecureToken:true}).then(pack),
   delAccount:idToken=>post(AUTH+'delete'+K,{idToken}),
+  setAlias:(idToken,a)=>post(AUTH+'update'+K,{idToken,email:emailOf(a),returnSecureToken:true}).then(pack),
   setPass:(idToken,pw)=>post(AUTH+'update'+K,{idToken,password:pw,returnSecureToken:true}).then(pack),
   async login(a,pw){S.user=await api.signIn(a,pw);save();return S.user;},
   restore(u){S.user=u;},
@@ -358,7 +359,7 @@ function vInicio(m){const h=new Date().getHours(),sal=h<14?'¡Buenos días!':h<2
  if($('#rqc',m))$('#rqc',m).onclick=()=>{const t=act[0];nav('torneos',t?t.id:null);};}
 /* ---------- PDF de claves ---------- */
 function printCards(list){const ov=document.createElement('div');ov.className='sheetov';
- ov.innerHTML=`<div class="bar2"><button class="btn" id="pp">🖨️ Imprimir / PDF</button><button class="btn ghost" id="px">Cerrar</button><span class="muted" style="align-self:center">Elige «Guardar como PDF».</span></div><div class="cards">${list.map(u=>`<div class="cd"><b class="t">♞ Ajedrez Siurot</b><div class="nm">${esc(nm(u))}${u.grupo?` · ${esc(u.grupo)}`:''}</div><div>Usuario: <span class="cr">${esc(u.alias)}</span></div><div>Clave: <span class="cr">${esc(u.clave)}</span></div><div class="u">${esc(A.cfg.url)}</div></div>`).join('')}</div>`;
+ ov.innerHTML=`<div class="bar2"><button class="btn" id="pp">🖨️ Imprimir / PDF</button><button class="btn ghost" id="px">Cerrar</button><span class="muted" style="align-self:center">Elige «Guardar como PDF».</span></div><div class="cards">${list.map(u=>`<div class="cd"><div class="nm">${esc(nm(u))}${u.grupo?` <span class="gp">· ${esc(u.grupo)}</span>`:''}</div><div class="cl">Usuario <span class="cr">${esc(u.alias)}</span> &nbsp;Clave <span class="cr">${esc(u.clave)}</span></div></div>`).join('')}</div>`;
  document.body.appendChild(ov);$('#px',ov).onclick=()=>ov.remove();$('#pp',ov).onclick=()=>window.print();}
 /* ---------- alumnado ---------- */
 const csvUsers=l=>csv([['Usuario','Nombre','Grupo','Clave','Estado','Último acceso'],...l.map(u=>[u.alias,u.nombre,u.grupo,u.clave,u.ultimoLogin?'activo':'sin estrenar',fdate(u.ultimoLogin)])]);
@@ -378,20 +379,23 @@ function vUsers(m){
  const na=active().length;
  m.innerHTML=`<div class="bar"><input id="q" type="search" placeholder="🔎 Buscar alumno o grupo…" value="${esc(A.q)}" autocomplete="off"><button class="ib2" id="more" aria-label="Más opciones">⋯</button></div>
  <div class="seg">${[['','Todos'],['act','✔ Activos'],['pen','🎟 Sin entrar']].map(([k,t])=>`<button data-e="${k}" class="${A.est===k?'on':''}">${t}</button>`).join('')}</div>
- <p class="muted" style="margin:0 4px 10px">${A.users.length} usuarios · ${na} han entrado · <span id="nsel">${A.sel.size?A.sel.size+' marcados':'toca un grupo para verlo'}</span></p><div id="ul"></div>`;
+ <p class="muted" style="margin:0 4px 10px">${A.users.length} usuarios · ${na} han entrado · <span id="nsel">${A.sel.size?A.sel.size+' marcados':'toca un grupo para verlo'}</span></p><div id="selbar"></div><div id="ul"></div>`;
  const q=$('#q',m);q.oninput=()=>{A.q=q.value;drawUsers(m);};
  $$('[data-e]',m).forEach(b=>b.onclick=()=>{A.est=b.dataset.e;vUsers(m);});
  $('#more',m).onclick=async()=>{const l=filtered();const s=l.filter(u=>A.sel.has(u.id));
-  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'ng',e:'🏷️',t:'Crear grupo'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
-  if(k==='pdfl')l.length?printCards(l):toast('No hay nadie en la lista',1);if(k==='pdfs')printCards(s);if(k==='clr'){A.sel.clear();drawUsers(m);}
+  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},s.length&&{k:'mdel',e:'🗑',t:`Borrar los marcados (${A.sel.size})…`,cls:'red'},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'ng',e:'🏷️',t:'Crear grupo'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
+  if(k==='pdfl')l.length?printCards(l):toast('No hay nadie en la lista',1);if(k==='pdfs')printCards(s);if(k==='clr'){A.sel.clear();drawUsers(m);}if(k==='mdel')delMarked();
   if(k==='csv')download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');if(k==='alta')nav('alta');if(k==='ng'){const g=await askNewGroup();if(g){A.open.add(g);drawUsers(m);}}if(k==='bdel')bulkDel('');};
  drawUsers(m);}
-function drawUsers(m){const box=$('#ul',m);if(!box)return;const l=filtered();
+function selBar(m){const b=$('#selbar',m);if(!b)return;const n=A.sel.size;
+ b.innerHTML=n?`<div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding:10px 12px;position:sticky;top:0;z-index:5"><b style="flex:1;min-width:90px">${n} marcado${n>1?'s':''}</b><button class="btn sm ghost" id="sbp">🖨️ PDF</button><button class="btn sm red" id="sbd">🗑 Borrar</button><button class="btn sm ghost" id="sbc">☐ Quitar</button></div>`:'';
+ if(n){$('#sbp',b).onclick=()=>printCards(A.users.filter(u=>A.sel.has(u.id)));$('#sbd',b).onclick=delMarked;$('#sbc',b).onclick=()=>{A.sel.clear();drawUsers(m);};}}
+function drawUsers(m){const box=$('#ul',m);if(!box)return;selBar(m);const l=filtered();
  const gs={};l.forEach(u=>(gs[gOf(u)]=gs[gOf(u)]||[]).push(u));if(!A.q&&!A.est)A.grupos.forEach(g=>{gs[g]=gs[g]||[];});const keys=Object.keys(gs).sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
  const row=u=>`<div class="li" data-u="${u.id}"><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}><div class="t"><b>${esc(nm(u))}</b><span><span class="mono">${esc(u.alias)}</span> · clave <span class="mono">${esc(u.clave)}</span></span></div><span title="${u.ultimoLogin?'Ha entrado: '+fdate(u.ultimoLogin):'Aún no ha entrado'}">${u.ultimoLogin?'✔️':'🎟'}</span></div>`;
  box.innerHTML=keys.map(g=>`<details class="grp" data-g="${esc(g)}" ${A.q||A.open.has(g)?'open':''}><summary><span class="grow">${esc(g)} <span class="pill">${gs[g].length}</span></span><button class="ib2" data-gm="${esc(g)}" aria-label="Opciones del grupo">⋯</button></summary>${gs[g].map(row).join('')||'<p class="muted" style="padding:10px 14px;margin:0">Grupo vacío: pulsa ⋯ → «Añadir alumnos a este grupo».</p>'}</details>`).join('')||`<div class="card empty">${A.users.length?'Nadie coincide con la búsqueda.':'Aún no hay alumnado. Pulsa ⋯ → Dar de alta.'}</div>`;
  $$('details.grp',box).forEach(d=>d.ontoggle=()=>{if(A.q)return;d.open?A.open.add(d.dataset.g):A.open.delete(d.dataset.g);});
- const ns=()=>{const e=$('#nsel',m);if(e)e.textContent=A.sel.size?A.sel.size+' marcados':'toca un grupo para verlo';};
+ const ns=()=>{const e=$('#nsel',m);if(e)e.textContent=A.sel.size?A.sel.size+' marcados':'toca un grupo para verlo';selBar(m);};
  $$('.ck',box).forEach(c=>{c.onclick=e=>e.stopPropagation();c.onchange=()=>{c.checked?A.sel.add(c.dataset.id):A.sel.delete(c.dataset.id);ns();};});
  $$('[data-gm]',box).forEach(b=>b.onclick=async e=>{e.preventDefault();e.stopPropagation();const g=b.dataset.gm,gl=A.users.filter(u=>gOf(u)===g);
   const k=await sheet(`Grupo ${esc(g)} · ${gl.length} alumnos`,gl.length?[{k:'gp',e:'📊',t:'Progreso del grupo'},{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'pdf',e:'🖨️',t:'PDF de claves del grupo'},{k:'sel',e:'☑',t:'Marcar a todo el grupo'},g!=='(sin grupo)'&&{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'del',e:'🗑',t:'Borrar el grupo entero…',cls:'red'}]:[{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'rm',e:'🗑',t:'Quitar este grupo vacío',cls:'red'}]);
@@ -402,22 +406,26 @@ function drawUsers(m){const box=$('#ul',m);if(!box)return;const l=filtered();
   if(k==='gp')return groupProg(g,gl);
   if(k==='pdf')printCards(gl);if(k==='sel'){gl.forEach(u=>A.sel.add(u.id));drawUsers(m);ns();}if(k==='add'){A.alta='grupo';A.altaG=g==='(sin grupo)'?'':g;nav('alta');}if(k==='del')bulkDel(g);});
  $$('[data-u]',box).forEach(r=>r.onclick=async()=>{const u=A.users.find(x=>x.id===r.dataset.u);if(!u)return;
-  const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'prog',e:'📊',t:'Ver su progreso'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'ed',e:'✏️',t:'Editar nombre o grupo'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
+  const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'prog',e:'📊',t:'Ver su progreso'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'ed',e:'✏️',t:'Editar jugador'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
   if(k==='prog')showProg(u.id,nm(u));else if(k==='card')printCards([u]);else if(k)userAct(k,u);});}
 async function bulkDel(g){
  const groups=[...new Set(A.users.map(gOf))].sort((a,b)=>a.localeCompare(b,'es'));if(!groups.length)return toast('No hay grupos',1);
  if(!g){const r=await askM('🗑 Borrar un grupo entero',`<p>Elige el grupo que quieres borrar:</p><select>${groups.map(x=>`<option value="${esc(x)}">${esc(x)} (${A.users.filter(u=>gOf(u)===x).length})</option>`).join('')}</select>`,'Continuar');if(!r)return;g=r[0];}
  const list=A.users.filter(u=>gOf(u)===g);if(!list.length)return toast('Ese grupo está vacío',1);
- if(!await confirmM('⚠️ Aviso 1 de 2',`Vas a eliminar a <b>${list.length} usuarios</b> del grupo <b>${esc(g)}</b>.<br><br>Se borran sus cuentas, sus claves y su puntuación del salón de la fama.`,'Continuar',true))return;
- const r2=await askM('🛑 Aviso 2 de 2',`<p><b>Esta acción NO se puede deshacer.</b> Se borrarán ${list.length} usuarios de «${esc(g)}».</p><p>Para confirmar, escribe <b>BORRAR</b>:</p><input autocomplete="off" autocapitalize="characters">`,'Borrar grupo');
+ return delUsers(list,`del grupo <b>${esc(g)}</b>`,`de «${esc(g)}»`,'Borrar grupo',()=>{A.open.delete(g);A.grupos=A.grupos.filter(x=>x!==g);saveGroups().catch(()=>{});},`Grupo «${g}» eliminado`);}
+/* borra varios usuarios (con doble aviso): grupo entero o solo los marcados */
+async function delUsers(list,de,de2,btn,after,okMsg){
+ if(!await confirmM('⚠️ Aviso 1 de 2',`Vas a eliminar a <b>${list.length} usuario${list.length>1?'s':''}</b> ${de}.<br><br>Se borran sus cuentas, sus claves y su puntuación del salón de la fama.${list.length<=12?'<br><br>'+list.map(u=>esc(nm(u))).join(', '):''}`,'Continuar',true))return;
+ const r2=await askM('🛑 Aviso 2 de 2',`<p><b>Esta acción NO se puede deshacer.</b> Se borrarán ${list.length} usuario${list.length>1?'s':''} ${de2}.</p><p>Para confirmar, escribe <b>BORRAR</b>:</p><input autocomplete="off" autocapitalize="characters">`,btn);
  if(!r2||r2[0].trim().toUpperCase()!=='BORRAR')return r2?toast('No has escrito BORRAR: no se ha borrado nada',1):0;
  let n=0,fail=0;
  for(const u of list){toast(`Borrando ${++n} de ${list.length}…`);
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
    await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}
    A.users=A.users.filter(x=>x.id!==u.id);A.hof=A.hof.filter(x=>x.id!==u.id);A.sel.delete(u.id);}catch(e){fail++;}}
- A.open.delete(g);A.grupos=A.grupos.filter(x=>x!==g);saveGroups().catch(()=>{});
- toast(fail?`Borrados ${list.length-fail}; fallaron ${fail}`:`Grupo «${g}» eliminado (${list.length})`,!!fail);render();}
+ if(after)after();
+ toast(fail?`Borrados ${list.length-fail}; fallaron ${fail}`:`${okMsg||'Eliminados'} (${list.length})`,!!fail);render();}
+const delMarked=()=>{const l=A.users.filter(u=>A.sel.has(u.id));if(!l.length)return toast('No hay nadie marcado',1);return delUsers(l,'<b>marcados</b>','marcados','Borrar marcados',null,'Usuarios eliminados');};
 async function userAct(a,u){
  if(a==='del'){if(!await confirmM('Eliminar usuario',`¿Eliminar a <b>${esc(nm(u))}</b> (${esc(u.alias)})? Se borra su cuenta y su puntuación del salón de la fama.`,'Eliminar',true))return;
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
@@ -426,9 +434,17 @@ async function userAct(a,u){
  if(a==='rs'){if(!await confirmM('Nueva clave',`Se generará una clave nueva para <b>${esc(nm(u))}</b>. La anterior dejará de funcionar.`,'Generar'))return;
   try{const nc=genClave();const s=await FB.signIn(u.alias,u.clave);await FB.setPass(s.idToken,nc);await FB.set('users/'+u.id,{clave:nc},['clave']);u.clave=nc;
    await modal({title:'🔑 Nueva clave',html:`<p style="text-align:center">Usuario: <span class="mono">${esc(u.alias)}</span><br>Clave: <span class="mono" style="font-size:1.6rem">${nc}</span></p>`,buttons:[{t:'🖨️ Tarjeta',cls:'ghost',v:()=>{printCards([u]);return 1;}},{t:'Cerrar',v:1}]});render();}catch(e){toast(FB.msg(e),1);}}
- if(a==='ed'){const r=await askM('✏️ Editar',`<label class="f">Nombre</label><input value="${esc(u.nombre)}"><label class="f">Grupo</label>${groupSelect('eg',u.grupo)}`,'Guardar',bg=>groupBind(bg,'eg'));if(!r)return;
-  if(r[1]==='__new'){const g=await newGroup(r[2]);if(!g)return;r[1]=g;}
-  try{await FB.set('users/'+u.id,{nombre:r[0].trim(),grupo:r[1].trim()},['nombre','grupo']);u.nombre=r[0].trim();u.grupo=r[1].trim();toast('Guardado');render();}catch(e){toast(FB.msg(e),1);}}}
+ if(a==='ed'){const r=await askM('✏️ Editar jugador',`<label class="f">Nombre</label><input value="${esc(u.nombre)}" maxlength="30" autocomplete="off"><label class="f">Usuario (para entrar)</label><input value="${esc(u.alias)}" maxlength="24" autocomplete="off" autocapitalize="none"><label class="f">Grupo</label>${groupSelect('eg',u.grupo)}<p class="muted" style="margin:10px 0 0;font-size:.85rem">Si cambias el usuario, el alumno tendrá que entrar de nuevo con el nuevo. La clave no cambia.</p>`,'Guardar',bg=>groupBind(bg,'eg'));if(!r)return;
+  const nombre=r[0].trim(),alias=r[1].trim().toLowerCase();let grupo=r[2];
+  if(!nombre)return toast('El nombre no puede estar vacío',1);
+  if(!/^[a-z0-9]{2,24}$/.test(alias))return toast('El usuario solo puede tener letras sin tilde y números (2 a 24)',1);
+  if(alias!==u.alias&&A.users.some(x=>x.id!==u.id&&x.alias===alias))return toast('Ese usuario ya existe',1);
+  if(grupo==='__new'){const g=await newGroup(r[3]);if(!g)return;grupo=g;}grupo=String(grupo||'').trim();
+  try{
+   if(alias!==u.alias){const s=await FB.signIn(u.alias,u.clave);await FB.setAlias(s.idToken,alias);}
+   await FB.set('users/'+u.id,{nombre,alias,grupo},['nombre','alias','grupo']);
+   if(A.hof.some(x=>x.id===u.id)){try{await FB.set('hof/'+u.id,{nombre,alias,grupo},['nombre','alias','grupo']);}catch(e){}A.hof.forEach(x=>{if(x.id===u.id){x.nombre=nombre;x.alias=alias;x.grupo=grupo;}});}
+   u.nombre=nombre;u.alias=alias;u.grupo=grupo;toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}}}
 /* ---------- alta ---------- */
 function vAlta(m){const one=A.alta!=='grupo';const g0=A.altaG||'';A.altaG='';
  m.innerHTML=`<div class="seg"><button data-m="uno" class="${one?'on':''}">👤 Un alumno</button><button data-m="grupo" class="${one?'':'on'}">👥 Un grupo</button></div>
