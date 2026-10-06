@@ -277,6 +277,7 @@ const fhora=ms=>ms?new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minut
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
 const A={grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
+window.ADMIN_A=A;
 const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
 const TT=Object.fromEntries(TABS.map(([k,e,t])=>[k,t]));
 const nm=u=>u.nombre||u.alias;

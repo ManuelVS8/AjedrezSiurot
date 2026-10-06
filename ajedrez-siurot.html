@@ -2095,7 +2095,7 @@ function viewHome(m){
  const rk=RANKS[rankIdx(P.xp)];const mdone=(ensureDaily(),P.daily.ms.filter(x=>x.done).length);
  m.innerHTML=`<div class="card brand"><img src="${LOGO_URL}" alt="Ajedrez Siurot"><div><h1>Ajedrez Siurot</h1><p>CEIP Manuel Siurot · La Palma del Condado</p></div></div>
  <div class="hello2"><div class="bgk">♞</div><div class="hl"><h2>${hi}, ${esc(P.name)}! ${P.avatar}</h2><p>${rk.icono} ${rk.nombre}</p></div><div class="hchips"><span class="hchip">⭐ ${P.xp} XP</span><span class="hchip">♟ ELO ${P.elo||800}</span><span class="hchip">🔥 ${P.days.streak||0}</span></div></div>
- <div id="tcard"></div>
+ <div id="tcard"></div><div id="tkcard"></div>
  <div class="quick">
   <button class="qbtn" data-go="jugar"><div class="qi">🤖</div><b>Jugar</b><span>Contra la máquina</span></button>
   <button class="qbtn" data-go="online" style="border-color:#2563eb;background:#eef4ff"><div class="qi">🌐</div><b>Jugar online</b><span>Retos y compañeros conectados</span></button>
@@ -2107,7 +2107,7 @@ function viewHome(m){
   <button class="qbtn" data-go="laboratorio" style="border-color:#2563eb"><div class="qi">🔬</div><b>Análisis y aperturas</b><span>Explorador y tablero de análisis</span></button>
  </div>
  <div class="insig"><img src="https://raw.githubusercontent.com/ManuelVS8/AjedrezSiurot/refs/heads/main/Insignia.png" alt="Insignia: centro distinguido en ajedrez educativo (programa aulaDjaque)" loading="lazy" width="250" height="248" onerror="this.parentNode.remove()"></div>`;
- $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));
+ $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));try{tkBanner();}catch(e){}
  $('#qmis',m).onclick=()=>modal({title:'🎯 Misiones de hoy',html:missionsHTML(),buttons:[{t:'Cerrar',cls:'ghost'}]});
  homeOnline(m,VIEW);
 }
@@ -2877,7 +2877,7 @@ function eloCard(){
 function viewProgress(m){
  const r=rankIdx(P.xp),nx=RANKS[r+1];const wins=Object.values(P.games).reduce((a,g)=>a+g.w,0),played=Object.values(P.games).reduce((a,g)=>a+g.w+g.d+g.l,0);
  const lessonsDone=Object.keys(P.lessons).length,totalL=MODULES.reduce((a,md)=>a+md.lecciones.length,0);
- m.innerHTML=`<div class="sectitle"><h2>📈 Mi progreso</h2><div class="btnrow"><button class="btn ghost sm" id="mrep">📤 Informe para el profe</button></div></div>
+ m.innerHTML=`<div class="sectitle"><h2>📈 Mi progreso</h2></div>
  <div class="grid g2">
   <div class="card" style="display:flex;gap:16px;align-items:center"><div style="font-size:4rem">${P.avatar}</div><div style="flex:1"><h2>${esc(P.name)}</h2><div style="font-weight:800;margin:4px 0">${RANKS[r].icono} ${RANKS[r].nombre} · ${P.xp} XP</div>
    <div class="pbar"><i style="width:${nx?Math.round((P.xp-RANKS[r].xp)/(nx.xp-RANKS[r].xp)*100):100}%;background:var(--acc)"></i></div><div class="muted" style="font-size:.85rem;font-weight:700;margin-top:4px">${nx?`Te faltan <b>${nx.xp-P.xp} XP</b> para ser <b>${nx.nombre}</b>`:'¡Has llegado al rango máximo!'}</div></div></div>
@@ -2899,7 +2899,6 @@ function viewProgress(m){
  </div>
  <div class="card" style="margin-top:16px"><h3 style="margin-bottom:12px">🏅 Insignias (${Object.keys(P.badges).length}/${BADGES.length})</h3><div class="badges">${BADGES.map(b=>`<div class="badge ${P.badges[b.id]?'':'off'}"><div class="bi">${b.icono}</div><b>${b.nombre}</b><small>${b.desc}</small></div>`).join('')}</div></div>
  <div class="card" style="margin-top:16px"><h3>🗂️ Rangos</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">${RANKS.map((k,i)=>`<span class="pill" style="font-size:.95rem;padding:6px 12px;${i<=r?'background:#fbe3a8':''}">${k.icono} ${k.nombre} · ${k.xp}</span>`).join('')}</div></div>`;
- $('#mrep',m).onclick=showMyReport;
 }
 
 // ================= PERFILES Y AJUSTES =================
@@ -2933,7 +2932,7 @@ function newProfileModal(){
  inp.addEventListener('keydown',e=>{if(e.key==='Enter')createBtn.click();});
  pr.then(v=>{if(!v)return;const p=newProfile(inp.value.trim(),av);DB.profiles[p.id]=p;save();selectProfile(p.id);toast(`¡Bienvenido/a, ${esc(p.name)}! ${p.avatar}`);});
 }
-function selectProfile(id){DB.current=id;P=DB.profiles[id];P.elo=P.elo||800;P.eloHist=P.eloHist||[P.elo];P.eloMax=P.eloMax||P.elo;P.eloBy=P.eloBy||{};P.eloN=P.eloN||0;save();checkStreak();ensureDaily();renderHeader();go('inicio');setTimeout(maybePending,500);}
+function selectProfile(id){DB.current=id;P=DB.profiles[id];P.elo=P.elo||800;P.eloHist=P.eloHist||[P.elo];P.eloMax=P.eloMax||P.elo;P.eloBy=P.eloBy||{};P.eloN=P.eloN||0;save();checkStreak();ensureDaily();renderHeader();go('inicio');}
 function showSettings(){
  const S=DB.settings;const row=(k,t,d)=>`<div class="setrow"><div>${t}${d?`<div class="muted" style="font-size:.8rem;font-weight:700">${d}</div>`:''}</div><button class="switch ${S[k]?'on':''}" data-k="${k}"></button></div>`;
  const pcs=Object.keys(PIECESETS).map(k=>`<button class="psel ${S.pieces===k?'on':''}" data-p="${k}" title="${PIECENAMES[k]}"><span><img src="${pieceURL(k,'wN')}" alt=""><img src="${pieceURL(k,'bQ')}" alt=""></span><small>${PIECENAMES[k]}</small></button>`).join('')+`<button class="psel ${S.pieces==='unicode'?'on':''}" data-p="unicode" title="Texto"><span style="font-size:2rem;line-height:1">♘♛</span><small>Simples</small></button>`;
@@ -3000,12 +2999,12 @@ function boot(){
   try{applyLook();}catch(e){}
   const mm=document.querySelector('main');
   if(!a||a.email!==FBC.admin){mm.innerHTML='<div class="card" style="margin:20px;text-align:center">🔒 Esta parte es solo para el profesor.<br>Ábrela desde la app de administración.</div>';return;}
+  FB.restore(a);FB.S.onChange=u=>{try{u?localStorage.setItem('adm',JSON.stringify(u)):localStorage.removeItem('adm');}catch(e){}};
   PROFE=true;AULA_OK=true;teacherView(mm,'tareas');return;}
  if(/^#tv/.test(location.hash)){const tid=decodeURIComponent((location.hash.split('=')[1]||''));setTimeout(()=>openTV({tid}),200);}const hl=document.getElementById('hlogo');if(hl)hl.src=LOGO_URL;hideSplash();initBack();$('#burger').onclick=openMenu;
  $('#tabs').innerHTML=TABS.map(([id,ic,t])=>`<button data-tab="${id}">${ic} ${t}</button>`).join('');
  $$('#tabs button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
  $('.logo').onclick=()=>P&&go('inicio');
- takeHashTask();window.addEventListener('hashchange',()=>{if(takeHashTask()&&P)maybePending();});
  initWorker();applyLook();setTimeout(()=>SF.init(),600);initPWA();
  if(onlLogged()&&!ONL.acc.guest){selectProfile(accountProfile().id);}
  else if(DB.current&&DB.profiles[DB.current]){selectProfile(DB.current);}
@@ -4037,33 +4036,13 @@ function mistTrain(m){
  }
  card();
 }
-// ================= MODO AULA (sin servidor): tareas por enlace/QR, informes, panel del profe =================
-const b64e=s=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-const b64d=s=>{s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return decodeURIComponent(escape(atob(s)));};
-const codeSum=s=>hash('siurot'+s).toString(36).slice(-4).padStart(4,'0');
-function mkCode(kind,obj){const j=b64e(JSON.stringify(obj));return `SIU-${kind}.${j}.${codeSum(j)}`;}
-function readCodes(txt){
- const out=[];const re=/SIU-([A-Z])\.([A-Za-z0-9_-]+)\.([a-z0-9]{4})/g;let m;
- while((m=re.exec(String(txt||'')))){
-  if(codeSum(m[2])!==m[3]){out.push({bad:true});continue;}
-  try{out.push({kind:m[1],data:JSON.parse(b64d(m[2]))});}catch(e){out.push({bad:true});}
- }
- return out;
-}
+// ================= AULA: tareas que el profe envía al alumnado (Realtime Database) + panel del profe (fichas, torneos) =================
 function aulaDB(){DB.aula=DB.aula||{};const a=DB.aula;a.pin=a.pin||null;a.tareas=a.tareas||[];a.informes=a.informes||{};a.entregas=a.entregas||[];a.torneos=a.torneos||[];return a;}
 let AULA_OK=false,PROFE=false;
 /* el panel del profe solo se abre desde la app de administración (ajedrez-siurot.html#profe con la sesión del admin) */
 const aulaGo=o=>PROFE?teacherView(document.querySelector('main'),o.sec,o):go('aula',o);
 const nkey=n=>String(n||'').trim().toLowerCase();
-const baseURL=()=>location.href.split('#')[0].split('?')[0];
 const rid=()=>Math.random().toString(36).slice(2,8);
-// ---------- QR ----------
-function qrSVG(text,cell){
- try{const q=qrcode(0,'M');q.addData(text);q.make();const n=q.getModuleCount(),m=2;let p='';
-  for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(q.isDark(r,c))p+=`M${c+m},${r+m}h1v1h-1z`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n+m*2} ${n+m*2}" shape-rendering="crispEdges" style="width:${cell||300}px;max-width:100%;height:auto;background:#fff;border-radius:8px"><rect width="100%" height="100%" fill="#fff"/><path d="${p}" fill="#000"/></svg>`;
- }catch(e){return null;}
-}
 function projectOverlay(html){
  const o=document.createElement('div');o.className='projov';o.innerHTML=`<div class="pj">${html}</div><button class="btn" id="pjx" style="position:fixed;top:14px;right:14px">✕ Cerrar</button>`;
  document.body.appendChild(o);const close=()=>o.remove();o.querySelector('#pjx').onclick=close;o.addEventListener('pointerdown',e=>{if(e.target===o)close();});
@@ -4071,118 +4050,91 @@ function projectOverlay(html){
  try{o.requestFullscreen&&o.requestFullscreen();}catch(e){}
  return o;
 }
-// ---------- PIN ----------
-function askPin(title,msg,optional){
- return new Promise(res=>{
-  const id='pn'+rid();
-  modal({title,html:`<p class="muted" style="margin:0 0 8px">${msg||''}</p><input id="${id}" type="password" inputmode="numeric" maxlength="8" autocomplete="off" style="width:100%;padding:12px;font-size:1.4rem;text-align:center;letter-spacing:.4em;border:2px solid var(--line);border-radius:12px">`,buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:'Aceptar',v:true}]}).then(ok=>res(ok?(window.__pin||''):null));
-  const el=document.getElementById(id);window.__pin='';if(el){el.oninput=()=>{window.__pin=el.value;};el.onkeydown=e=>{if(e.key==='Enter'){window.__pin=el.value;const b=el.closest('.modal').querySelector('.btnrow').lastChild;b.click();}};setTimeout(()=>el.focus(),60);}
- });
-}
-async function aulaGate(){
- const A=aulaDB();if(AULA_OK)return true;
- if(!A.pin){
-  const v=await askPin('🔒 Panel del profesor','Crea un PIN (4 a 8 números) para que el alumnado no entre en tu panel. Déjalo vacío para no usar PIN.',true);
-  if(v===null)return false;if(v){A.pin=hash(v+'siurot');save();toast('🔒 PIN creado');}
-  AULA_OK=true;return true;
- }
- const v=await askPin('🔒 PIN del profesor','Escribe tu PIN.');
- if(v===null)return false;
- if(hash(v+'siurot')===A.pin){AULA_OK=true;return true;}
- sound('bad');
- const r=await modal({title:'❌ PIN incorrecto',html:'<p>Ese PIN no es correcto.</p>',buttons:[{t:'He olvidado el PIN',cls:'ghost',v:'f'},{t:'Aceptar',v:'o'}]});
- if(r==='f'&&await confirmModal('¿Borrar el panel?','Se borrarán el PIN, las tareas, los informes y los torneos del panel. <b>No</b> se borra el progreso de los alumnos.','Borrar el panel','Cancelar',true)){DB.aula={};aulaDB();save();toast('🧹 Panel reiniciado');}
- return false;
-}
-// ---------- informe del alumno ----------
-function reportObj(){
- const wins=Object.values(P.games||{}).reduce((a,g)=>a+g.w,0),played=Object.values(P.games||{}).reduce((a,g)=>a+g.w+g.d+g.l,0);
- const ms=P.mistStat||{};const top=Object.keys(ms).sort((a,b)=>ms[b]-ms[a]).slice(0,2);
- return {n:P.name,av:P.avatar,xp:P.xp,rk:RANKS[rankIdx(P.xp)].nombre,elo:P.elo||800,ls:Object.keys(P.lessons||{}).length,lt:MODULES.reduce((a,md)=>a+md.lecciones.length,0),
-  ps:Object.keys(P.puzzles||{}).length+temasTotal(),gw:wins,gp:played,bd:Object.keys(P.badges||{}).length,st:(P.days&&P.days.streak)||0,
-  sr:(P.scan&&P.scan.rounds)||0,sp:(P.scan&&P.scan.perfect)||0,mt:top,md:P.mistDone||0,d:today()};
-}
-async function showMyReport(){
- const code=mkCode('R',reportObj());
- const id='rc'+rid();
- modal({title:'📤 Mi informe para el profe',html:`<p class="muted" style="margin:0 0 8px">Copia este código y pégalo en la tarea de Classroom (o dáselo a tu profe). Resume tu progreso; no incluye datos personales.</p><textarea id="${id}" readonly style="width:100%;min-height:110px;padding:8px;font-family:monospace;font-size:.75rem;border:2px solid var(--line);border-radius:10px">${code}</textarea>`,buttons:[{t:'Cerrar',cls:'ghost',v:false},{t:'📋 Copiar código',v:true}],dismiss:true}).then(()=>{});
- const bg=$$('.modalbg').pop();const row=bg.querySelector('.modal > .btnrow');const cp=row.lastChild;
- cp.onclick=async e=>{e.stopImmediatePropagation();toast((await copyText(code))?'📋 Código copiado':'No se pudo copiar: selecciona el texto');};
-}
+
 // ---------- tareas: lado alumno ----------
-let PENDING_T=null;
-function takeHashTask(){
- const m=/#t=(SIU-T\.[A-Za-z0-9_.-]+)/.exec(location.hash||'');
- if(m){PENDING_T=m[1];try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}return true;}
- return false;
-}
-function maybePending(){
- if(!PENDING_T||!P)return;const c=readCodes(PENDING_T);PENDING_T=null;
- if(!c.length||c[0].bad||c[0].kind!=='T'){toast('❌ El enlace de la tarea no es válido');return;}
- taskIntro(c[0].data);
-}
-function taskLabel(t){
- if(t.t==='tema'){const T=THEME_OF(t.th);return `${T.icono} ${t.n} ejercicios de ${T.nombre}`;}
- if(t.t==='lec'){const md=MODULES.find(x=>x.id===t.mod),l=md&&md.lecciones.find(x=>x.id===t.l);return `📚 Lección: ${l?l.titulo:'?'}`;}
- if(t.t==='esc')return `🔍 Escáner de amenazas (${t.n} posiciones)`;
+/* El profe escribe la tarea en tareas/{uid}/{id} (Realtime Database). El alumno solo puede añadir su resultado (r), una vez (primer intento). */
+const TK={d:null};
+const tkSeenK=()=>'siurot_tseen_'+(typeof myUid==='function'&&myUid()||'');
+const tkSeen=()=>{try{return JSON.parse(localStorage.getItem(tkSeenK())||'[]');}catch(e){return[];}};
+const tkSeenAdd=ids=>{try{const l=[...new Set([...tkSeen(),...ids])].slice(-60);localStorage.setItem(tkSeenK(),JSON.stringify(l));}catch(e){}};
+const tkOn=()=>typeof onlLogged==='function'&&onlLogged()&&!ONL.acc.guest;
+const tkList=()=>Object.entries(TK.d||{}).filter(([id,t])=>t&&typeof t==='object'&&t.ti).map(([id,t])=>Object.assign({id},t)).sort((a,b)=>(b.c||0)-(a.c||0));
+const tkOpen=t=>RT.srv()<(t.dl||0);
+const tkPending=()=>tkList().filter(t=>!t.r&&tkOpen(t));
+function tkSum(t){
+ if(t.k==='mix')return (t.bl||[]).map(b=>{const T=THEME_OF(b.th);return `${b.n}× ${T.icono} ${T.nombre} (nivel ${b.lv})`;}).join(' · ');
+ if(t.k==='lec'){const md=MODULES.find(x=>x.id===t.mod),l=md&&md.lecciones.find(x=>x.id===t.l);return `📚 Lección: ${l?l.titulo:'?'}`;}
+ if(t.k==='esc')return `🔍 Escáner de amenazas (${t.n} posiciones)`;
  return 'Tarea';
 }
-async function taskIntro(t){
- P.aula=P.aula||{tareas:{}};const prev=P.aula.tareas[t.id];
- const v=await modal({title:'🏫 Tarea de tu profe',html:`<div class="bigicon">🏫</div><p style="text-align:center;font-size:1.15rem"><b>${esc(t.ti||'Tarea')}</b></p><p style="text-align:center" class="muted">${taskLabel(t)}</p>${prev&&prev.mx?`<p style="text-align:center">Ya la hiciste: <b>${prev.sc}/${prev.mx}</b>. Puedes repetirla.</p>`:''}`,buttons:[{t:'Más tarde',cls:'ghost',v:false},{t:'▶ Empezar',v:true}],dismiss:false});
- if(v)runTask(t);else{P.aula.tareas[t.id]=P.aula.tareas[t.id]||{ti:t.ti,t:t.t,d:today(),task:t,pend:true};save();go('aula');}
+const tkDate=ms=>new Date(ms).toLocaleDateString('es-ES',{day:'numeric',month:'short'});
+async function tkSync(o){o=o||{};if(!tkOn())return;
+ try{TK.d=await RT.get('tareas/'+myUid())||{};}catch(e){return;}
+ for(const t of tkList()){if(!t.r&&t.k==='lec'&&tkOpen(t)&&P&&P.lessons&&P.lessons[lessonKey(t.mod,t.l)])tkSend(t,1,1,[1]).catch(()=>{});}
+ try{invDots();tkBanner();}catch(e){}
+ if(o.popup===false){tkSeenAdd(tkPending().map(t=>t.id));return;}
+ const seen=tkSeen(),nu=tkPending().filter(t=>!seen.includes(t.id));
+ if(nu.length)tkPopup(nu);
 }
-function runTask(t){
- P.aula=P.aula||{tareas:{}};
- P.aula.tareas[t.id]=Object.assign({ti:t.ti,t:t.t,d:today(),task:t},P.aula.tareas[t.id]||{});save();
- if(t.t==='tema')return go('tarea',{task:t});
- if(t.t==='esc')return go('escaner',{seed:t.s%100000,total:t.n,back:()=>go('aula'),onDone:r=>finishTask(t,r.score,r.max)});
- if(t.t==='lec'){toast('📚 Haz la lección; después entrega tu código desde 🏫 Aula');return go('leccion',{mod:t.mod,l:t.l});}
+function tkBanner(){const el=document.getElementById('tkcard');if(!el)return;const n=tkPending().length;
+ el.innerHTML=n?`<div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:2px solid var(--acc);background:#fff8e6;margin-bottom:12px"><div style="font-size:1.8rem">🏫</div><div style="flex:1;min-width:160px"><b>Tienes ${n} tarea${n===1?'':'s'} de tu profe</b><div class="muted" style="font-size:.85rem">Plazo: ${tkDate(Math.min(...tkPending().map(t=>t.dl)))}</div></div><button class="btn acc" id="tkgo">Ver tareas</button></div>`:'';
+ const b=document.getElementById('tkgo');if(b)b.onclick=()=>go('aula');}
+let TK_POP=false;
+async function tkPopup(list){
+ const busy=TK_POP||ON.inGame||ON.reto||ON.search||ON.arena||PROFE||['ogame','contrarreloj','rushduel','partida','local2','arena','tarea','escaner'].includes(currentTab)||$$('.modalbg').length;
+ if(busy)return;   // el punto rojo sigue ahí y el aviso saldrá en cuanto se pueda
+ TK_POP=true;tkSeenAdd(list.map(t=>t.id));sound('ok');try{navigator.vibrate&&navigator.vibrate([150,60,150]);}catch(e){}
+ const t=list[0];
+ const v=await modal({title:'🏫 ¡Tienes una tarea!',html:`<div class="bigicon">🏫</div><p style="text-align:center;font-size:1.15rem;margin:0"><b>${esc(t.ti)}</b></p><p class="muted" style="text-align:center;margin:6px 0 0">${tkSum(t)}</p><p class="muted" style="text-align:center;margin:6px 0 0">Plazo: hasta el ${tkDate(t.dl)}. Solo cuenta el primer intento.</p>${list.length>1?`<p style="text-align:center;margin:8px 0 0">Tienes <b>${list.length}</b> tareas nuevas en 🏫 Aula.</p>`:''}`,buttons:[{t:'Más tarde',cls:'ghost',v:false},{t:list.length>1?'Ver mis tareas':'▶ Empezar',v:true}],dismiss:false});
+ TK_POP=false;
+ if(v){if(list.length>1)go('aula');else runTask(t);}
 }
-function taskScore(rec){
- if(!rec)return null;
- if(rec.t==='lec'&&rec.task){const done=!!P.lessons[lessonKey(rec.task.mod,rec.task.l)];return {sc:done?1:0,mx:1};}
- return rec.mx?{sc:rec.sc,mx:rec.mx}:null;
+function runTask(t,opt){
+ opt=opt||{};
+ if(t.k==='mix')return go('tarea',{task:t,practice:!!opt.practice});
+ if(t.k==='esc')return go('escaner',{seed:t.s%100000,total:t.n,back:()=>go('aula'),onDone:r=>tkFinish(t,r.score,r.max,[r.score],!!opt.practice)});
+ if(t.k==='lec'){toast('📚 Haz la lección; tu profe verá que la has terminado');return go('leccion',{mod:t.mod,l:t.l});}
 }
-function deliveryCode(id){
- const rec=(P.aula.tareas||{})[id];const s=taskScore(rec);if(!s)return null;
- return mkCode('E',{n:P.name,tid:id,ti:rec.ti,sc:s.sc,mx:s.mx,d:today()});
+async function tkSend(t,sc,mx,bs){
+ const r={sc,mx,bs,t:RT.SV};await RT.put(`tareas/${myUid()}/${t.id}/r`,r);
+ t.r={sc,mx,bs,t:RT.srv()};if(TK.d&&TK.d[t.id])TK.d[t.id].r=t.r;try{invDots();}catch(e){}
 }
-async function finishTask(t,score,max){
- P.aula=P.aula||{tareas:{}};const rec=P.aula.tareas[t.id]=Object.assign({ti:t.ti,t:t.t,task:t},P.aula.tareas[t.id]||{});
- const first=!rec.mx;rec.sc=Math.max(rec.sc||0,score);rec.mx=max;rec.d=today();rec.ts=Date.now();delete rec.pend;save();
- award('aula');if(first)addXP(5+Math.round(score/max*10),'Tarea de clase');
- if(score>=max*0.8)confetti();sound('done');
- await showDelivery(t.id,`Has conseguido <b>${score}</b> de <b>${max}</b> puntos.`);
+async function tkFinish(t,score,max,bs,practice){
+ if(practice||t.r||!tkOpen(t)){
+  if(score>=max*0.8)confetti();sound('done');
+  await modal({title:'🏁 Práctica terminada',html:`<div class="bigicon">🏁</div><p style="text-align:center">Has conseguido <b>${score}</b> de <b>${max}</b>.<br><span class="muted">Esta vez no cuenta para la nota${t.r?` (tu nota fue <b>${t.r.sc}/${t.r.mx}</b>)`:''}.</span></p>`,buttons:[{t:'Aceptar'}]});
+  return go('aula');
+ }
+ let ok=false;
+ for(;;){try{await tkSend(t,score,max,bs);ok=true;break;}catch(e){
+  const again=await modal({title:'📡 No se ha podido enviar',html:'<p>Comprueba tu conexión. Tu nota <b>aún no está enviada</b> a tu profe.</p>',buttons:[{t:'Salir',cls:'ghost',v:false},{t:'🔁 Reintentar',v:true}],dismiss:false});
+  if(!again)break;}}
+ if(ok){award('aula');addXP(5+Math.round(score/Math.max(1,max)*10),'Tarea de clase');if(score>=max*0.8)confetti();sound('done');
+  await modal({title:'✅ ¡Tarea entregada!',html:`<div class="bigicon">✅</div><p style="text-align:center">Has conseguido <b>${score}</b> de <b>${max}</b> puntos.<br><span class="muted">Tu profe ya puede ver tu nota.</span></p>`,buttons:[{t:'Aceptar'}]});}
  go('aula');
 }
-async function showDelivery(id,intro){
- const code=deliveryCode(id);if(!code)return;const tid='dc'+rid();
- modal({title:'✅ ¡Tarea hecha!',html:`<p>${intro||''}</p><p class="muted" style="margin:6px 0">Copia tu <b>código de entrega</b> y pégalo en Classroom (o enséñaselo a tu profe):</p><textarea id="${tid}" readonly style="width:100%;min-height:90px;padding:8px;font-family:monospace;font-size:.75rem;border:2px solid var(--line);border-radius:10px">${code}</textarea>`,buttons:[{t:'Cerrar',cls:'ghost',v:false},{t:'📋 Copiar código',v:true}]});
- const bg=$$('.modalbg').pop();const cp=bg.querySelector('.modal > .btnrow').lastChild;
- cp.onclick=async e=>{e.stopImmediatePropagation();toast((await copyText(code))?'📋 Código copiado':'No se pudo copiar');};
- await new Promise(r=>{const ob=new MutationObserver(()=>{if(!document.body.contains(bg)){ob.disconnect();r();}});ob.observe(document.body,{childList:true});});
-}
 // vista de una tarea de ejercicios (semilla fija: toda la clase hace los mismos)
-function viewTask(m,{task:t}){
- const tok=VIEW;const n=t.n,max=n*2;let i=-1,score=0,runner=null,skipped=false;
+function viewTask(m,{task:t,practice}){
+ const tok=VIEW;const bl=t.bl||[];const items=[];bl.forEach((b,bi)=>{for(let k=0;k<b.n;k++)items.push({bi,k,b});});
+ const n=items.length,max=n*2,bs=bl.map(()=>0);let i=-1,score=0,runner=null,skipped=false;
  const {board,body,under,nav}=trainerShell(m,'🏫 '+esc(t.ti||'Tarea'),()=>go('aula'));
- const T=THEME_OF(t.th);
- const pzOf=k=>{let r=null,a=0;while(!r&&a<12){r=genPuzzle(t.th,hash(t.s+'|'+k+'|'+a),t.lv||2);a++;}return r;};
- body.innerHTML='<div class="btnrow" style="align-items:center" id="top"></div><div class="steptext" id="goal"></div><div id="fb"></div>';
+ const pzOf=it=>{let r=null,a=0;while(!r&&a<12){r=genPuzzle(it.b.th,hash(t.s+'|'+it.bi+'|'+it.k+'|'+a),it.b.lv||2);a++;}return r;};
+ body.innerHTML='<div class="btnrow" style="align-items:center" id="top"></div><div class="steptext" id="goal"></div><div id="fb"></div>'+(practice||t.r?'<p class="muted" style="margin:0;font-weight:700">🏁 Práctica: no cuenta para la nota.</p>':'');
  under.innerHTML='<button class="btn ghost sm" id="h1">💡 Pista</button><button class="btn ghost sm" id="h2">⏭ Saltar</button>';
  const setFb=(h,c)=>$('#fb',body).innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';
  function next(){
-  i++;if(i>=n)return finishTask(t,score,max);
-  const pz=pzOf(i);const p=new E.Pos(pz.fen);skipped=false;setFb('');
-  $('#top',body).innerHTML=turnHTML(p.turn)+`<span class="pill">Ejercicio ${i+1}/${n}</span><span class="pill">⭐ ${score}/${max}</span>`;
+  i++;if(i>=n)return tkFinish(t,score,max,bs,practice);
+  const it=items[i],T=THEME_OF(it.b.th),pz=pzOf(it);if(!pz)return next();
+  const p=new E.Pos(pz.fen);skipped=false;setFb('');
+  $('#top',body).innerHTML=turnHTML(p.turn)+`<span class="pill">Ejercicio ${i+1}/${n}</span><span class="pill">${T.icono} ${esc(T.nombre)}</span><span class="pill" id="scp">⭐ ${score}/${max}</span>`;
   $('#goal',body).innerHTML=goalText(pz);nav.innerHTML='';
+  const nxt=()=>{nav.innerHTML=`<span style="flex:1"></span><button class="btn sm acc" id="nx">${i<n-1?'Siguiente →':'Terminar'}</button>`;$('#nx',nav).onclick=next;};
   runner=runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept,follow:pz.follow,fp:pz.fp},{
-   onSolved:(mk,help)=>{if(skipped)return;const pts=(mk===0&&help===0)?2:(help===2?0:1);score+=pts;sound('ok');setFb(`🎉 ¡Correcto! +${pts} punto${pts===1?'':'s'}`,'ok');$('#top .pill:last-child',body).textContent=`⭐ ${score}/${max}`;nav.innerHTML=`<span style="flex:1"></span><button class="btn sm acc" id="nx">${i<n-1?'Siguiente →':'Terminar'}</button>`;$('#nx',nav).onclick=next;},
+   onSolved:(mk,help)=>{if(skipped)return;const pts=(mk===0&&help===0)?2:(help===2?0:1);score+=pts;bs[it.bi]+=pts;sound('ok');setFb(`🎉 ¡Correcto! +${pts} punto${pts===1?'':'s'}`,'ok');$('#scp',body).textContent=`⭐ ${score}/${max}`;nxt();},
    onWrong:san=>{setFb(`❌ ${E.sanES(san)} no funciona. ¡Inténtalo otra vez!`,'bad');},
    msg:setFb},tok);
   $('#h1',under).onclick=()=>{runner.hint();setFb('💡 '+(pz.pista||T.pista||'Mira jaques y capturas.')+' La pieza está marcada.','info');};
-  $('#h2',under).onclick=()=>{skipped=true;board.interactive=false;setFb('⏭ Saltado (0 puntos).','info');nav.innerHTML=`<span style="flex:1"></span><button class="btn sm acc" id="nx">${i<n-1?'Siguiente →':'Terminar'}</button>`;$('#nx',nav).onclick=next;};
+  $('#h2',under).onclick=()=>{skipped=true;board.interactive=false;setFb('⏭ Saltado (0 puntos).','info');nxt();};
  }
  next();
 }
@@ -4190,109 +4142,111 @@ function viewTask(m,{task:t}){
 async function viewAula(m,arg){
  arg=arg||{};
  if(arg.sec&&PROFE)return teacherView(m,arg.sec,arg);
- const A=aulaDB();const tareas=Object.entries((P.aula&&P.aula.tareas)||{}).map(([id,r])=>({id,r,s:taskScore(r)}));
- m.innerHTML=`<div class="sectitle"><h2>🏫 Aula</h2><span class="pill">${esc(P.avatar)} ${esc(P.name)}</span></div>
- <div class="grid g2">
-  <div class="card"><h3>📥 Tarea de mi profe</h3><p class="muted" style="margin:4px 0 10px">Abre el enlace o escanea el QR que te dé tu profe. También puedes pegar aquí el código.</p><button class="btn acc" id="pt">📥 Pegar código o enlace</button></div>
-  <div class="card"><h3>📤 Mi informe</h3><p class="muted" style="margin:4px 0 10px">Genera un código con tu progreso para entregárselo a tu profe.</p><button class="btn" id="mr">📤 Generar mi informe</button></div>
- </div>
- <div class="card" style="margin-top:16px"><h3>📋 Mis tareas</h3>${tareas.length?`<div style="display:grid;gap:8px;margin-top:10px">${tareas.map(({id,r,s})=>`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:2px solid var(--line);border-radius:12px;background:#fff"><div style="flex:1;min-width:160px"><b>${esc(r.ti||'Tarea')}</b><div class="muted" style="font-size:.8rem;font-weight:700">${r.task?taskLabel(r.task):''}</div></div><span class="pill">${s?(s.sc>=s.mx?'✅ ':'')+s.sc+'/'+s.mx:'⏳ Pendiente'}</span><button class="btn sm ${s?'ghost':''}" data-run="${id}">${s?'Repetir':'▶ Empezar'}</button>${s?`<button class="btn sm ghost" data-del="${id}">📤 Código</button>`:''}</div>`).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Todavía no tienes tareas. Cuando tu profe te dé un enlace, aparecerá aquí.</p>'}</div>`;
-
- $('#pt',m).onclick=pasteTask;$('#mr',m).onclick=showMyReport;
- $$('[data-run]',m).forEach(b=>b.onclick=()=>{const r=P.aula.tareas[b.dataset.run];if(r&&r.task)runTask(r.task);});
- $$('[data-del]',m).forEach(b=>b.onclick=()=>showDelivery(b.dataset.del,''));
+ const tok=VIEW;
+ const head=`<div class="sectitle"><h2>🏫 Aula</h2><span class="pill">${esc(P.avatar)} ${esc(P.name)}</span></div>`;
+ if(!tkOn()){m.innerHTML=head+`<div class="card"><h3>📋 Mis tareas</h3><p class="muted" style="margin:6px 0 10px">Las tareas de tu profe llegan solas a esta pantalla cuando has iniciado sesión con tu usuario del cole.</p><button class="btn acc" id="lg">🔑 Iniciar sesión</button></div>`;
+  const b=$('#lg',m);if(b)b.onclick=()=>go('online');return;}
+ m.innerHTML=head+'<div class="card"><h3>📋 Mis tareas</h3><p class="muted" style="margin:6px 0 0">Buscando tareas…</p></div>';
+ await tkSync({popup:false});if(!alive(tok))return;
+ const L=tkList(),now=RT.srv();
+ const row=t=>{const done=!!t.r,open=tkOpen(t);const sc=done?`<span class="pill" style="background:${t.r.sc>=t.r.mx*.8?'#dcf5e6':t.r.sc>=t.r.mx*.5?'#fdf3d0':'#fde0dc'}">${t.r.sc>=t.r.mx*.8?'✅ ':''}${t.r.sc}/${t.r.mx}</span>`:open?'<span class="pill" style="background:#fff0c9">⏳ Pendiente</span>':'<span class="pill" style="background:#fde0dc">⌛ Caducada</span>';
+  const btn=t.k==='lec'?(done?'':`<button class="btn sm" data-lec="${t.id}">📚 Ir a la lección</button>`):(!done&&open?`<button class="btn sm" data-run="${t.id}">▶ Empezar</button>`:`<button class="btn sm ghost" data-pr="${t.id}">🏁 Practicar</button>`);
+  return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px;border:2px solid ${!done&&open?'var(--acc)':'var(--line)'};border-radius:12px;background:#fff"><div style="flex:1;min-width:170px"><b>${esc(t.ti)}</b><div class="muted" style="font-size:.82rem;font-weight:700">${tkSum(t)}</div><div class="muted" style="font-size:.78rem">${done?'Entregada':open?'Hasta el '+tkDate(t.dl):'Terminó el '+tkDate(t.dl)}</div></div>${sc}${btn}</div>`;};
+ m.innerHTML=head+`<div class="card"><h3>📋 Mis tareas</h3><p class="muted" style="margin:4px 0 10px">Solo cuenta tu <b>primer intento</b>. Después puedes practicar sin nota.</p>${L.length?`<div style="display:grid;gap:8px">${L.map(row).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Ahora mismo no tienes tareas. Cuando tu profe te mande una, saldrá aquí con un punto rojo 🔴.</p>'}</div>`;
+ $$('[data-run]',m).forEach(b=>b.onclick=()=>runTask(TK.d[b.dataset.run]&&Object.assign({id:b.dataset.run},TK.d[b.dataset.run])));
+ $$('[data-pr]',m).forEach(b=>b.onclick=()=>runTask(Object.assign({id:b.dataset.pr},TK.d[b.dataset.pr]),{practice:true}));
+ $$('[data-lec]',m).forEach(b=>b.onclick=()=>runTask(Object.assign({id:b.dataset.lec},TK.d[b.dataset.lec])));
 }
-async function pasteTask(){
- const txt=await askText('📥 Código o enlace de la tarea','Pega aquí el enlace o el código SIU-T…','',true);
- if(!txt)return;const c=readCodes(txt).find(x=>!x.bad&&x.kind==='T');
- if(!c){toast('❌ No encuentro un código de tarea válido');return;}
- taskIntro(c.data);
-}
-// ---------- panel del profesor ----------
-const SECS=[['tareas','📝','Tareas'],['clase','👥','Clase'],['fichas','🖨️','Fichas']];
+// ---------- panel del profesor (dentro de la app de administración) ----------
+const SECS=[['tareas','📝','Tareas'],['fichas','🖨️','Fichas']];
 function teacherView(m,sec,arg){
- m.innerHTML=`<div class="sectitle"><h2>🏫 Tareas, clase y fichas</h2></div>
+ m.innerHTML=`<div class="sectitle"><h2>🏫 Tareas y fichas</h2></div>
  <div class="chips" style="margin-bottom:14px">${SECS.map(([id,ic,t])=>`<button class="btn sm ${id===sec?'':'ghost'}" data-sec="${id}">${ic} ${t}</button>`).join('')}</div><div id="sec"></div>`;
  $$('[data-sec]',m).forEach(b=>b.onclick=()=>aulaGo({sec:b.dataset.sec}));
- if(false)$('#tpin',m).onclick=async()=>{const v=await askPin('🔑 Nuevo PIN','Escribe el nuevo PIN (déjalo vacío para quitarlo).');if(v===null)return;const A=aulaDB();A.pin=v?hash(v+'siurot'):null;save();toast(v?'🔒 PIN cambiado':'PIN quitado');};
  const box=$('#sec',m);
- ({tareas:secTareas,clase:secClase,fichas:secFichas,torneos:secTorneos})[sec](box,arg);
+ ({tareas:secTareas,fichas:secFichas,torneos:secTorneos})[sec](box,arg);
 }
-function optList(list,sel){return list.map(([v,t])=>`<option value="${v}" ${v===sel?'selected':''}>${t}</option>`).join('');}
+function optList(list,sel){return list.map(([v,t])=>`<option value="${v}" ${String(v)===String(sel)?'selected':''}>${t}</option>`).join('');}
 const inpStyle='padding:10px;border:2px solid var(--line);border-radius:10px;font-size:1rem;font-family:inherit;background:#fff';
+const parentA=()=>{try{return window.parent!==window&&window.parent.ADMIN_A||null;}catch(e){return null;}};
 function secTareas(box){
- const A=aulaDB();
+ const PA=parentA();
+ if(!PA){box.innerHTML='<div class="card">Abre esta pantalla desde la app de administración.</div>';return;}
+ const users=PA.users||[];
+ const groups=[...new Set([...(PA.grupos||[]),...users.map(u=>u.grupo).filter(Boolean)])].sort((a,b)=>a.localeCompare(b,'es'));
  const themes=TEMAS.map(t=>[t.id,t.icono+' '+t.nombre]);
  const mods=MODULES.map(md=>[md.id,md.icono+' '+md.nombre]);
- box.innerHTML=`<div class="card"><h3>➕ Nueva tarea</h3>
-  <div style="display:grid;gap:10px;margin-top:10px;max-width:560px">
-   <input id="tti" placeholder="Título (p. ej. «Horquillas · semana 3»)" style="${inpStyle}">
-   <select id="tty" style="${inpStyle}">${optList([['tema','🧩 Ejercicios de un tema'],['lec','📚 Una lección'],['esc','🔍 Escáner de amenazas']],'tema')}</select>
-   <div id="tfi" style="display:grid;gap:10px"></div>
-   <div class="btnrow"><button class="btn acc" id="tmk">🔗 Crear enlace y QR</button></div>
+ let bl=[{th:'horquilla',n:3,lv:2}];
+ box.innerHTML=`<div class="card"><h3>➕ Nueva tarea para la clase</h3>
+  <div style="display:grid;gap:12px;margin-top:10px;max-width:640px">
+   <input id="tti" placeholder="Título (p. ej. «Táctica · semana 3»)" style="${inpStyle}">
+   <div><b>1. ¿A quién?</b><div class="btnrow" style="margin-top:6px"><select id="tg" style="${inpStyle}">${groups.length?optList(groups.map(g=>[g,g]),groups[0]):'<option value="">(sin grupos)</option>'}</select></div><div id="tst" style="margin-top:8px"></div></div>
+   <div><b>2. ¿Qué?</b><select id="tty" style="${inpStyle};width:100%;margin-top:6px">${optList([['mix','🧩 Ejercicios (puedes combinar temas)'],['esc','🔍 Escáner de amenazas'],['lec','📚 Una lección']],'mix')}</select><div id="tfi" style="display:grid;gap:8px;margin-top:8px"></div></div>
+   <p class="muted" style="margin:0">⏳ Plazo: <b>1 semana</b> desde que la envías. Solo cuenta el primer intento. Al alumnado le sale un aviso y un punto rojo en 🏫 Aula.</p>
+   <div class="btnrow"><button class="btn acc" id="tmk">📨 Enviar tarea</button></div>
   </div></div>
-  <div class="card" style="margin-top:16px"><h3>🗂️ Mis tareas creadas</h3>${A.tareas.length?`<div style="display:grid;gap:8px;margin-top:10px">${A.tareas.map(t=>`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:2px solid var(--line);border-radius:12px;background:#fff"><div style="flex:1;min-width:160px"><b>${esc(t.ti)}</b><div class="muted" style="font-size:.8rem;font-weight:700">${taskLabel(t)} · ${t.c||''}</div></div><button class="btn sm" data-lk="${t.id}">🔗 Enlace / QR</button><button class="iconbtn sm" data-rm="${t.id}" aria-label="Borrar">🗑️</button></div>`).join('')}</div>`:'<p class="muted" style="margin:6px 0 0">Aún no has creado tareas.</p>'}</div>
-  <div class="card" style="margin-top:16px"><h3>ℹ️ Cómo funciona</h3><p class="muted" style="margin:6px 0 0">1. Creas la tarea y obtienes un <b>enlace</b> y un <b>QR</b> (puedes proyectarlo).<br>2. El alumnado lo abre y hace la tarea: los ejercicios son <b>los mismos para toda la clase</b>.<br>3. Al terminar, cada alumno copia su <b>código de entrega</b> y lo pega en Classroom.<br>4. Tú los pegas en <b>👥 Clase</b> y ves las notas.</p>${/^https?:$/.test(location.protocol)?'':'<p class="fb bad" style="margin-top:8px">⚠️ Esta copia está abierta como archivo. Para compartir enlaces, publica la app en la web (GitHub Pages / tu hosting).</p>'}</div>`;
+  <div class="card" style="margin-top:16px"><div class="btnrow" style="align-items:center"><h3 style="margin:0;flex:1">🗂️ Tareas enviadas y resultados</h3><button class="btn sm ghost" id="trf">🔄 Actualizar</button></div><div id="tres" style="margin-top:10px"><p class="muted">Cargando…</p></div></div>`;
+ const stBox=$('#tst',box);
+ const drawSt=()=>{const g=$('#tg',box).value;const us=users.filter(u=>u.grupo===g).sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||'','es'));
+  stBox.innerHTML=us.length?`<label style="display:flex;gap:8px;align-items:center;font-weight:900"><input type="checkbox" id="tall" checked style="width:auto;min-height:0"> Todo el grupo (<span id="tcnt">${us.length}</span>)</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px 12px;margin-top:6px">${us.map(u=>`<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="tu" data-u="${u.id}" checked style="width:auto;min-height:0"> ${esc(u.nombre)}</label>`).join('')}</div>`:'<p class="muted" style="margin:0">Este grupo no tiene alumnado.</p>';
+  const upd=()=>{const c=$$('.tu',stBox),n=c.filter(x=>x.checked).length;$('#tall',stBox).checked=n===c.length;$('#tcnt',stBox).textContent=n===c.length?c.length:n+' de '+c.length;};
+  if($('#tall',stBox)){$('#tall',stBox).onchange=e=>{$$('.tu',stBox).forEach(x=>x.checked=e.target.checked);upd();};$$('.tu',stBox).forEach(x=>x.onchange=upd);}};
+ $('#tg',box).onchange=drawSt;drawSt();
  const fi=$('#tfi',box);
- const draw=()=>{const ty=$('#tty',box).value;
-  if(ty==='tema')fi.innerHTML=`<label>Tema<select id="fth" style="${inpStyle};width:100%">${optList(themes,'horquilla')}</select></label><div class="btnrow"><label>Ejercicios<select id="fn" style="${inpStyle}">${optList([3,4,5,6,8,10].map(x=>[x,x]),5)}</select></label><label>Nivel<select id="flv" style="${inpStyle}">${optList([1,2,3,4,5,6].map(x=>[x,x]),2)}</select></label></div>`;
+ const drawFi=()=>{const ty=$('#tty',box).value;
+  if(ty==='mix'){const tot=bl.reduce((a,b)=>a+b.n,0);
+   fi.innerHTML=bl.map((b,i)=>`<div class="btnrow" style="gap:6px;flex-wrap:nowrap;align-items:center"><select data-f="th" data-i="${i}" style="${inpStyle};flex:1;min-width:0">${optList(themes,b.th)}</select><select data-f="n" data-i="${i}" style="${inpStyle}" title="Cuántos">${optList([1,2,3,4,5,6,8,10].map(x=>[x,x+'×']),b.n)}</select><select data-f="lv" data-i="${i}" style="${inpStyle}" title="Nivel">${optList([1,2,3,4,5,6].map(x=>[x,'Nv '+x]),b.lv)}</select>${bl.length>1?`<button class="iconbtn sm" data-rb="${i}" aria-label="Quitar">🗑️</button>`:''}</div>`).join('')+`<div class="btnrow" style="align-items:center"><button class="btn sm ghost" id="addb">➕ Añadir otro tema</button><span class="pill">Total: ${tot} ejercicio${tot===1?'':'s'}</span>${tot>30?'<span class="err" style="font-weight:800">Máximo 30</span>':''}</div>`;
+   $$('select[data-f]',fi).forEach(s=>s.onchange=()=>{bl[+s.dataset.i][s.dataset.f]=s.dataset.f==='th'?s.value:+s.value;drawFi();});
+   $$('[data-rb]',fi).forEach(b=>b.onclick=()=>{bl.splice(+b.dataset.rb,1);drawFi();});
+   $('#addb',fi).onclick=()=>{const last=bl[bl.length-1];bl.push({th:themes.find(t=>!bl.some(b=>b.th===t[0]))[0],n:3,lv:last?last.lv:2});drawFi();};}
   else if(ty==='lec'){fi.innerHTML=`<label>Módulo<select id="fmo" style="${inpStyle};width:100%">${optList(mods,MODULES[0].id)}</select></label><label>Lección<select id="fle" style="${inpStyle};width:100%"></select></label>`;const f2=()=>{const md=MODULES.find(x=>x.id===$('#fmo',box).value);$('#fle',box).innerHTML=optList(md.lecciones.map(l=>[l.id,l.titulo]),'');};$('#fmo',box).onchange=f2;f2();}
   else fi.innerHTML=`<label>Posiciones<select id="fn" style="${inpStyle}">${optList([3,4,5,6,8].map(x=>[x,x]),5)}</select></label>`;};
- $('#tty',box).onchange=draw;draw();
- $('#tmk',box).onclick=()=>{
-  const ti=$('#tti',box).value.trim();if(!ti){toast('✍️ Escribe un título');return;}
-  const ty=$('#tty',box).value;const t={id:rid(),ti,t:ty,c:today()};
-  if(ty==='tema'){t.th=$('#fth',box).value;t.n=+$('#fn',box).value;t.lv=+$('#flv',box).value;t.s=Math.floor(Math.random()*1e6);}
+ $('#tty',box).onchange=drawFi;drawFi();
+ $('#tmk',box).onclick=async()=>{
+  const ti=$('#tti',box).value.trim();if(!ti)return toast('✍️ Escribe un título');
+  const ids=$$('.tu',stBox).filter(x=>x.checked).map(x=>x.dataset.u);if(!ids.length)return toast('👥 Elige al menos un alumno');
+  const ty=$('#tty',box).value;const now=Date.now();
+  const t={ti,k:ty,g:$('#tg',box).value,c:now,dl:now+7*864e5,s:Math.floor(Math.random()*1e6)};
+  if(ty==='mix'){const tot=bl.reduce((a,b)=>a+b.n,0);if(tot>30)return toast('Máximo 30 ejercicios por tarea');t.bl=bl.map(b=>({th:b.th,n:b.n,lv:b.lv}));}
   else if(ty==='lec'){t.mod=$('#fmo',box).value;t.l=$('#fle',box).value;}
-  else{t.n=+$('#fn',box).value;t.s=Math.floor(Math.random()*1e6);}
-  A.tareas.unshift(t);save();aulaGo({sec:'tareas'});showTaskLink(t);
+  else t.n=+$('#fn',box).value;
+  const id=rid()+rid();const btn=$('#tmk',box);btn.disabled=true;
+  try{
+   const up={},ib={};ids.forEach((u,i)=>{up[u+'/'+id]=t;ib[u+'/t'+now.toString(36)+i]={k:'tarea',from:FB.S.user.uid,t:{'.sv':'timestamp'}};});
+   await RT.patch('tareas',up);
+   try{await RT.patch('inbox',ib);}catch(e){}   // el aviso en directo (si falla, la tarea les sale al abrir la app)
+   toast(`📨 Tarea enviada a ${ids.length} alumno${ids.length===1?'':'s'}`,'ok');$('#tti',box).value='';loadRes();
+  }catch(e){toast('❌ No se pudo enviar: '+(FB.msg?FB.msg(e):e.message),'bad');}
+  btn.disabled=false;
  };
- $$('[data-lk]',box).forEach(b=>b.onclick=()=>showTaskLink(A.tareas.find(t=>t.id===b.dataset.lk)));
- $$('[data-rm]',box).forEach(b=>b.onclick=async()=>{if(await confirmModal('¿Borrar la tarea?','El enlace seguirá funcionando para quien ya lo tenga.','Borrar','Cancelar',true)){A.tareas=A.tareas.filter(t=>t.id!==b.dataset.rm);save();aulaGo({sec:'tareas'});}});
-}
-function taskToCode(t){const o={id:t.id,ti:t.ti,t:t.t};if(t.t==='tema'){o.th=t.th;o.n=t.n;o.lv=t.lv;o.s=t.s;}else if(t.t==='lec'){o.mod=t.mod;o.l=t.l;}else{o.n=t.n;o.s=t.s;}return mkCode('T',o);}
-function showTaskLink(t){
- const code=taskToCode(t),web=/^https?:$/.test(location.protocol),link=web?baseURL()+'#t='+code:code;
- const svg=qrSVG(link,300),id='tl'+rid();
- modal({title:'🔗 '+esc(t.ti),html:`<p class="muted" style="margin:0 0 8px">${taskLabel(t)}</p>${svg?`<div style="text-align:center;margin:8px 0">${svg}</div>`:'<p class="fb bad">El enlace es demasiado largo para un QR.</p>'}<textarea id="${id}" readonly style="width:100%;min-height:70px;padding:8px;font-family:monospace;font-size:.72rem;border:2px solid var(--line);border-radius:10px">${link}</textarea>${web?'':'<p class="muted" style="font-size:.8rem;margin:6px 0 0">Abierta como archivo: se muestra el código, que el alumnado puede pegar en 🏫 Aula → «Pegar código».</p>'}`,
-  buttons:[{t:'Cerrar',cls:'ghost',v:'c'},{t:'🖥️ Proyectar QR',cls:'ghost',v:'p'},{t:'📋 Copiar',v:'k'}]});
- const bg=$$('.modalbg').pop();const bs=$$('.modal > .btnrow button',bg);
- bs[2].onclick=async e=>{e.stopImmediatePropagation();toast((await copyText(link))?'📋 Copiado':'No se pudo copiar');};
- bs[1].onclick=e=>{e.stopImmediatePropagation();bg._close('p');if(svg)projectOverlay(`<h2 style="margin:0 0 10px">${esc(t.ti)}</h2>${qrSVG(link,Math.min(window.innerHeight*0.7,window.innerWidth*0.8))}<p style="margin:10px 0 0;font-weight:800">Escanea el QR para empezar la tarea</p>`);};
-}
-// ---------- Clase: recoger códigos ----------
-function secClase(box){
- const A=aulaDB();
- const inf=Object.values(A.informes).sort((a,b)=>a.n.localeCompare(b.n,'es'));
- const tids=[...new Map(A.entregas.map(e=>[e.tid,e.ti])).entries()];
- const names=[...new Set(A.entregas.map(e=>e.n))].sort((a,b)=>a.localeCompare(b,'es'));
- const cell=(n,tid)=>{const e=A.entregas.find(x=>x.tid===tid&&nkey(x.n)===nkey(n));if(!e)return '<td class="muted">—</td>';const f=e.sc/e.mx;return `<td style="font-weight:900;background:${f>=.8?'#dcf5e6':f>=.5?'#fdf3d0':'#fde0dc'}">${e.sc}/${e.mx}</td>`;};
- box.innerHTML=`<div class="card"><h3>📥 Recoger códigos del alumnado</h3><p class="muted" style="margin:4px 0 8px">Pega aquí los códigos de entrega (<b>SIU-E…</b>) y de informe (<b>SIU-R…</b>) que te envíen. Puedes pegar muchos a la vez.</p>
-  <textarea id="cin" placeholder="Pega aquí los códigos…" style="width:100%;min-height:100px;padding:10px;font-family:monospace;font-size:.8rem;border:2px solid var(--line);border-radius:10px"></textarea><div class="btnrow" style="margin-top:8px"><button class="btn acc" id="cadd">➕ Añadir a la clase</button></div></div>
- <div class="card" style="margin-top:16px"><h3>📋 Notas de las tareas</h3>${names.length?`<div style="overflow-x:auto"><table class="rec"><tr><th style="text-align:left">Alumno/a</th>${tids.map(([id,ti])=>`<th>${esc(ti)}</th>`).join('')}<th></th></tr>${names.map(n=>`<tr><td style="text-align:left;font-weight:900">${esc(n)}</td>${tids.map(([id])=>cell(n,id)).join('')}<td><button class="iconbtn sm" data-rmn="${esc(n)}" aria-label="Quitar">🗑️</button></td></tr>`).join('')}</table></div>`:'<p class="muted" style="margin:6px 0 0">Aún no hay entregas.</p>'}</div>
- <div class="card" style="margin-top:16px"><h3>📈 Informes de progreso</h3>${inf.length?`<div style="overflow-x:auto"><table class="rec"><tr><th style="text-align:left">Alumno/a</th><th>Nivel</th><th>XP</th><th>ELO</th><th>Lecciones</th><th>Ejercicios</th><th>Partidas</th><th>Escáner</th><th>Fallo habitual</th><th>Fecha</th><th></th></tr>${inf.map(r=>`<tr><td style="text-align:left;font-weight:900">${esc(r.av||'')} ${esc(r.n)}</td><td>${esc(r.rk||'')}</td><td>${r.xp}</td><td>${r.elo}</td><td>${r.ls}/${r.lt}</td><td>${r.ps}</td><td>${r.gw}/${r.gp}</td><td>${r.sp||0}⭐/${r.sr||0}</td><td style="font-size:.8rem">${(r.mt||[]).map(k=>PATRONES[k]?PATRONES[k].i+' '+PATRONES[k].n:'').join('<br>')||'—'}</td><td style="font-size:.8rem">${esc(r.d||'')}</td><td><button class="iconbtn sm" data-rmi="${esc(nkey(r.n))}" aria-label="Quitar">🗑️</button></td></tr>`).join('')}</table></div>`:'<p class="muted" style="margin:6px 0 0">Aún no hay informes.</p>'}
-  <div class="btnrow" style="margin-top:12px"><button class="btn ghost sm" id="csv">📋 Copiar tabla (CSV)</button><button class="btn ghost sm" id="csvf">⬇️ Descargar CSV</button><button class="btn ghost sm" id="clr">🧹 Vaciar clase</button></div></div>`;
- $('#cadd',box).onclick=()=>{
-  const cs=readCodes($('#cin',box).value);if(!cs.length){toast('❌ No encuentro códigos');return;}
-  let e=0,r=0,bad=0;
-  for(const c of cs){
-   if(c.bad){bad++;continue;}
-   if(c.kind==='E'&&c.data&&c.data.n){const k=A.entregas.findIndex(x=>x.tid===c.data.tid&&nkey(x.n)===nkey(c.data.n));if(k>=0){if(c.data.sc>=A.entregas[k].sc||c.data.d>A.entregas[k].d)A.entregas[k]=c.data;}else A.entregas.push(c.data);e++;}
-   else if(c.kind==='R'&&c.data&&c.data.n){A.informes[nkey(c.data.n)]=c.data;r++;}
-   else bad++;
-  }
-  save();toast(`✅ ${e} entrega${e===1?'':'s'} y ${r} informe${r===1?'':'s'} añadidos${bad?` · ${bad} no válidos`:''}`);aulaGo({sec:'clase'});
- };
- $$('[data-rmn]',box).forEach(b=>b.onclick=()=>{A.entregas=A.entregas.filter(x=>nkey(x.n)!==nkey(b.dataset.rmn));save();aulaGo({sec:'clase'});});
- $$('[data-rmi]',box).forEach(b=>b.onclick=()=>{delete A.informes[b.dataset.rmi];save();aulaGo({sec:'clase'});});
- const csv=()=>{const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-  let out=['Alumno','Nivel','XP','ELO','Lecciones','Ejercicios','Partidas ganadas','Partidas','Escaner perfectos','Fecha'].map(q).join(';')+'\n';
-  inf.forEach(r=>{out+=[r.n,r.rk,r.xp,r.elo,r.ls,r.ps,r.gw,r.gp,r.sp||0,r.d].map(q).join(';')+'\n';});
-  if(names.length){out+='\n'+['Alumno',...tids.map(t=>t[1])].map(q).join(';')+'\n';names.forEach(n=>{out+=[n,...tids.map(([id])=>{const e=A.entregas.find(x=>x.tid===id&&nkey(x.n)===nkey(n));return e?e.sc+'/'+e.mx:'';})].map(q).join(';')+'\n';});}
-  return out;};
- $('#csv',box).onclick=async()=>toast((await copyText(csv()))?'📋 Tabla copiada: pégala en una hoja de cálculo':'No se pudo copiar');
- $('#csvf',box).onclick=()=>{const blob=new Blob(['﻿'+csv()],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='clase-ajedrez-'+today()+'.csv';a.click();};
- $('#clr',box).onclick=async()=>{if(await confirmModal('¿Vaciar la clase?','Se borrarán todas las entregas e informes recogidos.','Vaciar','Cancelar',true)){A.entregas=[];A.informes={};save();aulaGo({sec:'clase'});}};
+ const nameOf=uid=>{const u=users.find(x=>x.id===uid);return u?u.nombre:'(alumno eliminado)';};
+ async function loadRes(){
+  const el=$('#tres',box);el.innerHTML='<p class="muted">Cargando…</p>';
+  let all;try{all=await RT.get('tareas')||{};}catch(e){el.innerHTML='<p class="err">No se pudieron leer las tareas.</p>';return;}
+  const by={};const old=Date.now()-60*864e5,gc={};
+  for(const [uid,ts] of Object.entries(all))for(const [tid,t] of Object.entries(ts||{})){if(!t||!t.ti)continue;if((t.c||0)<old){gc[uid+'/'+tid]=null;continue;}(by[tid]=by[tid]||{t,rows:[]}).rows.push({uid,r:t.r});}
+  if(Object.keys(gc).length)RT.patch('tareas',gc).catch(()=>{});   // limpieza: se borran solas a los 60 días
+  const list=Object.entries(by).sort((a,b)=>(b[1].t.c||0)-(a[1].t.c||0));
+  if(!list.length){el.innerHTML='<p class="muted" style="margin:0">Aún no has enviado tareas.</p>';return;}
+  const now=Date.now();
+  el.innerHTML=list.map(([tid,{t,rows}])=>{
+   rows.sort((a,b)=>nameOf(a.uid).localeCompare(nameOf(b.uid),'es'));
+   const done=rows.filter(x=>x.r),open=now<t.dl,avg=done.length?Math.round(done.reduce((a,x)=>a+x.r.sc/x.r.mx,0)/done.length*100):0;
+   const bn=t.k==='mix'?(t.bl||[]).map(b=>{const T=THEME_OF(b.th);return T.icono+' '+T.nombre;}):[];
+   const cell=x=>x.r?`<td style="font-weight:900;background:${x.r.sc>=x.r.mx*.8?'#dcf5e6':x.r.sc>=x.r.mx*.5?'#fdf3d0':'#fde0dc'}">${x.r.sc}/${x.r.mx}</td>`+(t.k==='mix'&&bn.length>1?(t.bl||[]).map((b,i)=>`<td style="font-size:.85rem">${(x.r.bs&&x.r.bs[i])||0}/${b.n*2}</td>`).join(''):''):`<td class="muted">${open?'⏳ pendiente':'— no entregada'}</td>`+(t.k==='mix'&&bn.length>1?'<td></td>'.repeat(bn.length):'');
+   return `<details class="card" style="padding:10px 12px;margin-bottom:8px" ${open&&list.length<=3?'open':''}><summary style="cursor:pointer;font-weight:900">${esc(t.ti)} <span class="muted" style="font-weight:700">· ${esc(t.g||'')} · ${tkDate(t.c)}${open?'':' · plazo terminado'}</span> <span class="pill" style="margin-left:6px">${done.length}/${rows.length} entregadas${done.length?' · media '+avg+'%':''}</span></summary>
+    <p class="muted" style="margin:8px 0">${tkSum(t)} · Plazo: ${tkDate(t.dl)}</p>
+    <div style="overflow-x:auto"><table class="rec"><tr><th style="text-align:left">Alumno/a</th><th>Nota</th>${t.k==='mix'&&bn.length>1?bn.map(x=>`<th style="font-size:.8rem">${esc(x)}</th>`).join(''):''}</tr>${rows.map(x=>`<tr><td style="text-align:left;font-weight:800">${esc(nameOf(x.uid))}</td>${cell(x)}</tr>`).join('')}</table></div>
+    <div class="btnrow" style="margin-top:8px"><button class="btn sm ghost" data-csv="${tid}">📋 Copiar resultados</button><button class="btn sm ghost" data-del="${tid}" style="color:var(--bad,#c0392b)">🗑️ Borrar tarea</button></div></details>`;}).join('');
+  $$('[data-csv]',el).forEach(b=>b.onclick=async()=>{const {t,rows}=by[b.dataset.csv];const q=s=>String(s==null?'':s).replace(/[\t\n]/g,' ');
+   let out=['Alumno','Nota','Máximo',...(t.k==='mix'?(t.bl||[]).map(x=>THEME_OF(x.th).nombre):[])].join('\t')+'\n';
+   rows.forEach(x=>{out+=[nameOf(x.uid),x.r?x.r.sc:'',x.r?x.r.mx:'',...(t.k==='mix'?(t.bl||[]).map((_,i)=>x.r&&x.r.bs?x.r.bs[i]||0:''):[])].map(q).join('\t')+'\n';});
+   toast((await copyText(out))?'📋 Copiado: pégalo en una hoja de cálculo':'No se pudo copiar');});
+  $$('[data-del]',el).forEach(b=>b.onclick=async()=>{const {t,rows}=by[b.dataset.del];
+   if(!(await confirmModal('¿Borrar la tarea?',`Se borrará «${esc(t.ti)}» y sus resultados de ${rows.length} alumno${rows.length===1?'':'s'}. Desaparece de su pantalla.`,'Borrar','Cancelar',true)))return;
+   const up={};rows.forEach(x=>{up[x.uid+'/'+b.dataset.del]=null;});try{await RT.patch('tareas',up);toast('🗑️ Tarea borrada');loadRes();}catch(e){toast('❌ No se pudo borrar','bad');}});
+ }
+ $('#trf',box).onclick=loadRes;loadRes();
 }
 // ================= FICHAS IMPRIMIBLES Y TORNEOS DE CLASE =================
 function sheetBoard(pos,mm,orient){
@@ -4668,8 +4622,8 @@ const invK=()=>'siurot_inv_'+(ONL.acc&&ONL.acc.uid||'');
 const invGet=()=>{if(!(ONL.acc&&ONL.acc.uid)||ONL.acc.guest)return[];try{return JSON.parse(localStorage.getItem(invK())||'[]').filter(i=>!i.t||typeof i.t!=='number'||RT.srv()-i.t<7*864e5);}catch(e){return[];}};
 const invSet=l=>{try{localStorage.setItem(invK(),JSON.stringify(l.slice(-20)));}catch(e){}invDots();};
 /* punto rojo: invitaciones a distancia sin contestar (en el botón del menú ☰, en «Online» del menú y en «Jugar online» de la portada) */
-function invDots(){const n=invGet().length;
- [['#burger'],['.ditem[data-tab=online]'],['.qbtn[data-go=online]']].forEach(([sel])=>$$(sel).forEach(el=>{let d=el.querySelector(':scope>.rdot');if(n&&!d){d=document.createElement('i');d.className='rdot';el.appendChild(d);}else if(!n&&d)d.remove();if(d)d.textContent=n>1?n:'';}));}
+function invDots(){const n=invGet().length,nt=typeof tkPending==='function'&&tkOn()?tkPending().length:0;
+ [['#burger',n+nt],['.ditem[data-tab=online]',n],['.qbtn[data-go=online]',n],['.ditem[data-tab=aula]',nt]].forEach(([sel,c])=>$$(sel).forEach(el=>{let d=el.querySelector(':scope>.rdot');if(c&&!d){d=document.createElement('i');d.className='rdot';el.appendChild(d);}else if(!c&&d)d.remove();if(d)d.textContent=c>1?c:'';}));}
 const myUid=()=>ONL.acc&&ONL.acc.uid;
 const myElo=()=>(typeof P!=='undefined'&&P&&P.elo)||800;
 async function presTick(){if(!onlLogged()||document.hidden)return;
@@ -4685,8 +4639,8 @@ function inboxCtl(){if(!onlLogged()||ONL.acc.guest||!ON.pres){if(ON.ibw){ON.ibw.
  if(!want&&!document.hidden&&Date.now()-(ON.ibLast||0)>15000){ON.ibLast=Date.now();inboxTick();}}
 async function inboxHandle(m){if(!m||typeof m!=='object')return;ON.ibSeen=ON.ibSeen||new Set();
  for(const id of Object.keys(m)){const x=m[id];if(ON.ibSeen.has(id))continue;ON.ibSeen.add(id);RT.del(`inbox/${myUid()}/${id}`).catch(()=>{});if(x&&typeof x==='object')await onMsg(x);}}
-function onlStart(){if(!onlLogged()||ON.pres||ONL.acc.guest)return;presTick();ON.pres=setInterval(presTick,20000);ON.inb=setInterval(inboxCtl,1000);muteLoad().then(()=>presTick());setTimeout(perfilSync,4000);ON.pfT=setInterval(perfilSync,120000);}
-function onlStop(){arenaLeave(true);clearInterval(ON.pres);clearInterval(ON.inb);clearInterval(ON.pfT);ON.pres=ON.inb=null;if(ON.ibw){ON.ibw.close();ON.ibw=null;}ON.mutes=null;ON.fr=null;if(ON.search)ON.search.stop();}
+function onlStart(){if(!onlLogged()||ON.pres||ONL.acc.guest)return;presTick();ON.pres=setInterval(presTick,20000);ON.inb=setInterval(inboxCtl,1000);muteLoad().then(()=>presTick());setTimeout(perfilSync,4000);ON.pfT=setInterval(perfilSync,120000);setTimeout(()=>tkSync(),2500);ON.tkT=setInterval(()=>{if(!document.hidden)tkSync();},300000);}
+function onlStop(){arenaLeave(true);clearInterval(ON.pres);clearInterval(ON.inb);clearInterval(ON.pfT);clearInterval(ON.tkT);TK.d=null;ON.pres=ON.inb=null;if(ON.ibw){ON.ibw.close();ON.ibw=null;}ON.mutes=null;ON.fr=null;if(ON.search)ON.search.stop();}
 async function inboxTick(){if(document.hidden||!onlLogged()||ON.busy)return;ON.busy=true;
  try{const m=await RT.get('inbox/'+myUid());await inboxHandle(m);}catch(e){}
  ON.busy=false;}
@@ -4694,6 +4648,7 @@ function openWait(html,onCancel){const p=modal({title:'🌐 Online',html:`<p sty
  const bg=$$('.modalbg').pop();let done=false;p.then(v=>{if(!done){done=true;onCancel&&onCancel();}});
  return{close(){if(done)return;done=true;bg&&bg._close&&bg._close(null);}};}
 async function onMsg(x){
+ if(x.k==='tarea'){tkSync();return;}
  if(x.t&&typeof x.t==='number'&&RT.srv()-x.t>(x.tc==='corr'||x.corr?7*864e5:90000))return;
  if(x.k==='game'&&x.corr){corrCache.t=0;sound('ok');toast(`📨 ${esc(x.fn||'Tu rival')} ha aceptado la partida a distancia. Está en «Jugar online».`,'ok');return;}
  if(x.k==='rush'){if(ON.wait){ON.wait.close();ON.wait=null;}if(ON.search)ON.search.stop();return go('rushduel',{rid:x.rid});}
@@ -4942,7 +4897,7 @@ async function viewOnGame(m,{gid}){
 /* presencia: si la app no está a la vista (otra app, pantalla apagada, cerrada) NO puede contestar retos → se borra al instante; al volver reaparece */
 function presGone(){if(onlLogged()&&!ONL.acc.guest&&FB.S.user){try{fetch('https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/presence/'+myUid()+'.json?auth='+encodeURIComponent(FB.S.user.idToken),{method:'DELETE',keepalive:true});}catch(e){}}}
 if(typeof window!=='undefined'){window.addEventListener('pagehide',presGone);document.addEventListener('freeze',presGone);
- document.addEventListener('visibilitychange',()=>{if(document.hidden)presGone();else if(onlLogged()&&!ONL.acc.guest&&ON.pres)presTick();});}
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)presGone();else if(onlLogged()&&!ONL.acc.guest&&ON.pres){presTick();tkSync();}});}
 setTimeout(()=>{if(onlLogged())onlStart();},1500);
 
 /* ================= ARENA (torneo automático) ================= */
