@@ -86,7 +86,6 @@ main{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
 .insig{display:flex;justify-content:center;margin:22px 0 8px}.insig img{width:min(250px,62vw);height:auto;filter:drop-shadow(0 5px 12px rgba(0,0,0,.18))}
 /* fondo: la silueta del caballo de la tarjeta de saludo, detrás de todo y muy suave (no tapa nada) */
 body::before{content:'♞';position:fixed;right:-5vmin;bottom:-9vmin;font-size:72vmin;line-height:1;color:var(--pri);opacity:.07;z-index:-1;pointer-events:none;font-family:'Segoe UI Symbol','Noto Sans Symbols 2','DejaVu Sans',sans-serif}
-body.intrainer::before{display:none}
 .rdot{position:absolute;top:-3px;right:-3px;min-width:14px;height:14px;padding:0 3px;border-radius:999px;background:#e11d48;border:2px solid #fff;box-sizing:border-box;color:#fff;font:900 .6rem/10px system-ui,sans-serif;text-align:center;font-style:normal;animation:rpulse 1.6s ease-in-out infinite;pointer-events:none}
 .rdot:empty{width:14px;padding:0}
 @keyframes rpulse{50%{transform:scale(1.18)}}
@@ -2800,15 +2799,17 @@ function viewRush(m,arg){
  const draw0=()=>{body.innerHTML=`<div class="rushhud"><div class="timer" id="tm">${surv?'♾️':dur+':00'}</div><div class="lives" id="lv">${surv?'':'❤️❤️❤️'}</div><div style="margin-left:auto;text-align:right"><div class="muted" style="font-weight:800;font-size:.8rem">ACIERTOS</div><div class="score" id="sc">0</div></div></div>
   ${duelId?'<div class="rushopp" id="op"></div>':''}<div class="btnrow" id="tb"></div><div class="steptext" id="goal">¡Rápido!</div><div id="fb"></div><div class="muted" style="font-weight:700">🏅 ${surv?'Récord de supervivencia':'Récord en '+dur+' min'}: ${rec0.best}</div>`;};draw0();
  const fb=()=>$('#fb',body);const setFb=(h,c)=>{const f=fb();if(f)f.innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';};
- const hud=()=>{if(!$('#tm',body))return;if(!surv){const l=Math.max(0,left);$('#tm',body).textContent=Math.floor(l/60)+':'+String(l%60).padStart(2,'0');$('#tm',body).classList.toggle('low',l<=20);$('#lv',body).textContent='❤️'.repeat(Math.max(0,lives))+'🤍'.repeat(3-Math.max(0,lives));}$('#sc',body).textContent=score;};
+ const hud=()=>{if(!$('#tm',body))return;if(!surv){const l=Math.max(0,left);$('#tm',body).textContent=Math.floor(l/60)+':'+String(l%60).padStart(2,'0');$('#tm',body).classList.toggle('low',l<=20);$('#lv',body).textContent='❤️'.repeat(Math.max(0,lives))+'🤍'.repeat(3-Math.max(0,lives));}$('#sc',body).textContent=score+(surv&&liveRec?' 🏆':'');};
  function nextPz(){if(!running)return;
+  try{nextPz0();}catch(e){console.error(e);if(running)setTimeout(()=>{if(alive(tok)&&running)nextPz();},300);}}
+ function nextPz0(){
   let pz=null;while(!pz){n++;const th=['mate1','pasillo','horquilla','colgada','clavada','enfilada','descubierta','coronacion','mate1'][hash(base+'t'+n)%9];pz=genPuzzle(th,hash(base+'|'+n),Math.min(6,1+Math.floor(score/3)));}
   const p=new E.Pos(pz.fen);$('#tb',body).innerHTML=turnHTML(p.turn);$('#goal',body).innerHTML=goalText(pz);
   runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept,follow:pz.follow,fp:pz.fp},{
    onSolved:()=>{if(!running)return;score++;streak++;bestStreak=Math.max(bestStreak,streak);eloUpdate(pzRating(pz.level||1),1,5,'rush');sound('ok');hud();setFb('✅ ¡Bien!','ok');
     // los récords se avisan sin parar la partida; al final se muestran todos
-    if(!liveRec&&score>rec0.best&&rec0.best>0){liveRec=true;toast('🏆 ¡Nuevo récord de aciertos! Sigue…','badge');}
-    if(!liveStreak&&streak>rec0.streak&&rec0.streak>0&&streak>=3){liveStreak=true;toast('🔥 ¡Récord de racha! Sigue…','badge');}
+    if(!liveRec&&score>rec0.best&&rec0.best>0){liveRec=true;if(surv){const sc=$('#sc',body);if(sc)sc.textContent=score+' 🏆';}else toast('🏆 ¡Nuevo récord de aciertos! Sigue…','badge');}
+    if(!surv&&!liveStreak&&streak>rec0.streak&&rec0.streak>0&&streak>=3){liveStreak=true;toast('🔥 ¡Récord de racha! Sigue…','badge');}
     setTimeout(()=>{if(alive(tok)&&running)nextPz();},450);},
    onWrong:()=>{if(!running)return;lives--;streak=0;eloUpdate(pzRating(pz.level||1),0,5,'rush');hud();setFb(surv?'❌ ¡Primer error! Se acabó la supervivencia':'❌ ¡No era esa!','bad');if(lives<=0){end();return;}setTimeout(()=>{if(alive(tok)&&running)nextPz();},700);},
    msg:setFb},tok);
