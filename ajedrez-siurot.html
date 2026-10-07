@@ -2026,7 +2026,7 @@ function goBack(fb){
  while(NAV.length){const e=NAV.pop();if(e.tab===currentTab&&e.arg===currentArg)continue;BACKING=true;try{go(e.tab,e.arg);}finally{BACKING=false;}return;}
  if(typeof fb==='function')fb();else go(fb||'inicio');
 }
-const TABS=[['inicio','🏠','Inicio'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
+const TABS=[['inicio','🏠','Inicio'],['youtubers','🎥','YouTubers'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
 function go(tab,arg){
  if(!BACKING&&P&&VIEW>0&&currentTab!==tab&&!NAV_SKIP.has(currentTab)){NAV.push({tab:currentTab,arg:currentArg});if(NAV.length>40)NAV.shift();}
  if(tab==='inicio')NAV.length=0;
@@ -2035,8 +2035,22 @@ function go(tab,arg){
  const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'partidas',estudio:'estudios',escaner:'ejercicios',errores:'partidas',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,youtubers:viewYoutubers,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
  try{invDots();}catch(e){}
+}
+// ================= YOUTUBERS: saludos al alumnado =================
+const YOUTUBERS=[
+ {n:'Rey Enigma',id:'0TMVhmqRHxM',t:'Rey Enigma, finalista del concurso Got Talent, envía un saludo a nuestro alumnado animándolo a practicar el ajedrez. Descubre tú también todos los beneficios que aporta este deporte.'},
+ {n:'GM Ibarra',id:'zb7lZ4pHeMg',t:'Saludo del GM José Carlos Ibarra al alumnado del CEIP Manuel Siurot. El Gran Maestro y youtuber Ibarra ha sido componente de la selección española de ajedrez y campeón de España en la modalidad de ajedrez de partidas rápidas y relámpago.'},
+ {n:'Andrés Guerrero',id:'yvFfrkozrro',t:'El Maestro FIDE Andrés Guerrero envía un mensaje al alumnado del CEIP Manuel Siurot de La Palma del Condado, animándolo a seguir practicando ajedrez y a participar en el programa AulaDjaque. Sigue su canal de YouTube @AjedrezGuerrero para crecer como ajedrecista.'},
+ {n:'Sabrina Vega',id:'3KN_gdqm_u0',t:'La maestra internacional de ajedrez (IM) Sabrina Vega, ocho veces campeona de España y subcampeona de Europa, ha colaborado con el CEIP Manuel Siurot con motivo del Día Internacional de la Mujer y anima a nuestro alumnado a seguir disfrutando del ajedrez.'},
+ {n:'Luisón',id:'v-Ic572ZDFY',t:'El maestro FIDE Luis Fernández Siles, más conocido como Luisón, es un famoso ajedrecista además de ser el mayor creador de contenido sobre ajedrez en YouTube. También es editor de la revista de ajedrez Capakhine y autor de todos los vídeos de chess.com en español. Luisón anima a nuestro alumnado a seguir disfrutando del ajedrez y a participar en nuestro programa AulaDjaque.'}
+];
+function viewYoutubers(m){
+ m.innerHTML=`<div class="sectitle"><h2>🎥 YouTubers</h2></div><p class="muted" style="margin:0 0 14px">Saludos de ajedrecistas y youtubers a nuestro alumnado.</p>
+ <div style="display:grid;gap:16px;max-width:760px">${YOUTUBERS.map(y=>`<div class="card"><h3 style="margin:0 0 8px">🎥 ${esc(y.n)}</h3><p style="margin:0 0 12px">${esc(y.t)}</p>
+  <div style="position:relative;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden"><iframe src="https://www.youtube-nocookie.com/embed/${y.id}?rel=0" title="Saludo de ${esc(y.n)}" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
+  <p style="margin:10px 0 0"><a href="https://www.youtube.com/watch?v=${y.id}" target="_blank" rel="noopener" class="btn sm ghost" style="text-decoration:none;display:inline-block">▶ Abrir en YouTube</a></p></div>`).join('')}</div>`;
 }
 function alive(tok){return tok===VIEW;}
 function renderHeader(){
