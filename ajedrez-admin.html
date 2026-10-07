@@ -422,7 +422,7 @@ async function delUsers(list,de,de2,btn,after,okMsg){
  let n=0,fail=0;
  for(const u of list){toast(`Borrando ${++n} de ${list.length}…`);
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
-   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}
+   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}try{await RT.del('liga/'+u.id);}catch(e){}
    A.users=A.users.filter(x=>x.id!==u.id);A.hof=A.hof.filter(x=>x.id!==u.id);A.sel.delete(u.id);}catch(e){fail++;}}
  if(after)after();
  toast(fail?`Borrados ${list.length-fail}; fallaron ${fail}`:`${okMsg||'Eliminados'} (${list.length})`,!!fail);render();}

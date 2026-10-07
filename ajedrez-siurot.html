@@ -520,6 +520,14 @@ tr.tapr,.tapr{cursor:pointer}tr.tapr:hover td{background:#f5f0e2}.tapn{cursor:po
 .pl.tap{cursor:pointer}
 .mtop{display:flex;justify-content:flex-end;margin:-6px -6px 6px}
 
+/* liga semanal */
+.lglist{display:grid;gap:6px}
+.lgrow{display:grid;grid-template-columns:44px 34px minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px 12px;border:2px solid var(--line);border-radius:12px;background:#fff;cursor:pointer}
+.lgrow.me{background:#fff3cf;border-color:#f2b134}
+.lgrow .lgp{text-align:center;font-size:1.05rem}.lgrow .lga{font-size:1.4rem;text-align:center}
+.lgrow .lgn{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lgrow .lgn small{color:var(--mut,#777);font-weight:700}
+.lgrow .lgx{white-space:nowrap}
+
 </style>
 </head>
 <body>
@@ -1791,7 +1799,7 @@ function confetti(n){const em=['🎉','⭐','✨','🎊','♞','♛','🏆'];for
 // ================= Progreso: XP, rangos, insignias, misiones =================
 function rankIdx(xp){let i=0;RANKS.forEach((r,k)=>{if(xp>=r.xp)i=k;});return i;}
 function addXP(n,why){
- if(!n||!P)return;const before=rankIdx(P.xp);P.xp+=n;save();
+ if(!n||!P)return;const before=rankIdx(P.xp);P.xp+=n;try{wkXP(n);}catch(e){}save();
  toast(`+${n} XP · ${esc(why)}`,'xp');const after=rankIdx(P.xp);
  renderHeader();
  if(after>before){setTimeout(()=>{sound('level');confetti(40);modal({title:'¡Subes de rango!',html:`<div class="bigicon">${RANKS[after].icono}</div><p>Ahora eres <b>${RANKS[after].nombre}</b>.<br>¡Sigue así, ${esc(P.name)}!</p>`,buttons:[{t:'¡Genial!'}]});},500);}
@@ -2026,7 +2034,7 @@ function goBack(fb){
  while(NAV.length){const e=NAV.pop();if(e.tab===currentTab&&e.arg===currentArg)continue;BACKING=true;try{go(e.tab,e.arg);}finally{BACKING=false;}return;}
  if(typeof fb==='function')fb();else go(fb||'inicio');
 }
-const TABS=[['inicio','🏠','Inicio'],['youtubers','🎥','YouTubers'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
+const TABS=[['inicio','🏠','Inicio'],['youtubers','🎥','YouTubers'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['liga','🥇','Liga semanal'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
 function go(tab,arg){
  if(!BACKING&&P&&VIEW>0&&currentTab!==tab&&!NAV_SKIP.has(currentTab)){NAV.push({tab:currentTab,arg:currentArg});if(NAV.length>40)NAV.shift();}
  if(tab==='inicio')NAV.length=0;
@@ -2035,7 +2043,7 @@ function go(tab,arg){
  const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'partidas',estudio:'estudios',escaner:'ejercicios',errores:'partidas',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,youtubers:viewYoutubers,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,youtubers:viewYoutubers,liga:viewLiga,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
  try{invDots();}catch(e){}
 }
 // ================= YOUTUBERS: saludos al alumnado =================
@@ -2786,6 +2794,7 @@ function viewChallenges(m){
    ${hoy?`<p style="margin:4px 0;font-size:1.4rem;letter-spacing:3px">${retoEmoji(hoy.res)} <b style="letter-spacing:0;font-size:1rem">${hoy.ok}/5</b></p><p class="muted" style="margin:0;font-weight:700">Nuevo reto en ${untilTomorrow()} · Racha 🔥 ${P.retoRacha||0}</p>`:`<p class="muted" style="margin:0;font-weight:700">Racha de retos: 🔥 ${P.retoRacha||0} días</p>`}</div>
    <div class="btnrow">${hoy?'<button class="btn ghost" id="rep">🔁 Repasar</button>':'<button class="btn acc" id="daily" style="font-size:1.1rem">▶ Empezar el reto</button>'}</div></div>
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:14px;max-width:460px">${last7.join('')}</div></div>
+ <div id="ligac"></div>
  <div class="grid g2">
   <div class="card"><h3>🎯 Misiones de hoy</h3><p class="muted" style="margin:4px 0 8px">Cambian cada día. ¡Complétalas todas!</p>${missionsHTML()}</div>
   <div class="card" style="background:linear-gradient(135deg,#eef6ff,#fffdf8)"><h3>⚡ Contrarreloj</h3><p><b>1, 2 o 3 minutos</b> con 3 vidas, o <b>♾️ Supervivencia</b>: sin tiempo, hasta tu primer error. ¡Los ejercicios nunca se repiten!</p>
@@ -2795,6 +2804,7 @@ function viewChallenges(m){
    <div style="display:flex;gap:8px;flex-wrap:wrap">${BOTS.filter(b=>b.n<=maxBot()).map(b=>{const w=(P.games[b.n]||{}).w;const lk=b.n>(DB.settings.unlockAll?maxBot():P.unlocked);return `<div class="pill" style="font-size:1rem;padding:8px 12px;${w?'background:#dcf3e5':''}">${lk?'🔒':b.emoji} ${b.n} ${w?'✅':''}</div>`;}).join('')}</div>
    <button class="btn" style="margin-top:12px" data-go="jugar">Ir a jugar</button></div>
  </div>`;
+ try{ligaCard($('#ligac',m));}catch(e){}
  $('#rush',m).onclick=()=>go('contrarreloj');$('[data-go]',m).onclick=()=>go('jugar');
  if(hoy)$('#rep',m).onclick=()=>go('diario',{practica:true});else $('#daily',m).onclick=()=>go('diario');
  $$('[data-l]',m).forEach(r=>r.onclick=()=>go('leccion',{mod:'finales',l:r.dataset.l}));
@@ -3210,7 +3220,7 @@ function viewAnalysis(m,{id}){
   const youKey=g.color,botKey=g.color==='w'?'b':'w';
   const cntCell=(k,side,st)=>{const v=cl.cnt[side][k]||0;return `<td style="text-align:center"><span class="${v?'jumpc':''}" ${v?`data-jc="${k}" data-js="${side}" role="button" title="Ir a la jugada"`:''} style="${st}">${v}${v?' ›':''}</span></td>`;};
   const cntRow=k=>`<tr><td>${CLS[k].i} ${CLS[k].n}</td>${cntCell(k,youKey,`font-weight:800;color:${CLS[k].c}`)}${cntCell(k,botKey,'')}</tr>`;
-  body.innerHTML=head+`<div id="mc"></div>
+  body.innerHTML=head+`<div id="km"></div><div id="mc"></div>
   <div class="card" style="padding:10px"><div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:4px">📈 EVALUACIÓN (pulsa para saltar)</div><svg id="gr" viewBox="0 0 300 70" preserveAspectRatio="none" style="width:100%;height:84px;background:#fff;border:2px solid var(--line);border-radius:10px;cursor:pointer"></svg></div>
   <div class="card"><h3>📊 Resumen <span class="muted" style="font-size:.78rem;font-weight:700">· pulsa un número para ir a la jugada</span></h3><div style="display:flex;gap:14px;margin:8px 0"><div class="pill" style="font-size:1.05rem">Tu precisión: <b>${cl.acc[youKey]}%</b></div><div class="pill" style="font-size:1.05rem">${g.online?'Rival':'Máquina'}: <b>${cl.acc[botKey]}%</b></div></div>
    <table class="rec"><tr><th style="text-align:left"></th><th>Tú</th><th>${g.online?'Rival':'Máquina'}</th></tr>${CLS_ORDER.map(cntRow).join('')}</table></div>
@@ -3224,7 +3234,7 @@ function viewAnalysis(m,{id}){
   gr.onclick=e=>{const r=gr.getBoundingClientRect();go2(Math.round((e.clientX-r.left)/r.width*(an.ev.length-1)));};
   function drawML(){let h='';for(let i=0;i<n;i+=2){const cell=k=>k<n?`<span class="${k===cur-1?'cur':''}" data-i="${k+1}" style="cursor:pointer">${E.sanES(cl.moves[k].san)}<i style="color:${CLS[cl.moves[k].cls].c};font-style:normal;font-weight:900">${CLS[cl.moves[k].cls].s}</i></span>`:'<span></span>';h+=`<span class="n">${i/2+1}.</span>${cell(i)}${cell(i+1)}`;}
    const ml=$('#ml',body);ml.innerHTML=h;$$('[data-i]',ml).forEach(s=>s.onclick=()=>go2(+s.dataset.i));const c=$('.cur',ml);if(c)c.scrollIntoView({block:'nearest'});}
-  function go2(i){cur=Math.max(0,Math.min(n,i));draw();}
+  function go2(i){board.interactive=false;board.orient=g.color;cur=Math.max(0,Math.min(n,i));draw();}
   function draw(){
    const last=cur?mvs[cur-1]:null;board.hl=[];board.arrows=[];
    const mc=$('#mc',body);
@@ -3246,6 +3256,32 @@ function viewAnalysis(m,{id}){
    const nx=bad.find(([o,i])=>i+1>cur)||bad[0];go2(nx[1]+1);};
   $$('[data-jc]',body).forEach(el=>el.onclick=()=>{const k=el.dataset.jc,sd=el.dataset.js;const ix=cl.moves.map((o,i)=>o.cls===k&&o.mover===sd?i:-1).filter(i=>i>=0);if(!ix.length)return;
    const nx=ix.find(i=>i+1>cur);go2((nx===undefined?ix[0]:nx)+1);});
+  // ---- momento clave: tu peor jugada (o tu mejor, si no fallaste) explicada y para intentarla otra vez ----
+  function keyMoment(){
+   const box=$('#km',body);if(!box)return;
+   const mine=cl.moves.map((o,i)=>[o,i]).filter(([o])=>o.mover===youKey);
+   const bad=mine.filter(([o])=>['grave','error','omision'].includes(o.cls)).sort((a,b)=>b[0].loss-a[0].loss)[0];
+   const good=mine.filter(([o])=>['brillante','gran'].includes(o.cls))[0];
+   const k=bad||good;
+   if(!k){box.innerHTML='<div class="card" style="border-left:6px solid #16a34a"><b>🎯 Momento clave</b><p style="margin:6px 0 0">¡Partida muy limpia! No hay ningún error importante tuyo. 👏</p></div>';return;}
+   const [o,i]=k,num=Math.floor(i/2)+1+(g.start?new E.Pos(g.start).full-1:0),C=CLS[o.cls],pre=o.mover==='w'?num+'.':num+'…';
+   box.innerHTML=`<div class="card" style="border-left:6px solid ${C.c}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:1.05rem">🎯 Momento clave</b><span class="pill" style="background:${C.c};color:#fff">${C.i} ${C.n}</span><span class="pill">${pre} ${E.sanES(o.san)}</span></div>
+    <p style="margin:8px 0">${bad?'':'¡Tu mejor jugada de la partida! '}${moveExplain(g,an,cl,i)}</p>
+    <div class="btnrow" style="gap:6px">${bad&&an.best[i]?'<button class="btn sm acc" id="kmtry">🧩 ¿Encuentras la buena?</button>':''}<button class="btn sm ghost" id="kmgo">👀 Ver en el tablero</button></div><div id="kmfb"></div></div>`;
+   $('#kmgo',box).onclick=()=>{board.interactive=false;go2(i+1);};
+   const tb=$('#kmtry',box);if(tb)tb.onclick=()=>{
+    const p=new E.Pos(fens[i]);let tries=0;const fb=(h,c)=>{$('#kmfb',box).innerHTML=`<div class="fb ${c}" style="margin-top:8px">${h}</div>`;};
+    board.hl=[];board.arrows=[];board.set(p,{last:i?mvs[i-1]:null});board.orient=youKey;board.movable=youKey;board.interactive=true;board.render();
+    fb(`Es la posición de antes de tu jugada ${pre} Juegas con ${youKey==='w'?'⚪ blancas':'⚫ negras'}. ¡Busca la mejor jugada!`,'info');
+    board.onMove=mm=>{const u=E.uci(mm);
+     const q=new E.Pos(fens[i]);q.play(mm);const okMate=q.status()==='mate';
+     if(u===an.best[i]||okMate){board.interactive=false;board.set(q,{last:mm,anim:true});playSound(q,mm);sound('ok');fb(`✅ ¡Muy bien! <b>${E.sanES(new E.Pos(fens[i]).san(mm))}</b> era la buena.`,'ok');return;}
+     tries++;board.shake();sound('bad');
+     if(tries>=2){board.interactive=false;const bm=p.fromUci(an.best[i]);board.arrows=bm?[[bm.from,bm.to,'g']]:[];board.set(p,{last:null});fb(`💡 La buena era <b>${o.bestSan?E.sanES(o.bestSan):''}</b> (flecha verde).`,'info');}
+     else fb('❌ Esa no. ¡Prueba otra vez!','bad');};
+   };
+  }
+  keyMoment();
   draw();
  }
  start();
@@ -5134,11 +5170,52 @@ function perfilSum(){if(!P)return null;const r=rankIdx(P.xp),nx=RANKS[r+1];
   gm,on,st:(P.days&&P.days.streak)||0,rd:Object.keys(P.retos||{}).length,
   md:MODULES.map(md=>{const p=modProgress(md);return[md.icono,md.nombre,p.done,p.total,md.color];}),
   bd:BADGES.filter(b=>P.badges&&P.badges[b.id]).map(b=>[b.icono,b.nombre]),bdT:BADGES.length};}
-async function perfilSync(force){try{if(!onlLogged()||ONL.acc.guest||!P||P.cuenta!==ONL.acc.alias)return;
+async function perfilSync(force){ligaSync();try{if(!onlLogged()||ONL.acc.guest||!P||P.cuenta!==ONL.acc.alias)return;
  const s=perfilSum();if(!s)return;const j=JSON.stringify(s),K='siurot_pf_'+myUid();let last=null;try{last=JSON.parse(localStorage.getItem(K)||'null');}catch(e){}
  if(!force&&last&&last.j===j&&Date.now()-last.t<6*3600e3)return;
  await RT.putS('perfil/'+myUid(),{...s,t:RT.SV});try{localStorage.setItem(K,JSON.stringify({j,t:Date.now()}));}catch(e){}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof onlLogged==='function'&&onlLogged())perfilSync();});
+/* ===== LIGA SEMANAL: XP ganada desde el lunes. Cada alumno sube una línea pequeña a liga/{uid} ===== */
+const wkId=d=>{d=d?new Date(d):new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return today(d);};
+const wkPrev=()=>{const d=new Date();d.setDate(d.getDate()-7);return wkId(d);};
+function wkNow(){if(!P)return null;const w=wkId();const L=P.lw=P.lw||{w,x:0};if(L.w!==w){if(L.x>0){L.pw=L.w;L.px=L.x;}L.w=w;L.x=0;}return L;}
+function wkXP(n){const L=wkNow();if(L&&n>0)L.x+=n;}
+async function ligaSync(force){try{if(!onlLogged()||ONL.acc.guest||!P||P.cuenta!==ONL.acc.alias)return;
+ const L=wkNow();const v={n:ONL.acc.nombre,g:ONL.acc.grupo||'',av:P.avatar||'🧑‍🎓',w:L.w,x:L.x};if(L.pw){v.pw=L.pw;v.px=L.px||0;}
+ const j=JSON.stringify(v),K='siurot_lg_'+myUid();if(!force){let last=null;try{last=localStorage.getItem(K);}catch(e){}if(last===j)return;}
+ await RT.putS('liga/'+myUid(),v);try{localStorage.setItem(K,j);}catch(e){}}catch(e){}}
+const LIGA={d:null,t:0};
+async function ligaLoad(force){if(!force&&LIGA.d&&Date.now()-LIGA.t<60000)return LIGA.d;try{LIGA.d=await RT.get('liga')||{};LIGA.t=Date.now();}catch(e){LIGA.d=LIGA.d||{};}return LIGA.d;}
+function ligaRank(d,g,prev){const w=prev?wkPrev():wkId();const out=[];
+ for(const [id,x] of Object.entries(d||{})){if(!x||typeof x!=='object')continue;if(g&&x.g!==g)continue;const pts=x.w===w?x.x:(prev&&x.pw===w?x.px:0);if(pts>0)out.push({id,n:x.n,g:x.g,av:x.av,pts});}
+ return out.sort((a,b)=>b.pts-a.pts||String(a.n).localeCompare(String(b.n),'es'));}
+const ligaLeft=()=>{const d=new Date();const end=new Date(wkId());end.setDate(end.getDate()+7);end.setHours(0,0,0,0);const h=Math.max(0,Math.round((end-d)/36e5));return h>=48?`quedan ${Math.ceil(h/24)} días`:h>=1?`quedan ${h} h`:'termina ya';};
+async function ligaCard(el){if(!el)return;
+ if(!onlLogged()||ONL.acc.guest){el.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>🥇 Liga semanal</h3><p class="muted" style="margin:4px 0 10px">Compite cada semana con tu clase y con todo el cole. Entra con tu usuario del cole para participar.</p><button class="btn ghost" data-lg>Ver la liga</button></div>`;$('[data-lg]',el).onclick=()=>go('liga');return;}
+ el.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>🥇 Liga semanal</h3><p class="muted" style="margin:4px 0 0">Cargando…</p></div>`;
+ await ligaSync();const d=await ligaLoad();if(!el.isConnected)return;
+ const me=myUid(),cls=ligaRank(d,ONL.acc.grupo),all=ligaRank(d),pc=cls.findIndex(x=>x.id===me),pa=all.findIndex(x=>x.id===me),L=wkNow();
+ el.innerHTML=`<div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#eef4ff,#fffdf8);border-color:#b9cdf5"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="font-size:2.6rem">🥇</div><div style="flex:1;min-width:200px"><h3>Liga semanal</h3>
+  <p style="margin:4px 0">Esta semana llevas <b>${L.x} XP</b>. ${pc>=0?`Vas <b>${pc+1}º</b> en ${esc(ONL.acc.grupo||'tu clase')} y <b>${pa+1}º</b> en el cole.`:'¡Gana XP para entrar en la clasificación!'}</p><p class="muted" style="margin:0;font-size:.85rem">Se reinicia cada lunes · ${ligaLeft()}</p></div><button class="btn acc" data-lg>Ver clasificación</button></div></div>`;
+ $('[data-lg]',el).onclick=()=>go('liga');}
+async function viewLiga(m,arg){arg=arg||{};const tok=VIEW;const sc=arg.sc||'clase',prev=!!arg.prev;
+ const head=`<div class="sectitle"><h2>🥇 Liga semanal</h2><span class="pill">⏳ ${ligaLeft()}</span></div><p class="muted" style="margin:0 0 12px">Cuenta la <b>XP ganada desde el lunes</b> (lecciones, ejercicios, retos, partidas…). Cada lunes empieza una liga nueva.</p>`;
+ if(!onlLogged()||ONL.acc.guest){m.innerHTML=head+`<div class="card"><p style="margin:0 0 10px">Para aparecer en la liga, entra con tu usuario del cole.</p><button class="btn acc" id="lgin">🔑 Iniciar sesión</button></div>`;$('#lgin',m).onclick=()=>go('online');return;}
+ m.innerHTML=head+'<div class="card"><p class="muted" style="margin:0">Cargando clasificación…</p></div>';
+ await ligaSync(true);const d=await ligaLoad(true);if(!alive(tok))return;
+ const me=myUid(),g=ONL.acc.grupo||'';
+ const list=ligaRank(d,sc==='clase'?g:null,prev);const pos=list.findIndex(x=>x.id===me);
+ const medal=i=>['🥇','🥈','🥉'][i]||(i+1)+'º';
+ const row=(x,i)=>`<div class="lgrow${x.id===me?' me':''}" data-pl="${x.id}"><b class="lgp">${medal(i)}</b><span class="lga">${esc(x.av||'🧑‍🎓')}</span><span class="lgn">${esc(x.n)}${sc==='todos'?` <small>· ${esc(x.g||'')}</small>`:''}${x.id===me?' <small>(tú)</small>':''}</span><b class="lgx">${x.pts} XP</b></div>`;
+ const top=list.slice(0,30);
+ const podium=list.length?`<div style="display:flex;justify-content:center;align-items:flex-end;gap:10px;margin:6px 0 14px">${[1,0,2].map(k=>list[k]?`<div style="text-align:center;width:31%;max-width:150px"><div style="font-size:1.9rem">${esc(list[k].av||'🧑‍🎓')}</div><div style="font-weight:900;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(list[k].n)}</div><div style="background:${['#f2c94c','#c9ced6','#d79b62'][k]};border-radius:12px 12px 0 0;height:${[86,62,46][k]}px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-weight:900"><div style="font-size:1.4rem">${medal(k)}</div><div style="font-size:.85rem">${list[k].pts} XP</div></div></div>`:'').join('')}</div>`:'';
+ m.innerHTML=head+`<div class="chips" style="margin-bottom:10px"><button class="btn sm ${sc==='clase'?'':'ghost'}" data-sc="clase">🏫 Mi clase${g?' · '+esc(g):''}</button><button class="btn sm ${sc==='todos'?'':'ghost'}" data-sc="todos">🌍 Todo el cole</button><span style="flex:1"></span><button class="btn sm ${prev?'':'ghost'}" data-pv>${prev?'⬅ Esta semana':'🏅 Semana pasada'}</button></div>
+  <div class="card">${prev?'<h3 style="margin-bottom:6px">🏅 Ganadores de la semana pasada</h3>':''}${podium}${list.length?`<div class="lglist">${top.map(row).join('')}</div>${pos>=30?`<p class="muted" style="margin:8px 0 4px;text-align:center">⋯</p><div class="lglist">${row(list[pos],pos)}</div>`:''}`:`<p class="muted" style="margin:0">${prev?'No hubo participantes la semana pasada.':'Todavía nadie ha ganado XP esta semana. ¡Sé el primero!'}</p>`}
+  ${!prev&&pos<0?'<p class="muted" style="margin:10px 0 0">Aún no apareces: gana XP haciendo lecciones, ejercicios o partidas.</p>':''}</div>`;
+ $$('[data-sc]',m).forEach(b=>b.onclick=()=>go('liga',{sc:b.dataset.sc,prev}));
+ $('[data-pv]',m).onclick=()=>go('liga',{sc,prev:!prev});
+ $$('[data-pl]',m).forEach(r=>r.onclick=()=>{const x=list.find(y=>y.id===r.dataset.pl);if(x&&typeof playerCard==='function')playerCard({id:x.id,n:x.n,g:x.g});});}
+
 /* tarjeta de jugador: progreso + amigo + retar + silenciar (desde cualquier lista: conectados, torneos, salón de la fama, rival…) */
 async function playerCard(p,o){o=o||{};if(!p||!p.id)return;if(!onlLogged()){toast('Entra con tu usuario del cole para ver perfiles','bad');return;}
  const me=p.id===myUid(),guest=ONL.acc.guest;
