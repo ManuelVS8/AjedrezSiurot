@@ -2165,7 +2165,7 @@ function runPuzzle(board,cfg,cb,tok){
  const reset=async()=>{await sleep(650);if(!alive(tok))return;pos.undo();board.set(pos,{last:null});busy=false;};
  // ¿hay, tras la respuesta del rival, una captura que gane material? (plan precalculado o calculado al momento)
  const planFollow=()=>{
-  if(cfg.fp)return {rep:pos.fromUci(cfg.fp.rep),best:pos.fromUci(cfg.fp.best),acc:cfg.fp.acc,msg:cfg.fp.msg};
+  if(cfg.fp){const rep=pos.fromUci(cfg.fp.rep);if(!rep)return null;pos.play(rep);const best=pos.fromUci(cfg.fp.best);pos.undo();return {rep,best,acc:cfg.fp.acc,msg:cfg.fp.msg};}
   const sc=E.scoreMoves(pos,2);if(!sc.length)return null;const rep=sc[0].m;pos.play(rep);const f=E.scoreMoves(pos,3);pos.undo();
   const b=f[0];if(b&&(b.m.captured||b.m.promo)&&b.s>=150&&b.s<99000)return {rep,best:b.m,acc:f.filter(x=>b.s-x.s<=90).map(x=>E.uci(x.m))};return null;};
  board.onMove=async(m,anim)=>{
@@ -2816,24 +2816,27 @@ function viewRush(m,arg){
  const tok=VIEW;if((P.rushBestMix||0)>(P.rushBest||0)){P.rushBest=P.rushBestMix;save();}
  const duelId=arg.duel||null;let D=null,meK='a',opK='b',start=0;
  let surv=!!arg.surv;let dur=surv?0:(arg.dur||3),score=0,lives=surv?1:3,left=dur*60,running=false,finished=false,timerId=null,syncId=null,n=0,streak=0,bestStreak=0;let base=Date.now();
- const rec0={best:surv?(P.rushBestS||0):(P[RUSH_K(dur)]||0),streak:P.rushStreak||0,pz:(P.rt&&P.rt.problemas&&P.rt.problemas.max)||0};let liveRec=false,liveStreak=false;
+ const rec0={best:surv?(P.rushBestS||0):(P[RUSH_K(dur)]||0),streak:P.rushStreak||0,pz:(P.rt&&P.rt.problemas&&P.rt.problemas.max)||0};let failSan='',goodSan='';
  const {board,body,under}=trainerShell(m,duelId?'⚔️ Batalla de contrarreloj':'⚡ Contrarreloj',async()=>{if(running&&!(await confirmModal('¿Salir?','Se terminará la partida de contrarreloj.','Salir','Seguir')))return;clearInterval(timerId);clearInterval(syncId);if(running){running=false;if(duelId)RT.patch(`rush/${duelId}/${meK}`,{s:score,l:0,d:1}).catch(()=>{});}goBack(duelId?'online':'retos');});
  const draw0=()=>{body.innerHTML=`<div class="rushhud"><div class="timer" id="tm">${surv?'♾️':dur+':00'}</div><div class="lives" id="lv">${surv?'':'❤️❤️❤️'}</div><div style="margin-left:auto;text-align:right"><div class="muted" style="font-weight:800;font-size:.8rem">ACIERTOS</div><div class="score" id="sc">0</div></div></div>
   ${duelId?'<div class="rushopp" id="op"></div>':''}<div class="btnrow" id="tb"></div><div class="steptext" id="goal">¡Rápido!</div><div id="fb"></div><div class="muted" style="font-weight:700">🏅 ${surv?'Récord de supervivencia':'Récord en '+dur+' min'}: ${rec0.best}</div>`;};draw0();
  const fb=()=>$('#fb',body);const setFb=(h,c)=>{const f=fb();if(f)f.innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';};
- const hud=()=>{if(!$('#tm',body))return;if(!surv){const l=Math.max(0,left);$('#tm',body).textContent=Math.floor(l/60)+':'+String(l%60).padStart(2,'0');$('#tm',body).classList.toggle('low',l<=20);$('#lv',body).textContent='❤️'.repeat(Math.max(0,lives))+'🤍'.repeat(3-Math.max(0,lives));}$('#sc',body).textContent=score+(surv&&liveRec?' 🏆':'');};
+ const hud=()=>{if(!$('#tm',body))return;if(!surv){const l=Math.max(0,left);$('#tm',body).textContent=Math.floor(l/60)+':'+String(l%60).padStart(2,'0');$('#tm',body).classList.toggle('low',l<=20);$('#lv',body).textContent='❤️'.repeat(Math.max(0,lives))+'🤍'.repeat(3-Math.max(0,lives));}$('#sc',body).textContent=score;};
  function nextPz(){if(!running)return;
   try{nextPz0();}catch(e){console.error(e);if(running)setTimeout(()=>{if(alive(tok)&&running)nextPz();},300);}}
  function nextPz0(){
   let pz=null;while(!pz){n++;const th=['mate1','pasillo','horquilla','colgada','clavada','enfilada','descubierta','coronacion','mate1'][hash(base+'t'+n)%9];pz=genPuzzle(th,hash(base+'|'+n),Math.min(6,1+Math.floor(score/3)));}
   const p=new E.Pos(pz.fen);$('#tb',body).innerHTML=turnHTML(p.turn);$('#goal',body).innerHTML=goalText(pz);
-  runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept,follow:pz.follow,fp:pz.fp},{
+  const R=runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept,follow:pz.follow,fp:pz.fp},{
    onSolved:()=>{if(!running)return;score++;streak++;bestStreak=Math.max(bestStreak,streak);eloUpdate(pzRating(pz.level||1),1,5,'rush');sound('ok');hud();setFb('✅ ¡Bien!','ok');
-    // los récords se avisan sin parar la partida; al final se muestran todos
-    if(!liveRec&&score>rec0.best&&rec0.best>0){liveRec=true;if(surv){const sc=$('#sc',body);if(sc)sc.textContent=score+' 🏆';}else toast('🏆 ¡Nuevo récord de aciertos! Sigue…','badge');}
-    if(!surv&&!liveStreak&&streak>rec0.streak&&rec0.streak>0&&streak>=3){liveStreak=true;toast('🔥 ¡Récord de racha! Sigue…','badge');}
+    // ningún aviso durante la partida: los récords y logros se muestran solo al terminar
     setTimeout(()=>{if(alive(tok)&&running)nextPz();},450);},
-   onWrong:()=>{if(!running)return;lives--;streak=0;eloUpdate(pzRating(pz.level||1),0,5,'rush');hud();setFb(surv?'❌ ¡Primer error! Se acabó la supervivencia':'❌ ¡No era esa!','bad');if(lives<=0){end();return;}setTimeout(()=>{if(alive(tok)&&running)nextPz();},700);},
+   onWrong:san=>{if(!running)return;lives--;streak=0;eloUpdate(pzRating(pz.level||1),0,5,'rush');hud();
+    if(surv){running=false;board.interactive=false;failSan=san;setFb(`❌ <b>${E.sanES(san)}</b> no era la buena. Mira la flecha naranja.`,'bad');
+     // se enseña la jugada buena en el tablero y después el resumen
+     setTimeout(()=>{if(!alive(tok))return;try{R.solution();const ar=board.arrows[0],bp=board.pos;const mm=ar&&bp&&bp.legal().find(x=>x.from===ar[0]&&x.to===ar[1]);if(mm)goodSan=E.sanES(bp.san(mm));}catch(e){}},750);
+     setTimeout(()=>{if(alive(tok)){running=true;end();}},2300);return;}
+    setFb('❌ ¡No era esa!','bad');if(lives<=0){end();return;}setTimeout(()=>{if(alive(tok)&&running)nextPz();},700);},
    msg:setFb},tok);
  }
  function records(){const out=[];
@@ -2857,7 +2860,7 @@ function viewRush(m,arg){
     if(v==='r'&&typeof sendReto==='function'){go('online');setTimeout(()=>sendReto({id:D[opK],n:opN},'rush:'+dur),400);}else go('online');});
    return;}
   if(recs.length)confetti(60);
-  modal({title:recs.length?'🏆 ¡Récord!':surv?'💥 ¡Fin de la supervivencia!':'¡Tiempo!',html:`<div class="bigicon">${recs.length?'🏆':surv?'♾️':'⚡'}</div><p>${surv?`Has resuelto <b>${score}</b> ejercicio${score===1?'':'s'} seguido${score===1?'':'s'} sin fallar.`:`Has resuelto <b>${score}</b> ejercicios en ${dur} min.`}</p>${recs.length?`<div style="text-align:left"><b>Récords conseguidos:</b><br>${recs.join('<br>')}</div>`:`<p class="muted">${surv?'Récord de supervivencia: '+(P.rushBestS||0):'Récord en '+dur+' min: '+(P[RUSH_K(dur)]||0)}</p>`}`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'Otra vez',v:'o'}],dismiss:false}).then(v=>{if(v==='o')go('contrarreloj',surv?{surv:true}:{dur});else go('retos');});
+  modal({title:surv?(recs.length?'💥 ¡Fin… y nuevo récord!':'💥 ¡Fin de la supervivencia!'):recs.length?'🏆 ¡Récord!':'¡Tiempo!',html:`<div class="bigicon">${recs.length?'🏆':surv?'♾️':'⚡'}</div>${surv&&failSan?`<p class="muted" style="margin:0 0 6px">Fallaste con <b>${E.sanES(failSan)}</b>${goodSan?`; la buena era <b>${goodSan}</b>`:''}.</p>`:''}<p>${surv?`Has resuelto <b>${score}</b> ejercicio${score===1?'':'s'} seguido${score===1?'':'s'} sin fallar.`:`Has resuelto <b>${score}</b> ejercicios en ${dur} min.`}</p>${recs.length?`<div style="text-align:left"><b>Récords conseguidos:</b><br>${recs.join('<br>')}</div>`:`<p class="muted">${surv?'Récord de supervivencia: '+(P.rushBestS||0):'Récord en '+dur+' min: '+(P[RUSH_K(dur)]||0)}</p>`}`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'Otra vez',v:'o'}],dismiss:false}).then(v=>{if(v==='o')go('contrarreloj',surv?{surv:true}:{dur});else go('retos');});
  }
  function paintOpp(){const el=$('#op',body);if(!el||!D)return;const o=D[opK]||{};el.innerHTML=`🆚 <b>${esc(D[opK+'n']||'Rival')}</b> · ${o.s||0} aciertos · ${'❤️'.repeat(o.l==null?3:o.l)}${o.d?' · terminó':''}`;}
  function go2(){running=true;hud();nextPz();if(surv)return;
