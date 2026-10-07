@@ -528,6 +528,10 @@ tr.tapr,.tapr{cursor:pointer}tr.tapr:hover td{background:#f5f0e2}.tapn{cursor:po
 .lgrow .lgn{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lgrow .lgn small{color:var(--mut,#777);font-weight:700}
 .lgrow .lgx{white-space:nowrap}
 
+.ligalink{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px auto 0;padding:6px 14px;background:none;border:0;font:inherit;font-weight:900;font-size:1.15rem;color:#1f5c43;cursor:pointer;border-radius:12px}
+.ligalink:hover,.ligalink:focus-visible{background:#fff3cf;text-decoration:underline}
+.ligalink+.hello2{margin-top:8px}
+
 </style>
 </head>
 <body>
@@ -2116,6 +2120,7 @@ function viewHome(m){
  const nl=nextLesson();const hour=new Date().getHours();const hi=hour<14?'¡Buenos días':hour<21?'¡Buenas tardes':'¡Buenas noches';
  const rk=RANKS[rankIdx(P.xp)];const mdone=(ensureDaily(),P.daily.ms.filter(x=>x.done).length);
  m.innerHTML=`<div class="card brand"><img src="${LOGO_URL}" alt="Ajedrez Siurot"><div><h1>Ajedrez Siurot</h1><p>CEIP Manuel Siurot · La Palma del Condado</p></div></div>
+ <button class="ligalink" id="hliga">🏆 Liga semanal</button>
  <div class="hello2"><div class="bgk">♞</div><div class="hl"><h2>${hi}, ${esc(P.name)}! ${P.avatar}</h2><p>${rk.icono} ${rk.nombre}</p></div><div class="hchips"><span class="hchip">⭐ ${P.xp} XP</span><span class="hchip">♟ ELO ${P.elo||800}</span><span class="hchip">🔥 ${P.days.streak||0}</span></div></div>
  <div id="tcard"></div><div id="tkcard"></div>
  <div class="quick">
@@ -2129,7 +2134,7 @@ function viewHome(m){
   <button class="qbtn" data-go="laboratorio" style="border-color:#2563eb"><div class="qi">🔬</div><b>Análisis y aperturas</b><span>Explorador y tablero de análisis</span></button>
  </div>
  <div class="insig"><img src="https://raw.githubusercontent.com/ManuelVS8/AjedrezSiurot/refs/heads/main/Insignia.png" alt="Insignia: centro distinguido en ajedrez educativo (programa aulaDjaque)" loading="lazy" width="250" height="248" onerror="this.parentNode.remove()"></div>`;
- $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));try{tkBanner();}catch(e){}
+ $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));$('#hliga',m).onclick=()=>go('liga');try{tkBanner();}catch(e){}
  $('#qmis',m).onclick=()=>modal({title:'🎯 Misiones de hoy',html:missionsHTML(),buttons:[{t:'Cerrar',cls:'ghost'}]});
  homeOnline(m,VIEW);
 }
