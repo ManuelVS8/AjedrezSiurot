@@ -532,6 +532,63 @@ tr.tapr,.tapr{cursor:pointer}tr.tapr:hover td{background:#f5f0e2}.tapn{cursor:po
 .ligalink:hover,.ligalink:focus-visible{background:#fff3cf;text-decoration:underline}
 .ligalink+.hello2{margin-top:8px}
 
+/* ===== Mi camino ===== */
+.cmcard{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;padding:14px 16px;border-radius:18px;background:var(--cmbg);border:2px solid rgba(0,0,0,.08);box-shadow:0 4px 0 rgba(0,0,0,.08)}
+.cmcard.done{background:linear-gradient(135deg,#fff4d6,#f0c86a)}
+.cmce{font-size:2.6rem;line-height:1}
+.cmct{flex:1;min-width:180px;display:flex;flex-direction:column;gap:3px;color:var(--cmink,#1f5c43)}
+.cmct .cmsm{font-size:.8rem;font-weight:800;opacity:.85}.cmct b{font-size:1.1rem}
+.cmbar{height:10px;border-radius:6px;background:rgba(255,255,255,.7);overflow:hidden;margin-top:4px}.cmbar i{display:block;height:100%;background:var(--cmink,#2f7d5b);border-radius:6px}
+.cmbtns{display:flex;gap:8px;align-items:center}
+.cmmap{position:relative;display:flex;flex-direction:column;gap:0;border-radius:22px;overflow:hidden;border:2px solid var(--line);margin-bottom:90px}
+.cmw{position:relative;background:var(--cmbg);padding:16px 12px 26px;overflow:hidden;transition:filter 1.2s ease}
+.cmw.gray{filter:grayscale(1) brightness(.97)}
+.cmw+.cmw{border-top:3px dashed rgba(0,0,0,.12)}
+.cmdeco{position:absolute;opacity:.55;pointer-events:none;user-select:none}
+.cmwh{position:relative;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.75);border-radius:16px;padding:8px 12px;margin:0 auto 14px;max-width:420px;color:var(--cmink);box-shadow:0 2px 0 rgba(0,0,0,.06)}
+.cmwh .cmwe{font-size:2rem}.cmwh div{flex:1;display:flex;flex-direction:column}.cmwh small{font-weight:800;opacity:.8}.cmwh b{font-size:1.15rem}
+.cmpath{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px}
+.cmnode{position:relative;width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fff;border:4px solid rgba(0,0,0,.12);box-shadow:0 5px 0 rgba(0,0,0,.15);cursor:pointer;font-size:1.7rem;transition:transform .15s}
+.cmnode.ok{background:#3fa66b;border-color:#2b7c4e;color:#fff;font-weight:900}
+.cmnode.pz.ok{background:#3b82c4;border-color:#285f93}
+.cmnode.lk{background:#eceae4;color:#999;font-size:1.2rem;box-shadow:0 4px 0 rgba(0,0,0,.08)}
+.cmnode.cur{background:#fff3cf;border-color:#f2b134;animation:cmpulse 1.6s infinite}
+@keyframes cmpulse{0%,100%{box-shadow:0 5px 0 rgba(0,0,0,.15),0 0 0 0 rgba(242,177,52,.55)}50%{box-shadow:0 5px 0 rgba(0,0,0,.15),0 0 0 14px rgba(242,177,52,0)}}
+.cmme{position:absolute;top:-30px;left:50%;transform:translateX(-50%);font-size:1.7rem;background:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.25);animation:cmbob 1.4s ease-in-out infinite}
+@keyframes cmbob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-5px)}}
+.cmlab{position:absolute;top:72px;left:50%;transform:translateX(-50%);white-space:nowrap;background:#1f2a24;color:#fff;font-size:.8rem;font-weight:800;padding:3px 9px;border-radius:10px;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.cmnode.cur{margin-bottom:22px}
+.cmgate{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:10px;cursor:pointer}
+.cmdoor{position:relative;width:110px;height:118px;border-radius:55px 55px 8px 8px;background:#2b2118;overflow:hidden;border:5px solid #6b5333;box-shadow:0 6px 0 rgba(0,0,0,.2)}
+.cmdoor i{position:absolute;top:0;bottom:0;width:50%;background:repeating-linear-gradient(90deg,#8a6a3e 0 12px,#7a5c33 12px 14px);transition:transform 1s ease}
+.cmdoor i.l{left:0;border-right:2px solid #4d3a20}.cmdoor i.r{right:0;border-left:2px solid #4d3a20}
+.cmdoor .cmboss{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.6rem;z-index:2;filter:drop-shadow(0 2px 2px rgba(0,0,0,.5))}
+.cmgate.open .cmdoor i.l{transform:translateX(-92%)}.cmgate.open .cmdoor i.r{transform:translateX(92%)}
+.cmgate.open .cmdoor{background:radial-gradient(circle,#fff6c9,#f0c86a)}
+.cmgate.cur .cmdoor{border-color:#f2b134;animation:cmpulse 1.6s infinite}
+.cmgate.lk .cmdoor{filter:grayscale(.7)}
+.cmgl{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.85);border-radius:12px;padding:5px 12px;color:var(--cmink);text-align:center}
+.cmgl span{font-size:.82rem;font-weight:700}
+.cmgate .cmme{top:-20px}
+.cmlock{position:relative;margin:16px auto 0;width:max-content;max-width:90%;text-align:center;background:rgba(0,0,0,.65);color:#fff;font-weight:800;padding:6px 14px;border-radius:12px}
+.cmend{padding:22px;text-align:center;background:linear-gradient(180deg,#fff8e6,#fff);font-size:1.1rem}
+.cmfab{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;justify-content:center;z-index:30;pointer-events:none}
+.cmfab .btn{pointer-events:auto;min-width:240px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+/* conquista de un mundo nuevo: se abre la puerta y las casillas giran */
+.cmov{position:absolute;left:0;right:0;z-index:5;cursor:pointer;perspective:900px}
+.cmtiles{position:absolute;inset:0;display:grid}
+.cmtiles i{background:#efe2c4;backface-visibility:hidden;transform-origin:center}
+.cmtiles i.d{background:#8a6a3e}
+.cmov.go .cmtiles i{animation:cmflip .55s ease forwards}
+@keyframes cmflip{0%{transform:rotateY(0);opacity:1}100%{transform:rotateY(90deg);opacity:0}}
+.cmdoors{position:absolute;inset:0;z-index:2}
+.cmdoors i{position:absolute;top:0;bottom:0;width:50%;background:repeating-linear-gradient(90deg,#8a6a3e 0 18px,#7a5c33 18px 21px);transition:transform .9s cubic-bezier(.6,0,.3,1)}
+.cmdoors i.l{left:0;border-right:3px solid #4d3a20}.cmdoors i.r{right:0;border-left:3px solid #4d3a20}
+.cmdoorlab{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#fff;font-size:2.4rem;text-shadow:0 2px 6px rgba(0,0,0,.6);transition:opacity .4s}
+.cmdoorlab b{font-size:1.2rem}
+.cmov.go .cmdoors i.l{transform:translateX(-101%)}.cmov.go .cmdoors i.r{transform:translateX(101%)}.cmov.go .cmdoorlab{opacity:0}
+@media (prefers-reduced-motion:reduce){.cmnode.cur,.cmme,.cmgate.cur .cmdoor{animation:none}}
+
 </style>
 </head>
 <body>
@@ -2038,16 +2095,16 @@ function goBack(fb){
  while(NAV.length){const e=NAV.pop();if(e.tab===currentTab&&e.arg===currentArg)continue;BACKING=true;try{go(e.tab,e.arg);}finally{BACKING=false;}return;}
  if(typeof fb==='function')fb();else go(fb||'inicio');
 }
-const TABS=[['inicio','🏠','Inicio'],['youtubers','🎥','YouTubers'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['liga','🥇','Liga semanal'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
+const TABS=[['inicio','🏠','Inicio'],['youtubers','🎥','YouTubers'],['camino','🗺️','Mi camino'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['liga','🥇','Liga semanal'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
 function go(tab,arg){
  if(!BACKING&&P&&VIEW>0&&currentTab!==tab&&!NAV_SKIP.has(currentTab)){NAV.push({tab:currentTab,arg:currentArg});if(NAV.length>40)NAV.shift();}
  if(tab==='inicio')NAV.length=0;
  VIEW++;currentTab=tab;currentArg=arg;CUR_BOARD=null;window.scrollTo(0,0);stopSpeech();document.body.classList.remove('intrainer');fitHeader();
  $$('.modalbg').forEach(bg=>bg._close?bg._close(null):bg.remove());closeMenu();
- const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'partidas',estudio:'estudios',escaner:'ejercicios',errores:'partidas',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio'};
+ const tabOf={modulo:'aprender',leccion:'aprender',puzzle:'ejercicios',tema:'ejercicios',partida:'jugar',contrarreloj:'retos',diario:'retos',analisis:'partidas',estudio:'estudios',escaner:'ejercicios',errores:'partidas',tarea:'aula',ogame:'online',arena:'torneos',explorador:'laboratorio',tablero:'laboratorio',caminopz:'camino'};
  $$('nav.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===(tabOf[tab]||tab)));
  const m=$('main');m.innerHTML='';
- ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,youtubers:viewYoutubers,liga:viewLiga,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
+ ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,youtubers:viewYoutubers,camino:viewCamino,caminopz:viewCaminoPz,liga:viewLiga,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
  try{invDots();}catch(e){}
 }
 // ================= YOUTUBERS: saludos al alumnado =================
@@ -2122,19 +2179,19 @@ function viewHome(m){
  m.innerHTML=`<div class="card brand"><img src="${LOGO_URL}" alt="Ajedrez Siurot"><div><h1>Ajedrez Siurot</h1><p>CEIP Manuel Siurot · La Palma del Condado</p></div></div>
  <button class="ligalink" id="hliga">🏆 Liga semanal</button>
  <div class="hello2"><div class="bgk">♞</div><div class="hl"><h2>${hi}, ${esc(P.name)}! ${P.avatar}</h2><p>${rk.icono} ${rk.nombre}</p></div><div class="hchips"><span class="hchip">⭐ ${P.xp} XP</span><span class="hchip">♟ ELO ${P.elo||800}</span><span class="hchip">🔥 ${P.days.streak||0}</span></div></div>
- <div id="tcard"></div><div id="tkcard"></div>
+ <div id="cmhome"></div><div id="tcard"></div><div id="tkcard"></div>
  <div class="quick">
   <button class="qbtn" data-go="jugar"><div class="qi">🤖</div><b>Jugar</b><span>Contra la máquina</span></button>
   <button class="qbtn" data-go="online" style="border-color:#2563eb;background:#eef4ff"><div class="qi">🌐</div><b>Jugar online</b><span>Retos y compañeros conectados</span></button>
   <button class="qbtn" data-go="contrarreloj"><div class="qi">⚡</div><b>Contrarreloj</b><span>Récord: ${rushBestAll()}</span></button>
   <button class="qbtn" data-go="diario" style="border-color:#f2b134;background:#fff8e6"><div class="qi">📆</div><b>Reto diario</b><span>${(P.retos||{})[today()]?'Hecho hoy: '+retoEmoji(P.retos[today()].res):'¡5 ejercicios nuevos hoy!'}</span></button>
   <button class="qbtn" id="qmis"><div class="qi">🎯</div><b>Misiones de hoy</b><span>${mdone}/3 hechas${mdone===3?' ✅':''}</span></button>
-  <button class="qbtn" data-go="aprender"><div class="qi">📚</div><b>Aprender</b><span>${nl?'Siguiente: '+esc(nl.l.titulo):'¡Todo completado! 🏆'}</span></button>
+  <button class="qbtn" data-go="camino" style="border-color:#2f7d5b;background:#eef8f1"><div class="qi">🗺️</div><b>Mi camino</b><span>${(()=>{const S=cmState();return S.complete?'¡Completado! 🎓':'Mundo '+(S.curW+1)+' · '+esc(CAMINO[S.curW].n);})()}</span></button>
   <button class="qbtn" data-go="ejercicios"><div class="qi">🧩</div><b>Táctica por temas</b><span>Ejercicios sin límite</span></button>
   <button class="qbtn" data-go="laboratorio" style="border-color:#2563eb"><div class="qi">🔬</div><b>Análisis y aperturas</b><span>Explorador y tablero de análisis</span></button>
  </div>
  <div class="insig"><img src="https://raw.githubusercontent.com/ManuelVS8/AjedrezSiurot/refs/heads/main/Insignia.png" alt="Insignia: centro distinguido en ajedrez educativo (programa aulaDjaque)" loading="lazy" width="250" height="248" onerror="this.parentNode.remove()"></div>`;
- $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));$('#hliga',m).onclick=()=>go('liga');try{tkBanner();}catch(e){}
+ $$('[data-go]',m).forEach(b=>b.onclick=()=>go(b.dataset.go));$('#hliga',m).onclick=()=>go('liga');try{cmCardWire($('#cmhome',m));}catch(e){}try{tkBanner();}catch(e){}
  $('#qmis',m).onclick=()=>modal({title:'🎯 Misiones de hoy',html:missionsHTML(),buttons:[{t:'Cerrar',cls:'ghost'}]});
  homeOnline(m,VIEW);
 }
@@ -2240,7 +2297,7 @@ function bfsPar(fen,stars){
 }
 
 // ================= LECCIÓN =================
-function viewLesson(m,{mod:modId,l:lid}){
+function viewLesson(m,{mod:modId,l:lid,camino}){
  const tok=VIEW;const mod=MODULES.find(x=>x.id===modId),les=mod.lecciones.find(x=>x.id===lid);
  const {board,body,under,nav,speakBtn}=trainerShell(m,les.titulo,()=>goBack(()=>go('modulo',modId)));let speakTxt='';const say=t=>{if(modId!=='tactica'||idx===0)speak(t);};
  if(speakBtn){speakBtn.classList.remove('hidden');speakBtn.onclick=()=>speak(speakTxt,true);}
@@ -2438,7 +2495,7 @@ function viewLesson(m,{mod:modId,l:lid}){
   sound('done');confetti();
   const i=mod.lecciones.findIndex(x=>x.id===lid);const nxt=mod.lecciones[i+1];
   modal({title:'¡Lección completada!',html:`<div class="bigicon">${mod.icono}</div><p><b>${les.titulo}</b></p><p style="font-size:1.8rem">${starsHTML(stars)}</p><p class="muted">${stars===3?'¡Perfecta, sin errores!':stars===2?'¡Muy bien! Casi perfecta.':'¡Completada! Repítela para conseguir más estrellas.'}</p>`,
-   buttons:[{t:'Volver',cls:'ghost',v:'b'},...(nxt?[{t:'Siguiente lección →',v:'n'}]:[])]}).then(v=>{if(v==='n')go('leccion',{mod:modId,l:nxt.id});else go('modulo',modId);});
+   buttons:camino?[{t:'🗺️ Seguir el camino',v:'c'}]:[{t:'Volver',cls:'ghost',v:'b'},...(nxt?[{t:'Siguiente lección →',v:'n'}]:[])],dismiss:!camino}).then(v=>{if(camino)return go('camino');if(v==='n')go('leccion',{mod:modId,l:nxt.id});else go('modulo',modId);});
  }
  show();
 }
@@ -2687,10 +2744,10 @@ async function gameSetup(){
  S.gcfg={color:g.color,m:g.m,i:g.i,ev:g.ev,undo:!!g.undo,v960:!!g.v960};save();
  return {color:g.color,tc:g.m>0?{m:g.m,i:g.i}:null,ev:g.ev,undo:!!g.undo,v960:!!g.v960};
 }
-function viewGame(m,{level,color,resume,tc,ev,undo,v960}){
+function viewGame(m,{level,color,resume,tc,ev,undo,v960,camino}){
  const tok=VIEW;const bot=BOTS[level-1];const resumed0=!!(resume&&P.cur&&P.cur.level===level&&P.cur.color===color);const start=resumed0?(P.cur.start||undefined):(v960?E.fen960():undefined);const pos=new E.Pos(start);let over=false,thinking=false,undoUsed=false,hints=3,castled=false,gid=0;const sans=[];
  const resumed=!!(resume&&P.cur&&P.cur.level===level&&P.cur.color===color);
- if(resumed){tc=P.cur.tc||null;undo=!!P.cur.undo;}
+ if(resumed){tc=P.cur.tc||null;undo=!!P.cur.undo;camino=camino||P.cur.camino;}
  const prac=!!undo;   // con «deshacer» permitido la partida es de práctica: no suma XP ni ELO
  if(ev===undefined)ev=!!(DB.settings.gcfg&&DB.settings.gcfg.ev);
  let evOn=ev,evSeq=0,lastCp=0;
@@ -2724,7 +2781,7 @@ function viewGame(m,{level,color,resume,tc,ev,undo,v960}){
   if(cp==null){const q=new E.Pos(fen),sc=E.scoreMoves(q,2);if(sc.length){const v=Math.max(-9990,Math.min(9990,sc[0].s));cp=turn==='w'?v:-v;}else cp=q.status()==='mate'?(turn==='w'?-10000:10000):0;}
   if(my!==evSeq||!alive(tok))return;paintEv(cp);
  }
- function saveCur(){P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today(),tc:tc||null,undo:prac,start:start||undefined,clk:tc?{w:Math.round(clk.w),b:Math.round(clk.b)}:null};save();}
+ function saveCur(){P.cur={level,color,moves:pos.played.map(x=>E.uci(x)),date:today(),tc:tc||null,undo:prac,camino:camino||undefined,start:start||undefined,clk:tc?{w:Math.round(clk.w),b:Math.round(clk.b)}:null};save();}
  function updatePanel(){
   let h='';for(let i=0;i<sans.length;i+=2)h+=`<span class="n">${i/2+1}.</span><span class="${i===sans.length-1?'cur':''}">${E.sanES(sans[i])}</span><span class="${i+1===sans.length-1?'cur':''}">${sans[i+1]?E.sanES(sans[i+1]):''}</span>`;
   const ml=$('#ml',body);ml.innerHTML=h||'<span class="muted" style="grid-column:1/-1">¡Empieza la partida! Juegan blancas.</span>';ml.scrollTop=ml.scrollHeight;
@@ -2762,6 +2819,7 @@ function viewGame(m,{level,color,resume,tc,ev,undo,v960}){
   if(res==='w'){const first=g.w===1;xp=bot.xp+(first?Math.round(bot.xp/2):0);
    title='¡Has ganado!';icon='🏆';txt=`${why}. ¡Enhorabuena!`;if(!prac){track('ganar');award('win1');if(level>=3)award('win3');if(level>=5)award('win5');if(level>=6)award('win6');}
    if(!prac&&level===P.unlocked&&level<maxBot()){P.unlocked=level+1;txt+=`<br><br>🔓 ¡Has desbloqueado el <b>nivel ${level+1}: ${BOTS[level].nombre}</b>!`;}
+   if(camino&&!prac){cmBossWin(camino);txt+=`<br><br>🛡️ <b>¡Has vencido al guardián!</b> Se abre un nuevo mundo en tu camino.`;}
    confetti(50);sound('win');}
   else if(res==='d'){xp=Math.round(bot.xp/3);title='Tablas';icon='🤝';txt=why+'. ¡Buen resultado!';sound('ok');}
   else{xp=5;title='Esta vez ganó la máquina';icon='🤖';txt=why+'. ¡Cada derrota enseña algo! Inténtalo de nuevo.';sound('bad');}
@@ -2769,7 +2827,7 @@ function viewGame(m,{level,color,resume,tc,ev,undo,v960}){
   if(prac)xp=0;save();if(xp)addXP(xp,res==='w'?'Victoria':res==='d'?'Tablas':'Por intentarlo');
   const eloTxt=prac?'<span class="muted">Práctica: sin XP ni ELO</span>':eloTag(eloD);
   setFb(`${icon} <span><b>${title}</b><br>${why} ${eloTxt}</span>`,res==='w'?'ok':res==='d'?'info':'bad');
-  setTimeout(()=>{if(!alive(tok))return;modal({title,html:`<div class="bigicon">${icon}</div><p>${txt}</p>${prac?'<p class="muted"><b>↩️ Partida de práctica:</b> no suma XP ni ELO.</p>':`<p>${eloTag(eloD)} → <b>${P.elo}</b></p>`}`,buttons:[{t:'Menú',cls:'ghost',v:'m'},{t:'🔍 Analizar',cls:'ghost',v:'a'},{t:'Revancha',v:'r'}]}).then(v=>{if(v==='r')go('partida',{level,color,tc,ev:evOn,undo:prac,v960:!!start});else if(v==='m')go('jugar');else if(v==='a')go('analisis',{id:gid});});},700);
+  setTimeout(()=>{if(!alive(tok))return;modal({title,html:`<div class="bigicon">${icon}</div><p>${txt}</p>${prac?'<p class="muted"><b>↩️ Partida de práctica:</b> no suma XP ni ELO.</p>':`<p>${eloTag(eloD)} → <b>${P.elo}</b></p>`}`,buttons:camino?[{t:'🔍 Analizar',cls:'ghost',v:'a'},...(res==='w'?[]:[{t:'🔁 Revancha',cls:'ghost',v:'r'}]),{t:'🗺️ Camino',v:'c'}]:[{t:'Menú',cls:'ghost',v:'m'},{t:'🔍 Analizar',cls:'ghost',v:'a'},{t:'Revancha',v:'r'}]}).then(v=>{if(v==='c')go('camino');else if(v==='r')go('partida',{level,color,tc,ev:evOn,undo:prac,v960:!!start,camino});else if(v==='m')go('jugar');else if(v==='a')go('analisis',{id:gid});});},700);
  }
  async function botTurn(){
   if(over||pos.turn===color)return;thinking=true;updatePanel();
@@ -4306,6 +4364,125 @@ function secTareas(box){
  }
  $('#trf',box).onclick=loadRes;loadRes();
 }
+// ================= MI CAMINO: itinerario por mundos (lecciones → práctica → guardián) =================
+const _L=(mod,l)=>({k:'lec',mod,l}),_Z=(th,lv,n)=>({k:'pz',th,lv,n:n||5}),_B=(level,color)=>({k:'boss',level,color});
+const CAMINO=[
+ {id:'w1',n:'La aldea de los peones',e:'🌱',bg:'linear-gradient(180deg,#e4f6d6,#b9e39b)',ink:'#2f6b1f',deco:['🌳','🏡','🌻','🐑','🌾','🌼','🐓','🌳'],
+  st:[_L('piezas','tablero'),_L('piezas','torre'),_L('piezas','alfil'),_L('piezas','dama'),_L('piezas','rey'),_L('piezas','caballo'),_L('piezas','peon'),_L('piezas','valor'),_Z('colgada',1),_B(1,'w')]},
+ {id:'w2',n:'El castillo',e:'🏰',bg:'linear-gradient(180deg,#eceae4,#c9c3b6)',ink:'#4b4336',deco:['🏰','🚩','🛡️','⚔️','🗝️','🕯️','🏹','🚩'],
+  st:[_L('especiales','jaque'),_L('especiales','mate-ahogado'),_Z('mate1',1),_L('especiales','enroque'),_L('especiales','alpaso'),_L('especiales','coronacion'),_Z('coronacion',1),_L('especiales','tablas'),_B(2,'w')]},
+ {id:'w3',n:'El bosque de los mates',e:'🌲',bg:'linear-gradient(180deg,#d3ecd9,#8fc79f)',ink:'#1d5a33',deco:['🌲','🍄','🦉','🌲','🦊','🍂','🌲','🐿️'],
+  st:[_L('mates','mpasillo'),_L('mates','mbeso'),_Z('pasillo',1),_L('mates','mescalera'),_L('mates','mcoz'),_L('mates','mpastor'),_L('mates','mloco'),_Z('mate1',2),_B(2,'b')]},
+ {id:'w4',n:'Las montañas de la táctica',e:'⛰️',bg:'linear-gradient(180deg,#eef5ff,#b8d3f2)',ink:'#1f4f86',deco:['🏔️','⛰️','❄️','🦅','🌨️','🏔️','🐐','❄️'],
+  st:[_L('tactica','indefensa'),_Z('colgada',2),_L('tactica','horquilla'),_Z('horquilla',2),_L('tactica','ataquedoble'),_L('tactica','clavada'),_Z('clavada',2),_L('tactica','enfilada'),_Z('enfilada',2),_L('tactica','descubierta'),_Z('descubierta',2),_B(3,'w')]},
+ {id:'w5',n:'El puerto de las aperturas',e:'⚓',bg:'linear-gradient(180deg,#e2f6fb,#8fd0e6)',ink:'#0f5970',deco:['⛵','🐚','🌊','⚓','🐟','🦀','🌊','🚢'],
+  st:[_L('aperturas','principios'),_L('aperturas','italiana'),_L('aperturas','espanola'),_L('celadas','pastor'),_L('celadas','legal'),_L('aperturas','siciliana'),_L('aperturas','francesa'),_L('aperturas','carokann'),_L('aperturas','gambitodama'),_L('aperturas','londres'),_L('aperturas','ortodoxa'),_L('aperturas','indiarey'),_Z('mezcla',2),_B(3,'b')]},
+ {id:'w6',n:'El desierto de los mates',e:'🏜️',bg:'linear-gradient(180deg,#fdf1d8,#efcf8f)',ink:'#7a4b0e',deco:['🐪','🌵','☀️','🏜️','🦂','🌵','🐫','🏺'],
+  st:[_L('mates','marabe'),_L('mates','manastasia'),_L('mates','mboden'),_L('mates','mcharreteras'),_L('mates','mlegal'),_Z('mate2',1),_Z('mate2',2),_B(4,'w')]},
+ {id:'w7',n:'La gran ciudad',e:'🌆',bg:'linear-gradient(180deg,#fde4d4,#e9a98f)',ink:'#7a2f1b',deco:['🏙️','🚦','🌆','🚲','🏛️','🎡','🏙️','🚕'],
+  st:[_L('mediojuego','plan'),_L('mediojuego','rey-seguro'),_L('mediojuego','columnas'),_L('mediojuego','peones'),_L('mediojuego','mejorar'),_L('celadas','fegatello'),_L('celadas','griego'),_L('celadas','elefante'),_Z('mezcla',3),_B(5,'w')]},
+ {id:'w8',n:'El palacio del Rey',e:'👑',bg:'linear-gradient(180deg,#fff4d6,#f0c86a)',ink:'#7a5200',deco:['👑','💎','🏆','🕍','✨','🦚','💍','✨'],
+  st:[_L('finales','reyactivo'),_L('finales','fdama'),_L('finales','fdostorres'),_L('finales','ftorre'),_L('finales','fcuadrado'),_L('finales','foposicion'),_Z('coronacion',3),_B(6,'w')]}
+];
+const cmDB=()=>{P.camino=P.camino||{d:{},seen:['w1'],t:{}};P.camino.d=P.camino.d||{};P.camino.seen=P.camino.seen||['w1'];P.camino.t=P.camino.t||{};return P.camino;};
+const cmKey=(w,s)=>s.k==='lec'?'L:'+s.mod+'/'+s.l:s.k==='pz'?'Z:'+w.id+':'+s.th+s.lv:'B:'+w.id;
+function cmDone(w,s){if(s.k==='lec')return !!(P.lessons&&P.lessons[lessonKey(s.mod,s.l)]);return !!cmDB().d[cmKey(w,s)];}
+function cmLesson(s){const md=MODULES.find(x=>x.id===s.mod);return md&&md.lecciones.find(x=>x.id===s.l);}
+function cmTitle(s){if(s.k==='lec'){const l=cmLesson(s);return l?l.titulo:'Lección';}if(s.k==='pz'){const T=THEME_OF(s.th);return `Práctica: ${T.nombre}`;}const b=BOTS[s.level-1];return `Guardián: ${b.nombre}`;}
+function cmIcon(s){if(s.k==='lec'){const md=MODULES.find(x=>x.id===s.mod);return md?md.icono:'📖';}if(s.k==='pz')return THEME_OF(s.th).icono;return BOTS[s.level-1].emoji;}
+/* estado: primer paso sin hacer (en orden) */
+function cmState(){const flat=[];CAMINO.forEach((w,wi)=>w.st.forEach((s,si)=>flat.push({w,wi,s,si,done:cmDone(w,s)})));
+ const cur=flat.find(x=>!x.done)||null;const curW=cur?cur.wi:CAMINO.length;
+ const wDone=CAMINO.map(w=>w.st.filter(s=>cmDone(w,s)).length);
+ return {flat,cur,curW,wDone,complete:!cur};}
+function cmGo(x){if(!x)return go('camino');const {w,s}=x;
+ if(s.k==='lec')return go('leccion',{mod:s.mod,l:s.l,camino:1});
+ if(s.k==='pz')return go('caminopz',{w:w.id,i:x.si});
+ if(s.k==='boss')return go('partida',{level:s.level,color:s.color,camino:cmKey(w,s)});}
+/* tarjeta de la portada */
+function cmCardHTML(){if(!P)return'';const S=cmState();
+ if(S.complete)return `<div class="cmcard done"><div class="cmce">🎓</div><div class="cmct"><b>¡Has completado el camino!</b><span>Eres un ajedrecista de verdad. Sigue entrenando en la liga y los torneos.</span></div><button class="btn" data-cm="map">🗺️ Ver</button></div>`;
+ const w=S.cur.w,tot=w.st.length,dn=S.wDone[S.cur.wi];
+ return `<div class="cmcard" style="--cmbg:${w.bg};--cmink:${w.ink}"><div class="cmce">${w.e}</div><div class="cmct"><span class="cmsm">Mundo ${S.cur.wi+1} · ${esc(w.n)}</span><b>${cmIcon(S.cur.s)} ${esc(cmTitle(S.cur.s))}</b><div class="cmbar"><i style="width:${Math.round(dn/tot*100)}%"></i></div></div><div class="cmbtns"><button class="btn acc" data-cm="go">▶ Continuar</button><button class="btn sm ghost" data-cm="map">🗺️ Mapa</button></div></div>`;}
+function cmCardWire(el){if(!el)return;el.innerHTML=cmCardHTML();$$('[data-cm]',el).forEach(b=>b.onclick=()=>b.dataset.cm==='go'?cmGo(cmState().cur):go('camino'));}
+/* ---------- el mapa ---------- */
+const CM_ZZ=[0,52,86,52,0,-52,-86,-52];
+function viewCamino(m){
+ const tok=VIEW;const C=cmDB();const S=cmState();
+ const nodeHTML=(w,wi,s,si,k)=>{const done=cmDone(w,s),isCur=S.cur&&S.cur.w===w&&S.cur.si===si,locked=!done&&!isCur;
+  const off=CM_ZZ[k%CM_ZZ.length];
+  if(s.k==='boss'){const b=BOTS[s.level-1];return `<div class="cmgate ${done?'open':''} ${isCur?'cur':''} ${locked?'lk':''}" data-w="${wi}" data-s="${si}"><div class="cmdoor"><i class="l"></i><i class="r"></i><div class="cmboss">${b.emoji}</div></div><div class="cmgl"><b>${done?'✅ Guardián vencido':'🛡️ Guardián del mundo'}</b><span>${esc(b.nombre)} · juegas con ${s.color==='w'?'⚪ blancas':'⚫ negras'}</span></div>${isCur?`<div class="cmme">${esc(P.avatar)}</div>`:''}</div>`;}
+  return `<div class="cmnode ${s.k} ${done?'ok':''} ${isCur?'cur':''} ${locked?'lk':''}" style="transform:translateX(${off}px)" data-w="${wi}" data-s="${si}" title="${esc(cmTitle(s))}"><span class="cmi">${done?'✓':locked?'🔒':cmIcon(s)}</span>${isCur?`<div class="cmme">${esc(P.avatar)}</div><div class="cmlab">${esc(cmTitle(s))}</div>`:''}</div>`;};
+ const worldHTML=(w,wi)=>{const unl=wi<=S.curW,tot=w.st.length,dn=S.wDone[wi];let k=0;
+  const deco=w.deco.map((d,i)=>`<span class="cmdeco" style="top:${8+((i*37)%84)}%;${i%2?'right':'left'}:${4+((i*23)%14)}%;font-size:${1.6+(i%3)*.5}rem">${d}</span>`).join('');
+  return `<section class="cmw ${unl?'':'gray'}" id="cmw${wi}" style="--cmbg:${w.bg};--cmink:${w.ink}">${deco}
+   <div class="cmwh"><span class="cmwe">${w.e}</span><div><small>Mundo ${wi+1}</small><b>${esc(w.n)}</b></div><span class="pill">${dn}/${tot}</span></div>
+   <div class="cmpath">${w.st.map((s,si)=>nodeHTML(w,wi,s,si,s.k==='boss'?0:k++)).join('')}</div>
+   ${unl?'':`<div class="cmlock">🔒 Vence al guardián del mundo ${wi} para entrar</div>`}</section>`;};
+ m.innerHTML=`<div class="sectitle"><h2>🗺️ Mi camino</h2><span class="pill">${S.complete?'🎓 Completado':`Mundo ${S.curW+1} de ${CAMINO.length}`}</span></div>
+  <p class="muted" style="margin:0 0 12px">Lecciones, prácticas y un <b>guardián</b> al final de cada mundo: gánale para abrir el siguiente.</p>
+  <div class="cmmap">${CAMINO.map(worldHTML).join('')}<div class="cmend">${S.complete?'🎓 <b>¡Camino completado!</b>':'🎓 <b>Meta</b><br><span class="muted">Al final te espera tu diploma</span>'}</div></div>
+  <div class="cmfab"><button class="btn acc big" id="cmgo">${S.complete?'🎓 ¡Completado!':'▶ Continuar'}</button></div>`;
+ $$('[data-s]',m).forEach(el=>el.onclick=()=>{const wi=+el.dataset.w,si=+el.dataset.s,w=CAMINO[wi],s=w.st[si];
+  const done=cmDone(w,s),isCur=S.cur&&S.cur.w===w&&S.cur.si===si;
+  if(!done&&!isCur){toast(wi>S.curW?'🔒 Este mundo aún está cerrado':'🔒 Primero completa los pasos anteriores');return;}
+  const txt=s.k==='lec'?'Lección':s.k==='pz'?`${s.n} ejercicios de nivel ${s.lv}. Acierta al menos ${s.n-1} a la primera.`:`Gana la partida a <b>${esc(BOTS[s.level-1].nombre)}</b> con ${s.color==='w'?'blancas':'negras'} para abrir el siguiente mundo.`;
+  modal({title:`${cmIcon(s)} ${esc(cmTitle(s))}`,html:`<p style="text-align:center">${txt}</p>${done?'<p style="text-align:center" class="muted">✅ Ya lo has superado. Puedes repetirlo.</p>':''}`,buttons:[{t:'Cerrar',cls:'ghost',v:false},{t:done?'🔁 Repetir':'▶ Empezar',v:true}]}).then(v=>{if(v)cmGo({w,wi,s,si});});});
+ $('#cmgo',m).onclick=()=>S.complete?toast('🎓 ¡Ya has completado todo el camino!'):cmGo(S.cur);
+ // colocar la vista en el paso actual
+ setTimeout(()=>{if(!alive(tok))return;const c=$('.cmnode.cur,.cmgate.cur',m);if(c)c.scrollIntoView({block:'center',behavior:'instant'});},60);
+ // conquista: mundos recién abiertos que aún no se han visto
+ const fresh=CAMINO.map((w,wi)=>[w,wi]).filter(([w,wi])=>wi<=S.curW&&!C.seen.includes(w.id));
+ if(fresh.length){const [w,wi]=fresh[0];C.seen.push(...fresh.map(([x])=>x.id));save();setTimeout(()=>{if(alive(tok))cmConquer(m,wi);},450);}
+}
+function cmConquer(m,wi){
+ const sec=$('#cmw'+wi,m);if(!sec)return;const w=CAMINO[wi];
+ sec.scrollIntoView({block:'start',behavior:'smooth'});
+ sec.classList.add('gray','conq');
+ const ov=document.createElement('div');ov.className='cmov';
+ const cols=8,rows=Math.max(6,Math.ceil(sec.offsetHeight/(sec.offsetWidth/cols)));
+ let tiles='';for(let r=0;r<rows;r++)for(let c=0;c<cols;c++)tiles+=`<i class="${(r+c)%2?'d':'l'}" style="animation-delay:${900+(r+c)*70}ms"></i>`;
+ ov.innerHTML=`<div class="cmtiles" style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">${tiles}</div><div class="cmdoors"><i class="l"></i><i class="r"></i><div class="cmdoorlab">${w.e}<br><b>${esc(w.n)}</b></div></div>`;
+ const host=sec.parentNode;ov.style.top=sec.offsetTop+'px';ov.style.height=sec.offsetHeight+'px';host.appendChild(ov);
+ const end=()=>{if(!ov.isConnected)return;ov.remove();sec.classList.remove('gray','conq');};
+ setTimeout(()=>{ov.classList.add('go');sound('level');},350);
+ setTimeout(()=>sec.classList.remove('gray'),1000);
+ setTimeout(()=>{end();confetti(40);toast(`🎉 ¡Nuevo mundo: ${w.e} ${esc(w.n)}!`,'badge',3200);},1000+(rows+cols)*70+700);
+ ov.onclick=()=>{end();};
+}
+/* ---------- parada de práctica ---------- */
+function viewCaminoPz(m,{w:wid,i}){
+ const tok=VIEW;const w=CAMINO.find(x=>x.id===wid),s=w&&w.st[i];if(!s||s.k!=='pz')return go('camino');
+ const C=cmDB(),key=cmKey(w,s);const att=C.t[key]=(C.t[key]||0)+1;save();
+ const T=THEME_OF(s.th);const n=s.n,need=n-1;let k=-1,ok=0,runner=null,first=true;
+ const {board,body,under,nav}=trainerShell(m,`${T.icono} Práctica: ${esc(T.nombre)}`,()=>go('camino'));
+ body.innerHTML=`<div class="btnrow" style="align-items:center" id="top"></div><div class="steptext" id="goal"></div><div id="fb"></div><p class="muted" style="margin:0;font-weight:700">🎯 Acierta <b>${need} de ${n}</b> a la primera (sin pedir la solución) para avanzar.</p>`;
+ under.innerHTML='<button class="btn ghost sm" id="h1">💡 Pista</button>';
+ const setFb=(h,c)=>$('#fb',body).innerHTML=h?`<div class="fb ${c}">${h}</div>`:'';
+ const dots=()=>Array.from({length:n},(_,j)=>j<k?(res[j]?'🟢':'🔴'):j===k?'⚪':'◽').join('');const res=[];
+ function next(){
+  k++;if(k>=n)return fin();
+  let pz=null,a=0;while(!pz&&a<14){pz=genPuzzle(s.th,hash(key+'|'+att+'|'+k+'|'+a),s.lv);a++;}if(!pz){res.push(true);ok++;return next();}
+  const p=new E.Pos(pz.fen);first=true;setFb('');nav.innerHTML='';
+  $('#top',body).innerHTML=turnHTML(p.turn)+`<span class="pill">${dots()}</span>`;$('#goal',body).innerHTML=goalText(pz);
+  runner=runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept,follow:pz.follow,fp:pz.fp},{
+   onSolved:(mk,help)=>{const good=first&&mk===0&&help<2;res.push(good);if(good)ok++;sound('ok');setFb(good?'🎉 ¡Correcto a la primera!':'✅ Resuelto, pero no cuenta (hubo fallo o ayuda).',good?'ok':'info');
+    $('#top',body).innerHTML=turnHTML(p.turn)+`<span class="pill">${dots()}</span>`;nav.innerHTML=`<span style="flex:1"></span><button class="btn sm acc" id="nx">${k<n-1?'Siguiente →':'Terminar'}</button>`;$('#nx',nav).onclick=next;},
+   onWrong:san=>{first=false;setFb(`❌ ${E.sanES(san)} no funciona. ¡Inténtalo otra vez!`,'bad');},msg:setFb},tok);
+  $('#h1',under).onclick=()=>{runner.hint();setFb('💡 '+(pz.pista||T.pista||'Mira jaques y capturas.'),'info');};
+ }
+ async function fin(){
+  const pass=ok>=need;
+  if(pass){const was=!!C.d[key];C.d[key]=1;save();if(!was)addXP(15,'Camino');confetti(40);sound('done');
+   await modal({title:'✅ ¡Práctica superada!',html:`<div class="bigicon">${T.icono}</div><p style="text-align:center">Has acertado <b>${ok} de ${n}</b> a la primera.</p>`,buttons:[{t:'🗺️ Seguir el camino'}],dismiss:false});
+   go('camino');}
+  else{sound('bad');const v=await modal({title:'💪 ¡Casi!',html:`<div class="bigicon">🧩</div><p style="text-align:center">Has acertado <b>${ok} de ${n}</b>. Necesitas <b>${need}</b>.<br><span class="muted">Te saldrán ejercicios nuevos.</span></p>`,buttons:[{t:'🗺️ Mapa',cls:'ghost',v:'m'},{t:'🔁 Otra vez',v:'r'}],dismiss:false});
+   if(v==='r')go('caminopz',{w:wid,i});else go('camino');}
+ }
+ next();
+}
+/* el guardián: se llama desde el final de la partida contra la máquina */
+function cmBossWin(key){if(!key)return false;const C=cmDB();const was=!!C.d[key];C.d[key]=1;save();if(!was)setTimeout(()=>addXP(20,'Guardián vencido'),1200);return !was;}
 // ================= FICHAS IMPRIMIBLES Y TORNEOS DE CLASE =================
 function sheetBoard(pos,mm,orient){
  let h=`<div class="sbw" style="--c:${mm}mm"><div class="sbd">`;
