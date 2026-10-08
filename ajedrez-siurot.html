@@ -2186,7 +2186,7 @@ function viewHome(m){
   <button class="qbtn" data-go="contrarreloj"><div class="qi">⚡</div><b>Contrarreloj</b><span>Récord: ${rushBestAll()}</span></button>
   <button class="qbtn" data-go="diario" style="border-color:#f2b134;background:#fff8e6"><div class="qi">📆</div><b>Reto diario</b><span>${(P.retos||{})[today()]?'Hecho hoy: '+retoEmoji(P.retos[today()].res):'¡5 ejercicios nuevos hoy!'}</span></button>
   <button class="qbtn" id="qmis"><div class="qi">🎯</div><b>Misiones de hoy</b><span>${mdone}/3 hechas${mdone===3?' ✅':''}</span></button>
-  <button class="qbtn" data-go="camino" style="border-color:#2f7d5b;background:#eef8f1"><div class="qi">🗺️</div><b>Mi camino</b><span>${(()=>{const S=cmState();return S.complete?'¡Completado! 🎓':'Mundo '+(S.curW+1)+' · '+esc(CAMINO[S.curW].n);})()}</span></button>
+  <button class="qbtn" data-go="aprender"><div class="qi">📚</div><b>Aprender</b><span>${nl?'Siguiente: '+esc(nl.l.titulo):'¡Todo completado! 🏆'}</span></button>
   <button class="qbtn" data-go="ejercicios"><div class="qi">🧩</div><b>Táctica por temas</b><span>Ejercicios sin límite</span></button>
   <button class="qbtn" data-go="laboratorio" style="border-color:#2563eb"><div class="qi">🔬</div><b>Análisis y aperturas</b><span>Explorador y tablero de análisis</span></button>
  </div>
