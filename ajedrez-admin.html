@@ -282,6 +282,7 @@ window.ADMIN_A=A;
 const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
 const TT=Object.fromEntries(TABS.map(([k,e,t])=>[k,t]));
 const nm=u=>u.nombre||u.alias;
+const isAdm=g=>String(g||'').trim().toLowerCase()==='admin';   // grupo del profesorado: no suma al salón de la fama
 const ICON='icon-admin192.png';
 /* ---------- sesión e instalación ---------- */
 /* cada cambio público (torneos, salón de la fama, aviso) avisa a la app del alumnado al instante */
@@ -291,7 +292,7 @@ const pubT1=t=>{const o={};PUBF.forEach(k=>{if(t[k]!==undefined&&t[k]!==null)o[k
 async function pubSync(withIns){
  const open=A.torneos.filter(t=>t.estado!=='terminado');
  const T={};open.forEach(t=>T[t.id]=pubT1(t));
- const hof=A.hof.slice().sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
+ const hof=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
  const upd={t:T,hof,cfg:{avisos:(A.cfg.avisos||[]).filter(a=>a.on).map(a=>({texto:a.texto,url:a.url||''}))},seed:1,v:RT.SV};
  if(withIns){const ins={};for(const t of open){try{const js=await FB.list(`torneos/${t.id}/jugadores`);ins[t.id]={};js.forEach(j=>ins[t.id][j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});}catch(e){}}upd.ins=ins;}
  else{try{const cur=await RT.get('pub/ins')||{};const ids=new Set(open.map(t=>t.id));for(const k of Object.keys(cur))if(!ids.has(k))upd['ins/'+k]=null;}catch(e){}}
@@ -657,7 +658,7 @@ async function finishTorneo(t){
  const ok=js.filter(j=>!j.fuera&&((j.partidas||0)>0||(j.puntos||0)>0));
  const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
  const clasif=rk.filter(r=>(r.pa||0)>0||(r.pts||0)>0).slice(0,60).map(r=>({u:r.guest?'':r.id,n:r.n,g:r.g||'',p:r.pts||0,w:r.w||0,d:r.d||0,l:r.l||0}));
- for(const j of ok){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
+ for(const j of ok.filter(x=>!isAdm(x.grupo))){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
  const fin=(t.tipo||'arena')==='arena'&&tFin(t)?Math.min(Date.now(),tFin(t)):Date.now();
  const p={estado:'terminado',fin,podio,clasif};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);
  /* historial para el alumnado (Realtime Database: sin lecturas de Firestore): resumen, clasificación y «mis torneos» */
@@ -701,12 +702,13 @@ function projector(t,get,load){const ov=document.createElement('div');ov.classNa
 /* ---------- tareas, clase y fichas (se abre la herramienta del profe de la app de juego, con la sesión de admin) ---------- */
 function vProfe(m){m.innerHTML=`<iframe src="index.html#profe" title="Tareas y fichas" style="width:100%;height:calc(100vh - 62px - env(safe-area-inset-top));border:0;display:block;background:#fbf7ee"></iframe>`;}
 /* ---------- salón de la fama ---------- */
-function vHof(m){const l=[...A.hof].sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
+function vHof(m){const l=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
  m.innerHTML=`<div class="row" style="margin-bottom:10px"><p class="muted grow" style="margin:0 4px">Top 10 · suma de los puntos de todos los torneos terminados.</p><button class="ib2" id="opt" aria-label="Opciones">⋯</button></div>
  ${l.length?`<div class="list">${l.map((h,i)=>`<div class="li" style="cursor:default"><span class="pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="t"><b>${esc(h.nombre)}</b><span>${esc(h.grupo||'')} · ${h.torneos||0} torneos · mejor ${h.mejor||0}</span></div><span class="pts">${h.puntos||0}</span></div>`).join('')}</div>`:'<div class="card empty">Todavía no hay datos: termina algún torneo.</div>'}`;
  const backup=()=>download('salon-fama-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(A.hof,null,1),'application/json');
- $('#opt',m).onclick=async()=>{const k=await sheet('Salón de la fama',[{k:'bk',e:'⬇️',t:'Descargar copia de seguridad'},{k:'rs',e:'♻️',t:'Nuevo curso: vaciar el salón…',cls:'red'}]);
+ $('#opt',m).onclick=async()=>{const k=await sheet('Salón de la fama',[{k:'bk',e:'⬇️',t:'Descargar copia de seguridad'},A.hof.some(h=>isAdm(h.grupo))&&{k:'adm',e:'🧹',t:`Quitar al grupo Admin del salón (${A.hof.filter(h=>isAdm(h.grupo)).length})`},{k:'rs',e:'♻️',t:'Nuevo curso: vaciar el salón…',cls:'red'}]);
   if(k==='bk')backup();
+  if(k==='adm'){const q=A.hof.filter(h=>isAdm(h.grupo));if(!await confirmM('Quitar al grupo Admin',`Se borran del salón de la fama los puntos de ${q.length} jugador${q.length>1?'es':''} del grupo Admin. Sus cuentas no se tocan.`,'Quitar',true))return;try{for(const h of q)await FB.del('hof/'+h.id);A.hof=A.hof.filter(h=>!isAdm(h.grupo));try{await pubSync();}catch(e){}toast('Grupo Admin quitado del salón');render();}catch(e){toast(FB.msg(e),1);}}
   if(k==='rs'){const r=await askM('♻️ Vaciar salón de la fama',`<p>Se borrarán los puntos acumulados de <b>${A.hof.length}</b> jugadores. Antes se descargará una copia.</p><p>Escribe <b>RESTAURAR</b> para confirmar:</p><input autocomplete="off" autocapitalize="characters">`,'Vaciar');if(!r||r[0].trim().toUpperCase()!=='RESTAURAR')return r?toast('No coincide: no se ha borrado nada',1):0;
    try{backup();for(const h of A.hof)await FB.del('hof/'+h.id);A.hof=[];toast('Salón de la fama vacío');render();}catch(e){toast(FB.msg(e),1);}}};}
 /* ---------- ajustes ---------- */
