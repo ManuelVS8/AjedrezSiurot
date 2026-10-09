@@ -1790,7 +1790,7 @@ const KEY='ajedrezSiurot.v1';
 const DEF_SET={sound:true,coords:true,dots:true,unlockAll:false,pieces:'cburnett',board:'madera',muted:false,tts:false};
 function loadDB(){let d=null;try{d=JSON.parse(localStorage.getItem(KEY));}catch(e){}if(!(d&&d.profiles))d={profiles:{},current:null};d.studies=d.studies||[];d.aula=d.aula||{};d.settings=Object.assign({},DEF_SET,d.settings||{});if(!d.settings._v33){d.settings.tts=false;d.settings._v33=1;}return d;}
 let DB=loadDB();let P=null;
-function save(){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){}try{pgTouch();}catch(e){}}
 function today(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function yesterday(){const d=new Date();d.setDate(d.getDate()-1);return today(d);}
 function newProfile(name,avatar){return {id:'p'+Date.now().toString(36),name,avatar,xp:0,created:today(),lessons:{},puzzles:{},solved:0,noFail:0,games:{},unlocked:1,badges:{},days:{last:null,streak:0},daily:null,rushBest:0,elo:800,eloHist:[800],eloMax:800,eloN:0,eloBy:{}};}
@@ -3009,7 +3009,7 @@ function showProfiles(first){
  if($('#logoutp',m))$('#logoutp',m).onclick=doLogout;
 }
 async function doLogout(){if(!onlLogged())return;if(!(await confirmModal('¿Cerrar sesión?',`Se cerrará la sesión de <b>${esc(ONL.acc.nombre)}</b> en este dispositivo. Para volver a entrar necesitarás el usuario y la clave.`,'Cerrar sesión','Cancelar',true)))return;
- try{await perfilSync(true);}catch(e){}await onlLogout();setTimeout(()=>location.reload(),400);}
+ try{await pgPush();}catch(e){}try{await perfilSync(true);}catch(e){}await onlLogout();setTimeout(()=>location.reload(),400);}
 function newProfileModal(){
  let av=AVATARS[Math.floor(Math.random()*AVATARS.length)];
  const html=`<p class="muted">Escribe tu nombre y elige un avatar.</p><input class="txt" id="pname" maxlength="18" placeholder="Tu nombre" autocomplete="off"><div class="avpick">${AVATARS.map(a=>`<button data-a="${a}" class="${a===av?'on':''}">${a}</button>`).join('')}</div><div id="perr" style="color:var(--bad);font-weight:800;min-height:1.2em"></div>`;
@@ -3022,7 +3022,7 @@ function newProfileModal(){
  inp.addEventListener('keydown',e=>{if(e.key==='Enter')createBtn.click();});
  pr.then(v=>{if(!v)return;const p=newProfile(inp.value.trim(),av);DB.profiles[p.id]=p;save();selectProfile(p.id);toast(`¡Bienvenido/a, ${esc(p.name)}! ${p.avatar}`);});
 }
-function selectProfile(id){DB.current=id;P=DB.profiles[id];P.elo=P.elo||800;P.eloHist=P.eloHist||[P.elo];P.eloMax=P.eloMax||P.elo;P.eloBy=P.eloBy||{};P.eloN=P.eloN||0;save();checkStreak();ensureDaily();renderHeader();go('inicio');}
+function selectProfile(id){DB.current=id;P=DB.profiles[id];P.elo=P.elo||800;P.eloHist=P.eloHist||[P.elo];P.eloMax=P.eloMax||P.elo;P.eloBy=P.eloBy||{};P.eloN=P.eloN||0;save();checkStreak();ensureDaily();renderHeader();go('inicio');try{if(pgMine())pgPull(true);}catch(e){}}
 function showSettings(){
  const S=DB.settings;const row=(k,t,d)=>`<div class="setrow"><div>${t}${d?`<div class="muted" style="font-size:.8rem;font-weight:700">${d}</div>`:''}</div><button class="switch ${S[k]?'on':''}" data-k="${k}"></button></div>`;
  const pcs=Object.keys(PIECESETS).map(k=>`<button class="psel ${S.pieces===k?'on':''}" data-p="${k}" title="${PIECENAMES[k]}"><span><img src="${pieceURL(k,'wN')}" alt=""><img src="${pieceURL(k,'bQ')}" alt=""></span><small>${PIECENAMES[k]}</small></button>`).join('')+`<button class="psel ${S.pieces==='unicode'?'on':''}" data-p="unicode" title="Texto"><span style="font-size:2rem;line-height:1">♘♛</span><small>Simples</small></button>`;
@@ -4657,8 +4657,10 @@ function onlFecha(ms){if(!ms)return'';const d=new Date(ms),n=new Date(),h=d.toLo
 const PUB={d:null,w:null,t:0,legacy:0};
 /* aviso del profe (se escribe en la app de administración); con enlace, toda la tarjeta se puede pulsar */
 const avisoURL=u=>{u=String(u||'').trim();if(!u)return'';if(!/^https?:\/\//i.test(u))u='https://'+u;try{const x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:'';}catch(e){return'';}};
-function avisoHTML(cfg,st){cfg=cfg||{};if(!cfg.aviso)return'';const u=avisoURL(cfg.avisoUrl);const css=`display:flex;align-items:center;gap:10px;background:#fff8e6;border-color:#f2b134;${st||''}`;
- return u?`<a class="card avlink" href="${esc(u)}" target="_blank" rel="noopener" style="${css};text-decoration:none;color:inherit">📣 <b style="flex:1">${esc(cfg.aviso)}</b><span class="pill" style="background:#f2b134;color:#2c1d00;white-space:nowrap">🔗 Abrir</span></a>`:`<div class="card" style="${css}">📣 <b>${esc(cfg.aviso)}</b></div>`;}
+function avisoHTML(cfg,st){cfg=cfg||{};let list=Array.isArray(cfg.avisos)?cfg.avisos:(cfg.aviso?[{texto:cfg.aviso,url:cfg.avisoUrl}]:[]);
+ list=list.filter(a=>a&&a.texto);if(!list.length)return'';
+ const css=`display:flex;align-items:center;gap:10px;background:#fff8e6;border-color:#f2b134;${st||''}`;
+ return list.map(a=>{const u=avisoURL(a.url);return u?`<a class="card avlink" href="${esc(u)}" target="_blank" rel="noopener" style="${css};text-decoration:none;color:inherit">📣 <b style="flex:1">${esc(a.texto)}</b><span class="pill" style="background:#f2b134;color:#2c1d00;white-space:nowrap">🔗 Abrir</span></a>`:`<div class="card" style="${css}">📣 <b>${esc(a.texto)}</b></div>`;}).join('');}
 function pubBuild(d){d=d||{};const ts=Object.entries(d.t||{}).filter(([id,t])=>t&&typeof t==='object').map(([id,t])=>({...t,id}));
  const hof=(Array.isArray(d.hof)?d.hof:Object.values(d.hof||{})).filter(Boolean).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
  return{torneos:ts.sort((a,b)=>(a.inicio||0)-(b.inicio||0)),hof,cfg:d.cfg||{},ins:d.ins||{},pub:true};}
@@ -5361,6 +5363,66 @@ async function perfilSync(force){ligaSync();try{if(!onlLogged()||ONL.acc.guest||
  if(!force&&last&&last.j===j&&Date.now()-last.t<6*3600e3)return;
  await RT.putS('perfil/'+myUid(),{...s,t:RT.SV});try{localStorage.setItem(K,JSON.stringify({j,t:Date.now()}));}catch(e){}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&typeof onlLogged==='function'&&onlLogged())perfilSync();});
+/* ===== PROGRESO EN LA NUBE (prog/{uid} en Realtime Database): con usuario del cole, el progreso es el mismo en cualquier
+   dispositivo o navegador. Se sube 20 s después de un cambio (agrupando) y al salir de la app. Al abrirla o volver a ella
+   solo se pregunta un número de versión (rev, unos bytes); el progreso completo se baja únicamente si otro dispositivo lo cambió.
+   Se guarda como texto JSON: viaja exacto (Firebase no admite algunas claves ni guarda objetos vacíos).
+   Los ajustes (sonido, tablero…) y la partida a medias siguen siendo de cada dispositivo. ===== */
+const PG={t:null,pullT:0,mute:false,busy:null,ok:null};   // ok: uid ya comparado con la nube en esta sesión (antes no se sube nada)
+const PG_SKIP=new Set(['id','cur']);
+const pgMine=()=>typeof onlLogged==='function'&&onlLogged()&&!ONL.acc.guest&&!!P&&P.cuenta===ONL.acc.alias;
+const pgKey=()=>'siurot_pg_'+myUid();
+function pgMeta(){try{return JSON.parse(localStorage.getItem(pgKey())||'null')||{};}catch(e){return{};}}
+function pgSetMeta(m){try{localStorage.setItem(pgKey(),JSON.stringify(m));}catch(e){}}
+function pgData(){const o={};for(const k in P)if(!PG_SKIP.has(k)&&P[k]!==undefined)o[k]=P[k];return o;}
+function pgHash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return s.length+':'+h;}
+/* save() avisa aquí: se programa la subida */
+function pgTouch(){if(PG.mute||!pgMine())return;clearTimeout(PG.t);PG.t=setTimeout(()=>pgPush(),20000);}
+async function pgPush(hide){clearTimeout(PG.t);PG.t=null;if(!pgMine())return;if(PG.ok!==myUid())return pgPull(true);if(PG.busy)return PG.busy;
+ const uid=myUid(),j=JSON.stringify(pgData()),h=pgHash(j);if(pgMeta().h===h)return;   // nada nuevo desde la última vez
+ const rev=Date.now().toString(36)+Math.random().toString(36).slice(2,6),body=JSON.stringify({rev,t:RT.SV,p:j});
+ PG.busy=(async()=>{try{
+  if(hide&&body.length<60000){   // la app se cierra o pasa a segundo plano: «keepalive» para que el envío no se corte
+   const r=await fetch(RT.B+'prog/'+uid+'.json?print=silent&auth='+encodeURIComponent((await FB.tok())||''),{method:'PUT',body,keepalive:true,headers:{'Content-Type':'application/json'}});if(!r.ok)return;}
+  else await RT.putS('prog/'+uid,{rev,t:RT.SV,p:j});
+  if(myUid()===uid)pgSetMeta({rev,h});}catch(e){}finally{PG.busy=null;}})();
+ return PG.busy;}
+async function pgPull(force){if(!pgMine())return;const now=Date.now();if(!force&&now-PG.pullT<45000)return;PG.pullT=now;
+ if(PG.busy)await PG.busy;
+ const uid=myUid(),m=pgMeta();let rev;
+ try{rev=await RT.get(`prog/${uid}/rev`);}catch(e){return;}   // sin conexión: se sigue con lo de este dispositivo
+ if(!pgMine()||myUid()!==uid)return;
+ if(!rev||rev===m.rev){PG.ok=uid;return pgPush();}   // primera vez, o nadie más ha cambiado nada: se suben los cambios de aquí (si los hay)
+ let d=null;try{const s=await RT.get(`prog/${uid}/p`);d=s?JSON.parse(s):null;}catch(e){return;}
+ if(!d||!pgMine()||myUid()!==uid)return;
+ PG.ok=uid;const dirty=pgHash(JSON.stringify(pgData()))!==m.h,empty=!m.rev&&!(P.xp>0);
+ if(dirty&&!empty){pgApply(pgMerge(pgData(),d));pgSetMeta({rev,h:''});await pgPush();}   // cambios en los dos lados: se juntan y se sube el resultado
+ else{pgApply(d);pgSetMeta({rev,h:pgHash(JSON.stringify(pgData()))});}}
+function pgApply(d){const keep={id:P.id,cuenta:P.cuenta,cur:P.cur},base=newProfile(d.name||P.name,d.avatar||P.avatar);
+ for(const k of Object.keys(P))delete P[k];Object.assign(P,base,d,keep);if(keep.cur===undefined)delete P.cur;
+ PG.mute=true;try{try{checkStreak();ensureDaily();}catch(e){}save();}finally{PG.mute=false;}
+ try{renderHeader();}catch(e){}
+ if(['inicio','camino','progreso','aprender','modulo','ejercicios','retos','liga','partidas'].includes(currentTab)&&!$('.modalbg'))go(currentTab,currentArg);}
+/* fusión (solo si hubo cambios sin subir en este dispositivo y también en la nube): se queda lo mejor de cada lado */
+function pgDeep(a,b){if(a===undefined||a===null)return b;if(b===undefined||b===null)return a;
+ if(typeof a==='number'&&typeof b==='number')return Math.max(a,b);
+ if(typeof a==='boolean'&&typeof b==='boolean')return a||b;
+ if(Array.isArray(a)&&Array.isArray(b)){
+  if(a.concat(b).every(x=>x===null||typeof x!=='object'))return[...new Set(a.concat(b))];
+  if(a.concat(b).every(x=>x&&typeof x==='object'&&x.id!=null)){const m=new Map();a.concat(b).forEach(x=>m.set(String(x.id),m.has(String(x.id))?pgDeep(m.get(String(x.id)),x):x));return[...m.values()];}
+  return b.length>=a.length?b:a;}
+ if(typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b)){const o={};new Set([...Object.keys(a),...Object.keys(b)]).forEach(k=>o[k]=pgDeep(a[k],b[k]));return o;}
+ return b;}
+function pgMerge(a,b){const o=pgDeep(a,b),more=(x,y,k)=>!y?x:!x?y:((x[k]||0)>=(y[k]||0)?x:y);
+ const e=more(a,b,'eloN');['elo','eloHist','eloBy','eloN'].forEach(k=>{if(e[k]!==undefined)o[k]=e[k];});   // el ELO puede bajar: se queda el del lado con más partidas
+ ['rt','temas'].forEach(f=>{if(!a[f]&&!b[f])return;o[f]={};new Set([...Object.keys(a[f]||{}),...Object.keys(b[f]||{})]).forEach(k=>o[f][k]=more((a[f]||{})[k],(b[f]||{})[k],'n'));});
+ const later=(f,k)=>{const x=a[f],y=b[f];if(x&&y&&x[k]!==y[k])o[f]=String(x[k]||'')>String(y[k]||'')?x:y;};
+ later('days','last');later('daily','date');later('lw','w');
+ ['name','avatar'].forEach(k=>{if(b[k])o[k]=b[k];});
+ if(Array.isArray(o.hist)){o.hist.sort((x,y)=>(x.id||0)-(y.id||0));while(o.hist.filter(x=>!x.keep).length>15){o.hist.splice(o.hist.findIndex(x=>!x.keep),1);}}
+ return o;}
+document.addEventListener('visibilitychange',()=>{try{if(!pgMine())return;if(document.hidden)pgPush(true);else pgPull();}catch(e){}});
+window.addEventListener('pagehide',()=>{try{if(pgMine())pgPush(true);}catch(e){}});
 /* ===== LIGA SEMANAL: XP ganada desde el lunes. Cada alumno sube una línea pequeña a liga/{uid} ===== */
 const wkId=d=>{d=d?new Date(d):new Date();d.setHours(12,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return today(d);};
 const wkPrev=()=>{const d=new Date();d.setDate(d.getDate()-7);return wkId(d);};
