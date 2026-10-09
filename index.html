@@ -2106,6 +2106,7 @@ function go(tab,arg){
  const m=$('main');m.innerHTML='';
  ({inicio:viewHome,aprender:viewLearn,modulo:viewModule,leccion:viewLesson,ejercicios:viewExercises,puzzle:viewPuzzle,jugar:viewPlay,partida:viewGame,local2:viewLocal2,rushduel:(m,a)=>viewRush(m,{duel:a&&a.rid}),explorador:viewExplorer,tablero:viewBoardAn,laboratorio:viewLab,partidas:viewMyGames,retos:viewChallenges,contrarreloj:viewRush,progreso:viewProgress,tema:viewTema,diario:viewDaily,analisis:viewAnalysis,estudios:viewStudies,estudio:viewStudy,escaner:viewScanner,errores:viewMistakes,torneos:viewTorneos,online:viewOnline,youtubers:viewYoutubers,camino:viewCamino,caminopz:viewCaminoPz,liga:viewLiga,amigos:viewAmigos,ogame:viewOnGame,arena:viewArena,aula:viewAula,tarea:viewTask})[tab](m,arg);
  try{invDots();}catch(e){}
+ try{bkSync();}catch(e){}
 }
 // ================= YOUTUBERS: saludos al alumnado =================
 const YOUTUBERS=[
@@ -3048,17 +3049,31 @@ function showSettings(){
 }
 
 // ================= Arranque =================
-// El botón "atrás" del navegador/Chromebook navega dentro de la app y nunca saca de la página
+// Botón «atrás» del sistema:
+// - Móvil/tablet: cierra ventanas o vuelve a la pantalla anterior; SOLO en la pantalla de inicio (sin nada abierto) sale de la app.
+//   Para eso hay una entrada «guarda» en el historial solo mientras no se está en el inicio; en el inicio se quita.
+// - Ordenador/Chromebook: navega dentro de la app y nunca saca de la página (como siempre).
+const BK_MOBILE=(()=>{const u=navigator.userAgent||'';return !/CrOS/.test(u)&&(/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1));})();
+const BK={ign:0,t:null};
+const bkOverlay=()=>$('.drawerbg')||$$('.modalbg').pop()||$('.tvov')||$('.projov')||$('.sheetov');
+const bkNeed=()=>!BK_MOBILE||!!bkOverlay()||(!!P&&currentTab!=='inicio');
+function bkSync(){clearTimeout(BK.t);BK.t=setTimeout(()=>{try{const g=history.state&&history.state.app===2;
+ if(bkNeed()){if(!g)history.pushState({app:2},'');}
+ else if(g){BK.ign++;history.back();}}catch(e){}},60);}
 function initBack(){
- try{history.replaceState({app:1},'');history.pushState({app:2},'');}catch(e){}
+ try{history.replaceState({app:1},'');if(!BK_MOBILE)history.pushState({app:2},'');}catch(e){}
  window.addEventListener('popstate',()=>{
-  try{history.pushState({app:2},'');}catch(e){}
-  if($('.drawerbg')){closeMenu();return;}
-  const mb=$$('.modalbg').pop();if(mb){if(mb._dismiss&&mb._close)mb._close(null);return;}
-  const back=$('#back');
-  if(back)back.click();
-  else if(P&&currentTab!=='inicio')goBack('inicio');
+  if(BK.ign>0){BK.ign--;return;}   // la quitó la propia app (al llegar al inicio)
+  const ov=bkOverlay();
+  if(ov){if(ov.classList.contains('drawerbg'))closeMenu();
+   else if(ov.classList.contains('modalbg')){if(ov._dismiss&&ov._close)ov._close(null);}
+   else{const x=ov.querySelector('#tvx,#pjx,#shx');if(x)x.click();else ov.remove();document.body.classList.remove('sheeting');}}
+  else{const back=$('#back');
+   if(back)back.click();
+   else if(P&&currentTab!=='inicio')goBack('inicio');}
+  bkSync();
  });
+ new MutationObserver(bkSync).observe(document.body,{childList:true});   // se abren o cierran ventanas
 }
 function closeMenu(){const d=$('.drawerbg');if(d)d.remove();}
 function openMenu(){
