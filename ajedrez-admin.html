@@ -95,7 +95,8 @@ details.box>div{padding:0 14px 14px}
 .cards{display:grid;grid-template-columns:1fr 1fr;gap:0;width:190mm;max-width:100%;margin:0 auto}
 .cd{border:1px dashed #888;padding:1.5mm 3mm;height:14.5mm;display:flex;flex-direction:column;justify-content:center;gap:.6mm;page-break-inside:avoid;overflow:hidden;line-height:1.15}
 .cd .nm{font-size:10.5pt;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cd .gp{font-weight:600;color:#555}.cd .cl{font-size:8.5pt;color:#555;white-space:nowrap}.cd .cr{font-size:11pt;color:#000;font-family:ui-monospace,Consolas,monospace;font-weight:800;letter-spacing:.03em}
-@media print{body>*:not(.sheetov){display:none!important}.sheetov{position:static;padding:0}.sheetov .bar2{display:none}.cards{width:190mm}@page{size:A4;margin:10mm}}
+.pg{width:190mm;max-width:100%;margin:0 auto 18px}.phd{display:flex;align-items:center;gap:3mm;border-bottom:.7mm solid #1f5a41;padding:0 1mm 2mm;margin-bottom:3mm;color:#1f5a41}.phd img{width:16mm;height:16mm;object-fit:contain}.phd b{display:block;font-size:15pt;font-weight:900;line-height:1.1}.phd small{display:block;font-size:8.5pt;color:#555;font-weight:700}.phd .pr{text-align:right}.phd .pr small{color:#1f5a41;font-size:10pt}
+@media print{body>*:not(.sheetov){display:none!important}.sheetov{position:static;padding:0}.sheetov .bar2{display:none}.pg{width:auto;margin:0;padding:10mm;-webkit-box-decoration-break:clone;box-decoration-break:clone}.pg+.pg{break-before:page;page-break-before:always}.cards{width:190mm;grid-template-columns:1fr 1fr}.phd{break-after:avoid}@page{size:A4;margin:0}}
 @media(max-width:640px){.cards{grid-template-columns:1fr}}
 @media(min-width:700px){.tiles{grid-template-columns:repeat(3,1fr)}}
 body.framed main{max-width:none;padding:0}
@@ -249,7 +250,7 @@ function tEff(t,now){if(!t)return null;if(t.estado==='terminado')return'terminad
 /* claves: 3 números + 3 letras minúsculas (sin caracteres que se confunden) */
 function genClave(){const D='23456789',L='abcdefghjkmnpqrstuvwxyz',r=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n;};let s='';for(let i=0;i<3;i++)s+=D[r(D.length)];for(let i=0;i<3;i++)s+=L[r(L.length)];return s;}
 const claveOK=c=>/^[0-9]{3}[a-z]{3}$/.test(c);
-function slugAlias(nombre){const t=nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').trim().split(/\s+/).filter(Boolean);if(!t.length)return'';return t[0].slice(0,14)+(t.length>1?t[t.length-1].charAt(0):'');}
+function slugAlias(nombre){const t=nombre.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,'').trim().split(/\s+/).filter(Boolean);if(!t.length)return'';const PT=new Set(['de','del','la','las','los','el','y','i','da','do','dos','van','von','san','mc']);const s=t.slice(1).find(w=>!PT.has(w));return t[0].slice(0,14)+(s?s.charAt(0):'');}
 /* 👁 ver/ocultar clave en todos los campos de contraseña */
 (function(){const add=i=>{if(i.dataset.eye||i.type!=='password')return;i.dataset.eye=1;const w=document.createElement('span');w.style.cssText='position:relative;display:block;width:'+(i.style.width||'100%');i.parentNode.insertBefore(w,i);w.appendChild(i);i.style.width='100%';i.style.boxSizing='border-box';i.style.paddingRight='46px';
  const b=document.createElement('button');b.type='button';b.textContent='👁';b.title='Ver clave';b.setAttribute('aria-label','Ver clave');b.style.cssText='position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;border:0;background:transparent;font-size:1.2rem;cursor:pointer;padding:0;opacity:.75';
@@ -290,7 +291,7 @@ const pubT1=t=>{const o={};PUBF.forEach(k=>{if(t[k]!==undefined&&t[k]!==null)o[k
 async function pubSync(withIns){
  const open=A.torneos.filter(t=>t.estado!=='terminado');
  const T={};open.forEach(t=>T[t.id]=pubT1(t));
- const hof=A.hof.filter(h=>String(h.grupo||'').trim().toLowerCase()!=='admin').slice().sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
+ const hof=A.hof.slice().sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
  const upd={t:T,hof,cfg:{avisos:(A.cfg.avisos||[]).filter(a=>a.on).map(a=>({texto:a.texto,url:a.url||''}))},seed:1,v:RT.SV};
  if(withIns){const ins={};for(const t of open){try{const js=await FB.list(`torneos/${t.id}/jugadores`);ins[t.id]={};js.forEach(j=>ins[t.id][j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});}catch(e){}}upd.ins=ins;}
  else{try{const cur=await RT.get('pub/ins')||{};const ids=new Set(open.map(t=>t.id));for(const k of Object.keys(cur))if(!ids.has(k))upd['ins/'+k]=null;}catch(e){}}
@@ -358,10 +359,17 @@ function vInicio(m){const h=new Date().getHours(),sal=h<14?'¡Buenos días!':h<2
  $$('.tile',m).forEach(b=>b.onclick=()=>nav(b.dataset.k));
  $$('[data-t]',m).forEach(c=>c.onclick=()=>nav('torneos',c.dataset.t));
  if($('#rqc',m))$('#rqc',m).onclick=()=>{const t=act[0];nav('torneos',t?t.id:null);};}
-/* ---------- PDF de claves ---------- */
-function printCards(list){const ov=document.createElement('div');ov.className='sheetov';
- ov.innerHTML=`<div class="bar2"><button class="btn" id="pp">🖨️ Imprimir / PDF</button><button class="btn ghost" id="px">Cerrar</button><span class="muted" style="align-self:center">Elige «Guardar como PDF».</span></div><div class="cards">${list.map(u=>`<div class="cd"><div class="nm">${esc(nm(u))}${u.grupo?` <span class="gp">· ${esc(u.grupo)}</span>`:''}</div><div class="cl">Usuario <span class="cr">${esc(u.alias)}</span> &nbsp;Clave <span class="cr">${esc(u.clave)}</span></div></div>`).join('')}</div>`;
- document.body.appendChild(ov);$('#px',ov).onclick=()=>ov.remove();$('#pp',ov).onclick=()=>window.print();}
+/* ---------- PDF de claves: una hoja por grupo, con la cabecera de la app ---------- */
+function printSheets(list){const by={};list.forEach(u=>(by[gOf(u)]=by[gOf(u)]||[]).push(u));
+ const gs=Object.keys(by).sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));if(!gs.length)return toast('No hay nadie que imprimir',1);
+ const head=g=>`<div class="phd"><img src="logo.png" alt=""><div class="grow"><b>Ajedrez Siurot</b><small>CEIP Manuel Siurot · La Palma del Condado</small></div><div class="pr"><b>${g==='(sin grupo)'?'':esc(g)}</b><small>ajedrezsiurot.com</small></div></div>`;
+ const ov=document.createElement('div');ov.className='sheetov';
+ ov.innerHTML=`<div class="bar2"><button class="btn" id="pp">🖨️ Imprimir / PDF</button><button class="btn ghost" id="px">Cerrar</button><span class="muted" style="align-self:center">${gs.length>1?gs.length+' grupos, cada uno en su hoja. ':''}Elige «Guardar como PDF».</span></div>`
+  +gs.map(g=>`<section class="pg">${head(g)}<div class="cards">${by[g].sort((a,b)=>nm(a).localeCompare(nm(b),'es')).map(u=>`<div class="cd"><div class="nm">${esc(nm(u))}${u.grupo?` <span class="gp">· ${esc(u.grupo)}</span>`:''}</div><div class="cl">Usuario <span class="cr">${esc(u.alias)}</span> &nbsp;Clave <span class="cr">${esc(u.clave)}</span></div></div>`).join('')}</div></section>`).join('');
+ document.body.appendChild(ov);$('#px',ov).onclick=()=>ov.remove();
+ $('#pp',ov).onclick=()=>{const t=document.title;document.title='Claves ajedrez'+(gs.length===1&&gs[0]!=='(sin grupo)'?' '+gs[0]:'');window.print();setTimeout(()=>document.title=t,1500);};}
+const printCards=list=>printSheets(list);
+const printAllGroups=()=>A.users.length?printSheets(A.users):toast('No hay alumnado',1);
 /* ---------- alumnado ---------- */
 const csvUsers=l=>csv([['Usuario','Nombre','Grupo','Clave','Estado','Último acceso'],...l.map(u=>[u.alias,u.nombre,u.grupo,u.clave,u.ultimoLogin?'activo':'sin estrenar',fdate(u.ultimoLogin)])]);
 const gOf=u=>u.grupo||'(sin grupo)';
@@ -384,8 +392,8 @@ function vUsers(m){
  const q=$('#q',m);q.oninput=()=>{A.q=q.value;drawUsers(m);};
  $$('[data-e]',m).forEach(b=>b.onclick=()=>{A.est=b.dataset.e;vUsers(m);});
  $('#more',m).onclick=async()=>{const l=filtered();const s=l.filter(u=>A.sel.has(u.id));
-  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},s.length&&{k:'mdel',e:'🗑',t:`Borrar los marcados (${A.sel.size})…`,cls:'red'},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'ng',e:'🏷️',t:'Crear grupo'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
-  if(k==='pdfl')l.length?printCards(l):toast('No hay nadie en la lista',1);if(k==='pdfs')printCards(s);if(k==='clr'){A.sel.clear();drawUsers(m);}if(k==='mdel')delMarked();
+  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},{k:'pall',e:'🖨️',t:'Imprimir todos los grupos'},s.length&&{k:'mdel',e:'🗑',t:`Borrar los marcados (${A.sel.size})…`,cls:'red'},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'ng',e:'🏷️',t:'Crear grupo'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
+  if(k==='pdfl')l.length?printCards(l):toast('No hay nadie en la lista',1);if(k==='pdfs')printCards(s);if(k==='pall')printAllGroups();if(k==='clr'){A.sel.clear();drawUsers(m);}if(k==='mdel')delMarked();
   if(k==='csv')download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');if(k==='alta')nav('alta');if(k==='ng'){const g=await askNewGroup();if(g){A.open.add(g);drawUsers(m);}}if(k==='bdel')bulkDel('');};
  drawUsers(m);}
 function selBar(m){const b=$('#selbar',m);if(!b)return;const n=A.sel.size;
@@ -399,16 +407,43 @@ function drawUsers(m){const box=$('#ul',m);if(!box)return;selBar(m);const l=filt
  const ns=()=>{const e=$('#nsel',m);if(e)e.textContent=A.sel.size?A.sel.size+' marcados':'toca un grupo para verlo';selBar(m);};
  $$('.ck',box).forEach(c=>{c.onclick=e=>e.stopPropagation();c.onchange=()=>{c.checked?A.sel.add(c.dataset.id):A.sel.delete(c.dataset.id);ns();};});
  $$('[data-gm]',box).forEach(b=>b.onclick=async e=>{e.preventDefault();e.stopPropagation();const g=b.dataset.gm,gl=A.users.filter(u=>gOf(u)===g);
-  const k=await sheet(`Grupo ${esc(g)} · ${gl.length} alumnos`,gl.length?[{k:'gp',e:'📊',t:'Progreso del grupo'},{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'pdf',e:'🖨️',t:'PDF de claves del grupo'},{k:'sel',e:'☑',t:'Marcar a todo el grupo'},g!=='(sin grupo)'&&{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'del',e:'🗑',t:'Borrar el grupo entero…',cls:'red'}]:[{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'rm',e:'🗑',t:'Quitar este grupo vacío',cls:'red'}]);
+  const k=await sheet(`Grupo ${esc(g)} · ${gl.length} alumnos`,gl.length?[{k:'gp',e:'📊',t:'Progreso del grupo'},{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'pdf',e:'🖨️',t:'PDF de claves del grupo'},{k:'regen',e:'🔄',t:'Rehacer usuarios / claves del grupo…'},{k:'sel',e:'☑',t:'Marcar a todo el grupo'},g!=='(sin grupo)'&&{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'del',e:'🗑',t:'Borrar el grupo entero…',cls:'red'}]:[{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'rm',e:'🗑',t:'Quitar este grupo vacío',cls:'red'}]);
   if(k==='rm'){A.grupos=A.grupos.filter(x=>x!==g);try{await saveGroups();toast('Grupo quitado');}catch(er){toast(FB.msg(er),1);}drawUsers(m);return;}
   if(k==='ren'){const r=await askM('✏️ Cambiar nombre del grupo',`<label class="f">Nuevo nombre</label><input value="${esc(g)}" maxlength="20">`,'Guardar');const nn=r&&r[0].trim();if(!nn||nn===g)return;
    if(allGroups().some(x=>x.toLowerCase()===nn.toLowerCase()&&x!==g))return toast('Ya existe un grupo con ese nombre',1);
    try{for(const u of gl){await FB.set('users/'+u.id,{grupo:nn},['grupo']);u.grupo=nn;}A.grupos=A.grupos.map(x=>x===g?nn:x);if(!A.grupos.includes(nn))A.grupos.push(nn);await saveGroups();if(A.open.has(g)){A.open.delete(g);A.open.add(nn);}toast('Grupo renombrado');}catch(er){toast(FB.msg(er),1);}drawUsers(m);return;}
   if(k==='gp')return groupProg(g,gl);
-  if(k==='pdf')printCards(gl);if(k==='sel'){gl.forEach(u=>A.sel.add(u.id));drawUsers(m);ns();}if(k==='add'){A.alta='grupo';A.altaG=g==='(sin grupo)'?'':g;nav('alta');}if(k==='del')bulkDel(g);});
+  if(k==='regen')return regenGroup(g,gl,m);
+  if(k==='pdf')printCards(gl,g);if(k==='sel'){gl.forEach(u=>A.sel.add(u.id));drawUsers(m);ns();}if(k==='add'){A.alta='grupo';A.altaG=g==='(sin grupo)'?'':g;nav('alta');}if(k==='del')bulkDel(g);});
  $$('[data-u]',box).forEach(r=>r.onclick=async()=>{const u=A.users.find(x=>x.id===r.dataset.u);if(!u)return;
   const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'prog',e:'📊',t:'Ver su progreso'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'ed',e:'✏️',t:'Editar jugador'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
   if(k==='prog')showProg(u.id,nm(u));else if(k==='card')printCards([u]);else if(k)userAct(k,u);});}
+/* rehace los usuarios de un grupo con la regla actual (nombre + inicial de la 2ª palabra) y, si se pide, genera claves nuevas */
+async function regenGroup(g,gl,m){
+ const used=new Set(A.users.map(u=>u.alias)),plan=[];
+ for(const u of [...gl].sort((a,b)=>nm(a).localeCompare(nm(b),'es'))){used.delete(u.alias);const base=slugAlias(u.nombre||'');let a=null;
+  if(base)for(let n=0;n<30&&!a;n++){const c=n?base+(n+1):base;if(!used.has(c))a=c;}
+  a=a||u.alias;used.add(a);plan.push({u,a});}
+ const ch=plan.filter(p=>p.a!==p.u.alias);
+ const r=await askM('🔄 Rehacer usuarios · '+esc(g),
+  (ch.length?`<p style="margin:0 0 8px">Se cambiará el usuario de <b>${ch.length}</b> alumno${ch.length>1?'s':''}:</p><div style="max-height:40vh;overflow:auto;border:1px solid #ddd;border-radius:10px;padding:6px 10px;margin-bottom:10px">${ch.map(p=>`<div style="padding:3px 0">${esc(nm(p.u))}: <span class="mono" style="text-decoration:line-through;opacity:.6">${esc(p.u.alias)}</span> → <span class="mono"><b>${esc(p.a)}</b></span></div>`).join('')}</div>`
+   :'<p style="margin:0 0 10px">✅ Los usuarios de este grupo ya siguen la regla. No hay que cambiar ninguno.</p>')
+  +`<label class="row" style="font-weight:700"><input type="checkbox"> 🔑 Generar también claves nuevas para todo el grupo (${gl.length})</label>
+  <p class="muted" style="margin:10px 0 0;font-size:.85rem">El progreso de cada alumno se conserva. Tendrán que entrar otra vez con los datos nuevos: al terminar podrás imprimir las tarjetas.</p>`,'Aplicar');
+ if(!r)return;const newPass=!!r[0];
+ const todo=plan.filter(p=>p.a!==p.u.alias||newPass);if(!todo.length)return toast('No hay nada que cambiar');
+ let n=0,fail=[];
+ for(const {u,a} of todo){toast(`Actualizando ${++n} de ${todo.length}…`);
+  try{let s=await FB.signIn(u.alias,u.clave);const upd={};
+   if(a!==u.alias){s=await FB.setAlias(s.idToken,a);upd.alias=a;}
+   if(newPass){const nc=genClave();await FB.setPass(s.idToken,nc);upd.clave=nc;}
+   await FB.set('users/'+u.id,upd,Object.keys(upd));Object.assign(u,upd);
+   if(upd.alias&&A.hof.some(x=>x.id===u.id)){try{await FB.set('hof/'+u.id,{alias:a},['alias']);}catch(e){}A.hof.forEach(x=>{if(x.id===u.id)x.alias=a;});}
+  }catch(e){fail.push(nm(u)+': '+FB.msg(e));}}
+ drawUsers(m);
+ const ok=todo.length-fail.length;
+ const v=await modal({title:fail.length?'⚠️ Terminado con fallos':'✅ Grupo actualizado',html:`<p>Actualizados: <b>${ok}</b> de ${todo.length}.</p>${fail.map(f=>`<p class="err" style="margin:4px 0">${esc(f)}</p>`).join('')}`,buttons:[{t:'Cerrar',cls:'ghost',v:false},{t:'🖨️ Imprimir tarjetas del grupo',v:true}]});
+ if(v)printCards(A.users.filter(u=>gOf(u)===g),g);}
 async function bulkDel(g){
  const groups=[...new Set(A.users.map(gOf))].sort((a,b)=>a.localeCompare(b,'es'));if(!groups.length)return toast('No hay grupos',1);
  if(!g){const r=await askM('🗑 Borrar un grupo entero',`<p>Elige el grupo que quieres borrar:</p><select>${groups.map(x=>`<option value="${esc(x)}">${esc(x)} (${A.users.filter(u=>gOf(u)===x).length})</option>`).join('')}</select>`,'Continuar');if(!r)return;g=r[0];}
@@ -451,7 +486,7 @@ function vAlta(m){const one=A.alta!=='grupo';const g0=A.altaG||'';A.altaG='';
  m.innerHTML=`<div class="seg"><button data-m="uno" class="${one?'on':''}">👤 Un alumno</button><button data-m="grupo" class="${one?'':'on'}">👥 Un grupo</button></div>
  ${one?`<div class="card"><label class="f">Nombre e inicial</label><input id="n1" placeholder="Lucía M." autocomplete="off"><label class="f">Grupo</label>${groupSelect('gs',g0||A.lastG||'')}<button class="btn big" id="b1" style="margin-top:14px">Crear usuario</button></div>`
  :`<div class="card"><label class="f">Grupo</label>${groupSelect('gs',g0||A.lastG||'')}<label class="f">Alumnado (uno por línea)</label><textarea id="ta" placeholder="Lucía M.&#10;Pablo R.&#10;Ana G."></textarea><button class="btn big" id="b2" style="margin-top:14px">Crear usuarios</button></div>`}
- <p class="muted" style="margin:0 4px 12px">Solo nombre e inicial del apellido. El usuario será nombre + inicial (ej. «Lucía M.» → <span class="mono">luciam</span>) y la clave, 3 números y 3 letras.</p>
+ <p class="muted" style="margin:0 4px 12px">Escribe nombre y apellidos (o nombre e inicial). El usuario será el primer nombre + la inicial de la palabra siguiente: «Abril Orihuela Grande» → <span class="mono">abrilo</span>; «María José García» → <span class="mono">mariaj</span>. La clave: 3 números y 3 letras.</p>
  <div id="res"></div>`;groupBind(m,'gs');
  $$('[data-m]',m).forEach(b=>b.onclick=()=>{A.alta=b.dataset.m;vAlta(m);});
  const go=async names=>{if(!names.map(x=>x.trim()).filter(Boolean).length)return toast('Escribe algún nombre',1);const g=await groupValue(m,'gs');if(!g)return;A.lastG=g;createUsers(names,g,m);};
@@ -622,7 +657,7 @@ async function finishTorneo(t){
  const ok=js.filter(j=>!j.fuera&&((j.partidas||0)>0||(j.puntos||0)>0));
  const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
  const clasif=rk.filter(r=>(r.pa||0)>0||(r.pts||0)>0).slice(0,60).map(r=>({u:r.guest?'':r.id,n:r.n,g:r.g||'',p:r.pts||0,w:r.w||0,d:r.d||0,l:r.l||0}));
- for(const j of ok.filter(j=>String(j.grupo||'').trim().toLowerCase()!=='admin')){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
+ for(const j of ok){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
  const fin=(t.tipo||'arena')==='arena'&&tFin(t)?Math.min(Date.now(),tFin(t)):Date.now();
  const p={estado:'terminado',fin,podio,clasif};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);
  /* historial para el alumnado (Realtime Database: sin lecturas de Firestore): resumen, clasificación y «mis torneos» */
