@@ -4,7 +4,7 @@
 // - Si no hay conexión, se usa la última copia guardada (la app sigue funcionando).
 // - Iconos, Stockfish y fuentes: se sirven de la copia guardada y se actualizan en segundo plano.
 const CACHE = 'siurot-cache-v2';
-const PRE = ['./', './ajedrez-siurot.html', './manifest.webmanifest', './icon192.png', './icon512.png', './logo.png'];
+const PRE = ['./', './index.html', './manifest.webmanifest', './icon192.png', './icon512.png', './logo.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
@@ -46,7 +46,7 @@ async function networkFirst(req) {
     if (res && res.ok) c.put(req, res.clone());
     return res;
   } catch (err) {
-    const hit = await c.match(req, { ignoreSearch: true }) || await c.match('./ajedrez-siurot.html') || await c.match('./');
+    const hit = await c.match(req, { ignoreSearch: true }) || await c.match('./index.html') || await c.match('./');
     if (hit) return hit;
     throw err;
   }
