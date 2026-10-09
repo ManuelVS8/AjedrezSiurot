@@ -276,7 +276,7 @@ const fdate=ms=>ms?new Date(ms).toLocaleString('es-ES',{day:'2-digit',month:'2-d
 const fhora=ms=>ms?new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
-const A={grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:'',avisoUrl:''},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
+const A={grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',avisos:[]},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
 window.ADMIN_A=A;
 const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
 const TT=Object.fromEntries(TABS.map(([k,e,t])=>[k,t]));
@@ -291,7 +291,7 @@ async function pubSync(withIns){
  const open=A.torneos.filter(t=>t.estado!=='terminado');
  const T={};open.forEach(t=>T[t.id]=pubT1(t));
  const hof=A.hof.slice().sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
- const upd={t:T,hof,cfg:{aviso:A.cfg.aviso||'',avisoUrl:A.cfg.avisoUrl||''},seed:1,v:RT.SV};
+ const upd={t:T,hof,cfg:{avisos:(A.cfg.avisos||[]).filter(a=>a.on).map(a=>({texto:a.texto,url:a.url||''}))},seed:1,v:RT.SV};
  if(withIns){const ins={};for(const t of open){try{const js=await FB.list(`torneos/${t.id}/jugadores`);ins[t.id]={};js.forEach(j=>ins[t.id][j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});}catch(e){}}upd.ins=ins;}
  else{try{const cur=await RT.get('pub/ins')||{};const ids=new Set(open.map(t=>t.id));for(const k of Object.keys(cur))if(!ids.has(k))upd['ins/'+k]=null;}catch(e){}}
  await RT.patch('pub',upd);}
@@ -310,7 +310,7 @@ async function boot(){let u=null;try{u=JSON.parse(localStorage.getItem('adm')||'
 function loginView(){$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><h2 style="margin:16px 0 2px">Ajedrez Siurot</h2><p class="muted" style="margin:0 0 18px">Administración</p><input id="em" type="email" placeholder="Correo" value="${FBC.admin}" autocomplete="username"><input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password"><button class="btn" id="go">Entrar</button><p class="err" id="er"></p></div>`;
  const go=async()=>{$('#er').textContent='';const b=$('#go');b.disabled=true;b.textContent='Entrando…';try{const u=await FB.login($('#em').value.trim().toLowerCase(),$('#pw').value);if(u.email!==FBC.admin){FB.logout();throw {code:'NO_ADMIN'};}await loadAll();pubSync(true).catch(()=>{});shell();}catch(e){b.disabled=false;b.textContent='Entrar';$('#er').textContent=e.code==='NO_ADMIN'?'Esta cuenta no es de administración.':FB.msg(e);}};
  $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go();};}
-async function loadAll(){lastRefresh=Date.now();needRefresh=false;const[u,t,h,c,gr]=await Promise.all([FB.list('users'),FB.query('torneos',{orderBy:['inicio','desc'],limit:60}),FB.list('hof'),FB.get('config/main'),FB.get('config/grupos').catch(()=>null)]);A.grupos=(gr&&gr.lista)||[];A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;if(c)A.cfg={...A.cfg,...c};}
+async function loadAll(){lastRefresh=Date.now();needRefresh=false;const[u,t,h,c,gr]=await Promise.all([FB.list('users'),FB.query('torneos',{orderBy:['inicio','desc'],limit:60}),FB.list('hof'),FB.get('config/main'),FB.get('config/grupos').catch(()=>null)]);A.grupos=(gr&&gr.lista)||[];A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;if(c){A.cfg={...A.cfg,...c};if(!Array.isArray(A.cfg.avisos))A.cfg.avisos=c.aviso?[{id:'m1',texto:c.aviso,url:c.avisoUrl||'',on:true}]:[];delete A.cfg.aviso;delete A.cfg.avisoUrl;}}
 async function logout(){if(!await confirmM('Cerrar sesión','¿Salir de la administración en este dispositivo?','Salir',true))return;FB.logout();A.tab='inicio';A.tid=null;loginView();}
 /* ---------- armazón: barra, cajón y navegación ---------- */
 function shell(){$('#app').innerHTML=`<header class="top"><button class="ib" id="bk" aria-label="Atrás">←</button><img class="lg" id="lg" src="${ICON}" alt=""><h1 id="ttl"></h1><button class="ib" id="mn" aria-label="Menú">☰<span class="dot" id="mdot" style="display:none"></span></button></header><main id="main"></main>`;
@@ -515,14 +515,25 @@ async function vTorneo(m,t){if(!t){A.tid=null;return render();}
   ${rq.length?`<div class="card alert"><h3>🙋 Solicitudes de entrada (${rq.length})</h3>${rq.map(r=>`<div class="row" style="margin:8px 0"><b class="grow">${esc(r.n)}</b><button class="btn sm" data-ok="${r.id}">✔ Dar paso</button><button class="btn sm red" data-no="${r.id}">✕</button></div>`).join('')}<p class="muted" style="margin:6px 0 0">Los invitados no entran en el salón de la fama y se borran al terminar.</p></div>`:''}
   <div class="sec">Clasificación</div>${js.length?`<div class="list">${js.map((j,i)=>`<div class="li ${j.fuera?'off':''}" data-j="${j.id}"><span class="pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="t"><b>${esc(j.nombre)}${j.guest?' <span class="pill">invitado</span>':''}</b><span>${esc(j.grupo||'')}${j.est?' · '+j.est:''} · ${j.partidas||0} partidas${j.fuera?' · descalificado':''}</span></div>${j.fx?`<span class="pill" style="background:#fde0dc;color:#b91c1c" title="Salió de la pestaña ${j.fx} veces durante sus partidas: podría estar usando ayuda externa">⚠️ ${j.fx}</span>`:''}<span class="pts">${j.puntos||0}</span></div>`).join('')}</div>`:'<div class="card empty">Nadie se ha apuntado todavía.</div>'}`;
   $('#opt',m).onclick=async()=>{const k=await sheet(esc(t.nombre),[{k:'tv',e:'📺',t:'Ver las partidas en directo (proyector)'},{k:'pj',e:'🏆',t:'Clasificación en el proyector'},{k:'cs',e:'⬇️',t:'Descargar clasificación (CSV)'},ab&&{k:'add',e:'➕',t:'Añadir jugador'},ab&&{k:'ed',e:'✏️',t:'Editar torneo'},{k:'rm',e:'🗑',t:'Eliminar torneo',cls:'red'}]);
-   if(k==='tv')window.open('index.html#tv='+encodeURIComponent(t.id),'_blank');
+   if(k==='tv')window.open('ajedrez-siurot.html#tv='+encodeURIComponent(t.id),'_blank');
    if(k==='pj')projector(t,()=>js,load);
    if(k==='cs')download(`torneo-${t.nombre.replace(/\W+/g,'_')}.csv`,csv([['Puesto','Usuario','Nombre','Grupo','Puntos','Partidas','Salidas de pestaña'],...js.map((j,i)=>[i+1,j.alias,j.nombre,j.grupo,j.puntos||0,j.partidas||0,j.fx||0])]),'text/csv');
    if(k==='add'){const have=new Set(js.map(j=>j.id));const c=A.users.filter(u=>!have.has(u.id));if(!c.length)return toast('No hay más alumnos',1);
     const r=await askM('➕ Añadir jugador',`<select>${c.map(u=>`<option value="${u.id}">${esc(nm(u))} · ${esc(u.grupo||'')}</option>`).join('')}</select>`,'Añadir');if(!r)return;
     const u=A.users.find(x=>x.id===r[0]);const j={alias:u.alias,nombre:nm(u),grupo:u.grupo||'',puntos:0,partidas:0,fuera:false};try{await FB.set(`torneos/${t.id}/jugadores/${u.id}`,j);RT.put(`pub/ins/${t.id}/${u.id}`,{n:j.nombre,g:j.grupo,a:j.alias}).catch(()=>{});js.push({id:u.id,...j});draw();}catch(e){toast(FB.msg(e),1);}}
-   if(k==='ed'){const r=await askM('✏️ Editar torneo',`<label class="f">Nombre</label><input value="${esc(t.nombre)}">${ritmoHTML(t.ritmo)}<label class="f">Duración (min)</label><input type="number" inputmode="numeric" value="${t.duracion||20}"><label class="row" style="margin-top:14px;font-weight:700"><input type="checkbox" ${t.furia!==false?'checked':''}> 🔥 Permitir Modo furia</label>`,'Guardar');if(!r)return;
-    const p={nombre:r[0].trim()||t.nombre,ritmo:mkRitmo(r[1],r[2]),duracion:Math.min(120,Math.max(5,+r[3]||20)),furia:!!r[4]};try{await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);$('#ttl').textContent=t.nombre;draw();}catch(e){toast(FB.msg(e),1);}}
+   if(k==='ed'){const dI=new Date(t.inicio||Date.now()),dv=new Date(dI-dI.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+    const r=await askM('✏️ Editar torneo',`<label class="f">Nombre</label><input value="${esc(t.nombre)}">
+     <label class="f">Día y hora de inicio</label><input type="datetime-local" value="${dv}">
+     <label class="f">Tipo de torneo</label><select id="ettp"><option value="arena"${(!t.tipo||t.tipo==='arena')?' selected':''}>🏟️ Arena (por tiempo, emparejamiento continuo)</option><option value="suizo"${t.tipo==='suizo'?' selected':''}>🇨🇭 Suizo (por rondas)</option><option value="rr"${t.tipo==='rr'?' selected':''}>🔁 Todos contra todos</option></select>
+     ${ritmoHTML(t.ritmo)}
+     <div id="etdur"><label class="f">Duración del torneo (minutos)</label><input type="number" value="${t.duracion||20}" min="5" max="120" inputmode="numeric"></div>
+     <div id="etrnd" style="display:none"><label class="f">Número de rondas (suizo)</label><input type="number" value="${t.rondas||5}" min="2" max="15" inputmode="numeric"></div>
+     <label class="row" style="margin-top:14px;font-weight:700"><input type="checkbox" ${t.furia!==false?'checked':''}> 🔥 Permitir Modo furia</label>`,'Guardar',bg=>{const tp=$('#ettp',bg),up=()=>{const v=tp.value;$('#etdur',bg).style.display=v==='arena'?'':'none';$('#etrnd',bg).style.display=v==='suizo'?'':'none';};tp.onchange=up;up();});
+    if(!r)return;
+    const nombre=r[0].trim()||t.nombre,inicio=new Date(r[1]).getTime()||t.inicio,tipo=r[2]||t.tipo||'arena',duracion=Math.min(120,Math.max(5,+r[5]||20));
+    const p={nombre,inicio,tipo,ritmo:mkRitmo(r[3],r[4]),duracion,rondas:Math.min(15,Math.max(2,+r[6]||5)),furia:!!r[7]};
+    if(t.fin)p.fin=(t.inicioReal||inicio)+duracion*60000;   // torneo ya activado: recalcula cuándo termina
+    try{await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);$('#ttl').textContent=t.nombre;draw();}catch(e){toast(FB.msg(e),1);}}
    if(k==='rm'&&await delTorneo(t)){A.tid=null;render();}};
   $$('[data-ok]',m).forEach(b=>b.onclick=async()=>{try{await RT.put(`arena/${t.id}/permit/${b.dataset.ok}`,true);await RT.patch(`arena/${t.id}/req/${b.dataset.ok}`,{s:'ok'});rq=rq.filter(r=>r.id!==b.dataset.ok);A.reqN=Math.max(0,A.reqN-1);badges();toast('Entrada concedida');draw();}catch(e){toast(FB.msg(e),1);}});
   $$('[data-no]',m).forEach(b=>b.onclick=async()=>{try{await RT.patch(`arena/${t.id}/req/${b.dataset.no}`,{s:'no'});rq=rq.filter(r=>r.id!==b.dataset.no);A.reqN=Math.max(0,A.reqN-1);badges();draw();}catch(e){toast(FB.msg(e),1);}});
@@ -653,7 +664,7 @@ function projector(t,get,load){const ov=document.createElement('div');ov.classNa
  const paint=()=>{const l=get().filter(j=>!j.fuera).slice(0,12);ov.innerHTML=`<button class="btn x" id="px">✕ Cerrar</button><h1>🏆 ${esc(t.nombre)}</h1><table><thead><tr><th>#</th><th>Jugador</th><th>Grupo</th><th class="n">Puntos</th></tr></thead><tbody>${l.map((j,i)=>`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n"><b>${j.puntos||0}</b></td></tr>`).join('')}</tbody></table>`;$('#px',ov).onclick=close;};
  paint();const iv=setInterval(async()=>{await load();paint();},10000);}
 /* ---------- tareas, clase y fichas (se abre la herramienta del profe de la app de juego, con la sesión de admin) ---------- */
-function vProfe(m){m.innerHTML=`<iframe src="index.html#profe" title="Tareas y fichas" style="width:100%;height:calc(100vh - 62px - env(safe-area-inset-top));border:0;display:block;background:#fbf7ee"></iframe>`;}
+function vProfe(m){m.innerHTML=`<iframe src="ajedrez-siurot.html#profe" title="Tareas y fichas" style="width:100%;height:calc(100vh - 62px - env(safe-area-inset-top));border:0;display:block;background:#fbf7ee"></iframe>`;}
 /* ---------- salón de la fama ---------- */
 function vHof(m){const l=[...A.hof].sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
  m.innerHTML=`<div class="row" style="margin-bottom:10px"><p class="muted grow" style="margin:0 4px">Top 10 · suma de los puntos de todos los torneos terminados.</p><button class="ib2" id="opt" aria-label="Opciones">⋯</button></div>
@@ -664,14 +675,37 @@ function vHof(m){const l=[...A.hof].sort((a,b)=>(b.puntos||0)-(a.puntos||0)).sli
   if(k==='rs'){const r=await askM('♻️ Vaciar salón de la fama',`<p>Se borrarán los puntos acumulados de <b>${A.hof.length}</b> jugadores. Antes se descargará una copia.</p><p>Escribe <b>RESTAURAR</b> para confirmar:</p><input autocomplete="off" autocapitalize="characters">`,'Vaciar');if(!r||r[0].trim().toUpperCase()!=='RESTAURAR')return r?toast('No coincide: no se ha borrado nada',1):0;
    try{backup();for(const h of A.hof)await FB.del('hof/'+h.id);A.hof=[];toast('Salón de la fama vacío');render();}catch(e){toast(FB.msg(e),1);}}};}
 /* ---------- ajustes ---------- */
-function vAjustes(m){const groups=allGroups();
- m.innerHTML=`<details class="box"><summary>📣 Aviso en la portada${A.cfg.aviso?' <span class="pill activo">activo</span>':''}</summary><div><p class="muted" style="margin:0 0 8px">Lo ve todo el alumnado. Déjalo vacío para quitarlo.</p><input id="av" maxlength="140" placeholder="Hoy torneo en el recreo a las 12:00" value="${esc(A.cfg.aviso)}"><label class="f">Enlace (opcional): al pulsar el aviso se abre esta dirección</label><input id="avl" inputmode="url" placeholder="https://lichess.org/tournament/…" value="${esc(A.cfg.avisoUrl||'')}"><label class="f">Dirección de la app (sale en las tarjetas de claves)</label><input id="ur" value="${esc(A.cfg.url)}" inputmode="url"><button class="btn big" id="sv" style="margin-top:12px">Guardar</button></div></details>
+async function saveAvisos(){try{await FB.set('config/main',{avisos:A.cfg.avisos},['avisos']);try{await pubSync();}catch(e){}}catch(e){toast(FB.msg(e),1);}}
+async function toggleAviso(id){const a=(A.cfg.avisos||[]).find(x=>x.id===id);if(!a)return;a.on=!a.on;await saveAvisos();render();}
+async function newAviso(){const r=await askM('➕ Nuevo aviso',`<label class="f">Texto</label><input maxlength="140" placeholder="Hoy torneo en el recreo a las 12:00" autocomplete="off"><label class="f">Enlace (opcional): al pulsar el aviso se abre esta dirección</label><input inputmode="url" placeholder="https://lichess.org/tournament/…" autocomplete="off"><label class="row" style="margin-top:14px;font-weight:700"><input type="checkbox"> 👁️ Mostrar ya al alumnado</label>`,'Crear');if(!r)return;
+ const texto=r[0].trim();if(!texto)return toast('Escribe el texto del aviso',1);
+ let url=r[1].trim();if(url&&!/^https?:\/\//i.test(url))url='https://'+url;if(url){try{new URL(url);}catch(e){return toast('El enlace no es válido',1);}}
+ A.cfg.avisos=A.cfg.avisos||[];A.cfg.avisos.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),texto,url,on:!!r[2]});
+ await saveAvisos();toast('Aviso creado ✔️');render();}
+async function editAviso(av){const r=await askM('✏️ Editar aviso',`<label class="f">Texto</label><input maxlength="140" value="${esc(av.texto)}"><label class="f">Enlace (opcional): al pulsar el aviso se abre esta dirección</label><input inputmode="url" value="${esc(av.url||'')}">`,'Guardar');if(!r)return;
+ const texto=r[0].trim();if(!texto)return toast('Escribe el texto del aviso',1);
+ let url=r[1].trim();if(url&&!/^https?:\/\//i.test(url))url='https://'+url;if(url){try{new URL(url);}catch(e){return toast('El enlace no es válido',1);}}
+ av.texto=texto;av.url=url;await saveAvisos();toast('Guardado ✔️');render();}
+function vAjustes(m){const groups=allGroups(),avs=A.cfg.avisos||[];
+ m.innerHTML=`<details class="box" open><summary>📣 Avisos en la portada${avs.some(a=>a.on)?' <span class="pill activo">activo</span>':''}</summary><div>
+ <p class="muted" style="margin:0 0 8px">Lo que esté marcado como visible 👁️ lo ve todo el alumnado. Puedes preparar varios avisos y mostrar solo el que necesites, cuando lo necesites.</p>
+ ${avs.length?`<div class="list" style="margin:0 0 10px">${avs.map(a=>`<div class="li" data-av="${a.id}"><span style="font-size:1.3rem">${a.on?'👁️':'🙈'}</span><div class="t"><b>${esc(a.texto)}</b>${a.url?'<span>🔗 '+esc(a.url)+'</span>':''}</div><button class="ib2" data-avm="${a.id}" aria-label="Opciones">⋯</button></div>`).join('')}</div>`:'<p class="muted" style="margin:0 0 10px">Aún no hay avisos creados.</p>'}
+ <button class="btn ghost wide" id="avn">➕ Nuevo aviso</button>
+ </div></details>
+ <details class="box"><summary>🌐 Dirección de la app</summary><div><label class="f">Sale en las tarjetas de claves</label><input id="ur" value="${esc(A.cfg.url)}" inputmode="url"><button class="btn big" id="sv" style="margin-top:12px">Guardar</button></div></details>
  <details class="box"><summary>⬆️ Subir de curso</summary><div><p class="muted" style="margin:0 0 8px">Cambia el nombre de los grupos de golpe (ej. 4ºA → 5ºA). Deja en blanco los que no cambien.</p>${groups.length?groups.map(g=>`<div class="row" style="margin:6px 0;flex-wrap:nowrap"><b style="min-width:84px">${esc(g)}</b><span class="muted">(${A.users.filter(u=>u.grupo===g).length})</span><span>→</span><input class="ng" data-g="${esc(g)}" placeholder="Nuevo" style="flex:1;min-width:0"></div>`).join('')+'<button class="btn big" id="up" style="margin-top:10px">Aplicar cambios</button>':'<p class="muted">Aún no hay grupos.</p>'}</div></details>
  <details class="box"><summary>📤 Exportar</summary><div><button class="btn ghost wide" id="cu">⬇️ Todo el alumnado (CSV)</button></div></details>
  <details class="box"><summary>🔒 Protección de datos</summary><div><p class="muted" style="margin:0">Solo se guardan un usuario (nombre + inicial), el grupo y la fecha del último acceso. Sin apellidos completos, sin correos ni datos personales. Servidor en la UE (Firestore eur3). Al eliminar un usuario se borra su cuenta y su puntuación.</p></div></details>
  ${standalone()?'':'<button class="btn ghost big" id="ins" style="margin-top:6px">📲 Instalar esta app en el móvil</button>'}
  <button class="btn ghost big" id="lo" style="margin-top:10px;color:var(--rd);border-color:var(--rd)">🚪 Cerrar sesión</button>`;
- $('#sv',m).onclick=async()=>{let lk=$('#avl',m).value.trim();if(lk&&!/^https?:\/\//i.test(lk))lk='https://'+lk;if(lk){try{new URL(lk);}catch(e){return toast('El enlace no es válido',1);}}const c={aviso:$('#av',m).value.trim(),avisoUrl:lk,url:$('#ur',m).value.trim()||'https://ajedrezsiurot.com/'};try{await FB.set('config/main',c);Object.assign(A.cfg,c);try{await pubSync();}catch(e){}toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}};
+ $('#sv',m).onclick=async()=>{const c={url:$('#ur',m).value.trim()||'https://ajedrezsiurot.com/'};try{await FB.set('config/main',c,['url']);Object.assign(A.cfg,c);toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}};
+ $('#avn',m).onclick=()=>newAviso();
+ $$('.li[data-av]',m).forEach(r=>r.onclick=async e=>{if(e.target.closest('[data-avm]'))return;await toggleAviso(r.dataset.av);});
+ $$('[data-avm]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const av=(A.cfg.avisos||[]).find(x=>x.id===b.dataset.avm);if(!av)return;
+  const k=await sheet(esc(av.texto),[{k:av.on?'off':'on',e:av.on?'🙈':'👁️',t:av.on?'Ocultar':'Mostrar'},{k:'ed',e:'✏️',t:'Editar'},{k:'del',e:'🗑',t:'Eliminar',cls:'red'}]);
+  if(k==='on'||k==='off')await toggleAviso(av.id);
+  if(k==='ed')await editAviso(av);
+  if(k==='del'){if(await confirmM('Eliminar aviso',`¿Eliminar «${esc(av.texto)}»?`,'Eliminar',true)){A.cfg.avisos=A.cfg.avisos.filter(x=>x!==av);await saveAvisos();render();}}});
  $('#cu',m).onclick=()=>download('usuarios-ajedrez.csv',csvUsers(A.users),'text/csv');
  if($('#ins',m))$('#ins',m).onclick=doInstall;$('#lo',m).onclick=logout;
  if($('#up',m))$('#up',m).onclick=async()=>{const map={};$$('.ng',m).forEach(i=>{if(i.value.trim())map[i.dataset.g]=i.value.trim();});const ks=Object.keys(map);if(!ks.length)return toast('No hay cambios',1);
