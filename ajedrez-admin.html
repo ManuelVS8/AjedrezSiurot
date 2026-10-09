@@ -290,7 +290,7 @@ const pubT1=t=>{const o={};PUBF.forEach(k=>{if(t[k]!==undefined&&t[k]!==null)o[k
 async function pubSync(withIns){
  const open=A.torneos.filter(t=>t.estado!=='terminado');
  const T={};open.forEach(t=>T[t.id]=pubT1(t));
- const hof=A.hof.slice().sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
+ const hof=A.hof.filter(h=>String(h.grupo||'').trim().toLowerCase()!=='admin').slice().sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
  const upd={t:T,hof,cfg:{avisos:(A.cfg.avisos||[]).filter(a=>a.on).map(a=>({texto:a.texto,url:a.url||''}))},seed:1,v:RT.SV};
  if(withIns){const ins={};for(const t of open){try{const js=await FB.list(`torneos/${t.id}/jugadores`);ins[t.id]={};js.forEach(j=>ins[t.id][j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});}catch(e){}}upd.ins=ins;}
  else{try{const cur=await RT.get('pub/ins')||{};const ids=new Set(open.map(t=>t.id));for(const k of Object.keys(cur))if(!ids.has(k))upd['ins/'+k]=null;}catch(e){}}
@@ -622,7 +622,7 @@ async function finishTorneo(t){
  const ok=js.filter(j=>!j.fuera&&((j.partidas||0)>0||(j.puntos||0)>0));
  const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
  const clasif=rk.filter(r=>(r.pa||0)>0||(r.pts||0)>0).slice(0,60).map(r=>({u:r.guest?'':r.id,n:r.n,g:r.g||'',p:r.pts||0,w:r.w||0,d:r.d||0,l:r.l||0}));
- for(const j of ok){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
+ for(const j of ok.filter(j=>String(j.grupo||'').trim().toLowerCase()!=='admin')){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
  const fin=(t.tipo||'arena')==='arena'&&tFin(t)?Math.min(Date.now(),tFin(t)):Date.now();
  const p={estado:'terminado',fin,podio,clasif};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);
  /* historial para el alumnado (Realtime Database: sin lecturas de Firestore): resumen, clasificación y «mis torneos» */

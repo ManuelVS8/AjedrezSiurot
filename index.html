@@ -4882,8 +4882,12 @@ function invDots(){const n=invGet().length,nt=typeof tkPending==='function'&&tkO
  [['#burger',n+nt],['.ditem[data-tab=online]',n],['.qbtn[data-go=online]',n],['.ditem[data-tab=aula]',nt]].forEach(([sel,c])=>$$(sel).forEach(el=>{let d=el.querySelector(':scope>.rdot');if(c&&!d){d=document.createElement('i');d.className='rdot';el.appendChild(d);}else if(!c&&d)d.remove();if(d)d.textContent=c>1?c:'';}));}
 const myUid=()=>ONL.acc&&ONL.acc.uid;
 const myElo=()=>(typeof P!=='undefined'&&P&&P.elo)||800;
+/* grupo «admin» (el profe y colaboradores): no salen en la liga del alumnado y, salvo que lo elijan, tampoco en «conectados» */
+const isAdmG=g=>String(g||'').trim().toLowerCase()==='admin';
+const iAmAdm=()=>onlLogged()&&!ONL.acc.guest&&isAdmG(ONL.acc.grupo);
+const admHidden=()=>iAmAdm()&&!(P&&P.verme);
 async function presTick(){if(!onlLogged()||document.hidden)return;
- try{const v={n:ONL.acc.nombre,g:ONL.acc.grupo||'',e:myElo(),s:ON.inGame?'jugando':'libre',t:RT.SV};const mu=Object.keys(ON.mutes||{}).filter(isMuted).join(',');if(mu)v.mu=mu;
+ try{const v={n:ONL.acc.nombre,g:ONL.acc.grupo||'',e:myElo(),s:ON.inGame?'jugando':'libre',t:RT.SV};if(admHidden())v.oc=1;const mu=Object.keys(ON.mutes||{}).filter(isMuted).join(',');if(mu)v.mu=mu;
   if(!ON.offT||Date.now()-ON.offT>600000){const r=await RT.put('presence/'+myUid(),v);if(r&&typeof r.t==='number'){RT.off=r.t-Date.now();ON.offT=Date.now();}}   // la hora del servidor, cada 10 min
   else await RT.putS('presence/'+myUid(),v);}catch(e){}}
 /* buzón de retos: se ESCUCHA en directo (no llega nada si nadie te escribe = casi 0 datos). Durante una partida o en el arena
@@ -4943,13 +4947,13 @@ async function quickMatch(){if(ON.search||ON.wait)return;if(ON.tc==='corr')retur
  const w=openWait(`🔎 Buscando rival de <b>${tcTxtO(ON.tc)}</b>${ON.v960?' · Chess960':''}…`,()=>S.stop());
  const S={dead:false,stop(){if(S.dead)return;S.dead=true;clearInterval(S.iv);ON.search=null;RT.del('seeks/'+uid).catch(()=>{});w.close();}};ON.search=S;
  const mu=Object.keys(ON.mutes||{}).filter(isMuted).join(',');
- try{await RT.put('seeks/'+uid,{n:ONL.acc.nombre,e:myElo(),tc,t:RT.SV,...(mu?{mu}:{})});}catch(e){S.stop();return toast(FB.msg(e),'bad');}
+ try{await RT.put('seeks/'+uid,{n:ONL.acc.nombre,e:myElo(),tc,t:RT.SV,...(mu?{mu}:{}),...(iAmAdm()?{ad:1}:{}),...(admHidden()?{oc:1}:{})});}catch(e){S.stop();return toast(FB.msg(e),'bad');}
  let n=0;const t0=Date.now();
  S.iv=setInterval(async()=>{if(S.dead)return;n++;
   if(Date.now()-t0>120000){S.stop();return toast('Ahora mismo no hay rivales. Prueba a retar a alguien conectado.','bad',4200);}
   if(n%3===0)RT.patch('seeks/'+uid,{t:RT.SV}).catch(()=>{});
   try{const all=await RT.get('seeks')||{};if(S.dead)return;const now=RT.srv();
-   const o=Object.entries(all).find(([id,s])=>id!==uid&&s&&s.tc===tc&&now-(s.t||0)<18000&&!isMuted(id)&&!String(s.mu||'').split(',').includes(uid));
+   const o=Object.entries(all).find(([id,s])=>id!==uid&&s&&s.tc===tc&&now-(s.t||0)<18000&&!isMuted(id)&&!String(s.mu||'').split(',').includes(uid)&&(!s.oc||iAmAdm())&&(!admHidden()||s.ad));
    if(o&&uid<o[0]){S.dead=true;clearInterval(S.iv);ON.search=null;RT.del('seeks/'+uid).catch(()=>{});w.close();
     const wMe=Math.random()<.5,me={id:uid,n:ONL.acc.nombre,e:myElo()},op={id:o[0],n:o[1].n,e:o[1].e};await createGame(wMe?me:op,wMe?op:me,tc.split('|')[0],o[0],{v:tc.endsWith('|960')});}}catch(e){}},2000);}
 /* ---------- sala ---------- */
@@ -4975,11 +4979,12 @@ function viewOnline(m){const tok=VIEW;let timer=null,first=true;
   if(gid){try{const g=await RT.get('games/'+gid);if(g&&g.st==='play'&&g.tc!=='corr'&&(g.w===myUid()||g.b===myUid()))og=gid;else localStorage.removeItem('siurot_og');}catch(e){}}
   if(!alive(tok))return;
   const now=RT.srv(),me=myUid(),inv=invGet();
-  const list=Object.entries(pres).filter(([id,p])=>id!==me&&p&&now-(p.t||0)<55000&&!String(p.mu||'').split(',').includes(me)).map(([id,p])=>({id,...p,fr:!!fr[id]})).sort((a,b)=>(b.fr-a.fr)||(a.s==='jugando')-(b.s==='jugando')||String(a.n).localeCompare(b.n,'es'));
+  const list=Object.entries(pres).filter(([id,p])=>id!==me&&p&&now-(p.t||0)<55000&&!String(p.mu||'').split(',').includes(me)&&(!p.oc||iAmAdm())).map(([id,p])=>({id,...p,fr:!!fr[id]})).sort((a,b)=>(b.fr-a.fr)||(a.s==='jugando')-(b.s==='jugando')||String(a.n).localeCompare(b.n,'es'));
   const onIds=new Set(list.map(p=>p.id));const offFr=Object.entries(fr).filter(([id])=>!onIds.has(id)).map(([id,x])=>({id,...x}));
   const hist=(P.hist||[]).filter(g=>g.online&&!g.local).slice(-5).reverse();
   const row=p=>`<div class="pl ${p.s==='jugando'?'':'tap'}" data-pr="${p.id}" title="Pulsa para ver su perfil"><span class="pdot ${p.s==='jugando'?'busy':''}"></span><div style="flex:1"><b>${p.fr?'⭐ ':''}${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span><div class="muted" style="font-size:.8rem">♟ ${p.e||800} · ${p.s==='jugando'?'jugando':'libre'}${isMuted(p.id)?' · 🔕 silenciado':''}</div></div><button class="btn sm ghost" data-fs="${p.id}" title="${p.fr?'Quitar de amigos':'Añadir a amigos'}">${p.fr?'⭐':'☆'}</button><button class="btn sm ${p.s==='jugando'?'ghost':''}" data-r="${p.id}" ${p.s==='jugando'?'disabled':''}>⚔️ Retar</button></div>`;
   m.innerHTML=`<div class="sectitle"><h2>🌐 Jugar online</h2><span class="pill">🟢 ${list.length+1} conectados</span></div><div class="onl">
+  ${iAmAdm()?`<div class="card" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:${P.verme?'#e8f7ee':'#f1f1f1'}"><div style="font-size:1.6rem">${P.verme?'👁️':'🙈'}</div><div style="flex:1;min-width:180px"><b>${P.verme?'Visible para el alumnado':'Oculto para el alumnado'}</b><div class="muted" style="font-size:.82rem">Grupo admin: ${P.verme?'los alumnos te ven conectado y pueden retarte.':'solo te ve el grupo admin. Los alumnos no te ven ni pueden retarte.'}</div></div><button class="btn sm ${P.verme?'ghost':''}" id="admvis">${P.verme?'Ocultarme':'Hacerme visible'}</button></div>`:''}
   ${og?`<div class="card" style="background:#fff3c4;border-color:#e8a317"><b>♟ Tienes una partida en curso</b><div class="btnrow" style="margin-top:8px"><button class="btn acc" id="back2g">Volver a la partida</button></div></div>`:''}
   ${inv.length?`<div class="card" style="border:2px solid #7c3aed;background:#f5f0ff"><h3 style="margin:0 0 6px">📨 Te invitan a partidas a distancia</h3>${inv.map((x,i)=>`<div class="pl"><div style="flex:1"><b>${esc(x.fn)}</b> <span class="muted">ELO ${x.fe||'?'}${x.v?' · 🔀 Chess960':''}</span></div><button class="btn sm ghost" data-ino="${i}">No</button><button class="btn sm" data-iok="${i}">Aceptar</button></div>`).join('')}</div>`:''}
   ${cg.length?`<div class="card"><h3 style="margin:0 0 6px">📨 Partidas a distancia</h3>${cg.map(c=>`<div class="pl tap" data-cg="${c.gid}"><div style="flex:1"><b>vs ${esc(c.o)}</b><div class="muted" style="font-size:.8rem">${Math.ceil(c.n/2)} jugadas</div></div>${c.mine?'<span class="pill" style="background:#d9f5e3;color:#14703a">¡Te toca!</span>':'<span class="pill">Le toca</span>'}</div>`).join('')}</div>`:''}
@@ -4998,6 +5003,7 @@ function viewOnline(m){const tok=VIEW;let timer=null,first=true;
   if($('#qm',m))$('#qm',m).onclick=quickMatch;
   $('#tv',m).onclick=()=>openTV({});
   if($('#back2g',m))$('#back2g',m).onclick=()=>go('ogame',{gid:og});
+  if($('#admvis',m))$('#admvis',m).onclick=async()=>{P.verme=!P.verme;save();await presTick();toast(P.verme?'👁️ Ahora el alumnado te ve conectado':'🙈 Ya no te ve el alumnado');draw();};
   $$('[data-an]',m).forEach(b=>b.onclick=e=>{e.stopPropagation();go('analisis',{id:+b.dataset.an});});
   $$('[data-cg]',m).forEach(b=>b.onclick=()=>{corrCache.t=0;go('ogame',{gid:b.dataset.cg});});
   $$('[data-iok]',m).forEach(b=>b.onclick=async()=>{const l=invGet(),x=l[+b.dataset.iok];if(!x)return;invSet(l.filter(y=>y!==x));const wMe=accWhite(x.col),meP={id:myUid(),n:ONL.acc.nombre,e:myElo()},op={id:x.from,n:x.fn,e:x.fe};corrCache.t=0;await createGame(wMe?meP:op,wMe?op:meP,'corr',x.from,{v:x.v});});
@@ -5027,7 +5033,7 @@ function viewAmigos(m){const tok=VIEW;let timer=null,first=true;
   if(Object.keys(fr).length){try{pres=await RT.get('presence')||{};}catch(e){}}
   if(!alive(tok))return;
   const now=RT.srv(),me=myUid();
-  const L=Object.entries(fr).map(([id,x])=>{const p=pres[id];const on=!!p&&now-(p.t||0)<55000&&!String(p.mu||'').split(',').includes(me);
+  const L=Object.entries(fr).map(([id,x])=>{const p=pres[id];const on=!!p&&now-(p.t||0)<55000&&!String(p.mu||'').split(',').includes(me)&&(!p.oc||iAmAdm());
    return{id,n:(p&&p.n)||x.n,g:(p&&p.g)||x.g||'',e:p&&p.e,on,busy:on&&p.s==='jugando'};}).sort((a,b)=>(b.on-a.on)||(a.busy-b.busy)||String(a.n).localeCompare(b.n,'es'));
   const nOn=L.filter(p=>p.on).length;
   const row=p=>`<div class="frow" data-pr="${p.id}"><span class="pdot ${p.busy?'busy':''}" style="${p.on?'':'background:#c9c9c9'}"></span><div class="fi"><b>${esc(p.n)}</b> <span class="muted">${esc(p.g||'')}</span><div class="muted" style="font-size:.8rem">${p.on?(p.busy?'🟠 jugando ahora':'🟢 conectado')+(p.e?' · ♟ '+p.e:''):'⚪ desconectado'}${isMuted(p.id)?' · 🔕 silenciado':''}</div></div><div class="fb">${p.on?`<button class="btn sm ${p.busy?'ghost':''}" data-r="${p.id}" ${p.busy?'disabled':''}>⚔️ Retar</button>`:''}<button class="btn sm ghost" data-dist="${p.id}">📨 A distancia</button></div></div>`;
@@ -5450,7 +5456,7 @@ async function ligaSync(force){try{if(!onlLogged()||ONL.acc.guest||!P||P.cuenta!
 const LIGA={d:null,t:0};
 async function ligaLoad(force){if(!force&&LIGA.d&&Date.now()-LIGA.t<60000)return LIGA.d;try{LIGA.d=await RT.get('liga')||{};LIGA.t=Date.now();}catch(e){LIGA.d=LIGA.d||{};}return LIGA.d;}
 function ligaRank(d,g,prev){const w=prev?wkPrev():wkId();const out=[];
- for(const [id,x] of Object.entries(d||{})){if(!x||typeof x!=='object')continue;if(g&&x.g!==g)continue;const pts=x.w===w?x.x:(prev&&x.pw===w?x.px:0);if(pts>0)out.push({id,n:x.n,g:x.g,av:x.av,pts});}
+ for(const [id,x] of Object.entries(d||{})){if(!x||typeof x!=='object')continue;if(g&&x.g!==g)continue;if(isAdmG(x.g)&&!iAmAdm())continue;const pts=x.w===w?x.x:(prev&&x.pw===w?x.px:0);if(pts>0)out.push({id,n:x.n,g:x.g,av:x.av,pts});}
  return out.sort((a,b)=>b.pts-a.pts||String(a.n).localeCompare(String(b.n),'es'));}
 const ligaLeft=()=>{const d=new Date();const end=new Date(wkId());end.setDate(end.getDate()+7);end.setHours(0,0,0,0);const h=Math.max(0,Math.round((end-d)/36e5));return h>=48?`quedan ${Math.ceil(h/24)} días`:h>=1?`quedan ${h} h`:'termina ya';};
 async function ligaCard(el){if(!el)return;
