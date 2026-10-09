@@ -4704,7 +4704,9 @@ const onlErr=e=>e&&e.code==='BAJA'?'Este usuario ya no existe.':FB.msg(e);
 /* el perfil local se reconoce por la cuenta (uid); así sigue siendo suyo aunque el profe le cambie el usuario */
 function accountProfile(){const acc=ONL.acc,ps=Object.values(DB.profiles);let p=(acc.uid&&ps.find(x=>x.uid===acc.uid))||ps.find(x=>x.cuenta===acc.alias);
  let ch=false;if(!p){p=newProfile(acc.nombre,AVATARS[Math.floor(Math.random()*AVATARS.length)]);DB.profiles[p.id]=p;ch=true;}
- if(p.cuenta!==acc.alias){p.cuenta=acc.alias;ch=true;}if(acc.uid&&p.uid!==acc.uid){p.uid=acc.uid;ch=true;}if(ch)save();return p;}
+ if(p.cuenta!==acc.alias){p.cuenta=acc.alias;ch=true;}if(acc.uid&&p.uid!==acc.uid){p.uid=acc.uid;ch=true;}
+ /* solo grupo Admin: el saludo toma el nombre actual de la cuenta (el alumnado no cambia) */
+ if(isAdmG(acc.grupo)&&acc.nombre&&p.name!==acc.nombre){p.name=acc.nombre;ch=true;}if(ch)save();return p;}
 async function onlLogin(){
  return new Promise(res=>{const bg=modal({title:'🔑 Entrar con tu usuario del cole',html:`<p class="muted" style="margin:0 0 8px">Tu usuario y tu clave están en la tarjeta que te dio el profe.</p><input id="lu" placeholder="Usuario" autocapitalize="none" autocomplete="username" style="width:100%;margin-bottom:8px"><input id="lp" placeholder="Clave (3 números y 3 letras)" autocapitalize="none" autocomplete="current-password" style="width:100%"><p id="le" style="color:#c0392b;font-weight:800;min-height:1.2em;margin:8px 0 0"></p>`,buttons:[{t:'Cancelar',cls:'ghost',v:false},{t:'Entrar',v:'go'}],dismiss:true});
   setTimeout(()=>{const root=$$('.modalbg').pop();if(!root)return;const btn=$$('button',root).find(b=>b.textContent.trim()==='Entrar');const le=$('#le',root);
@@ -5423,6 +5425,7 @@ async function pgPull(force){if(!pgMine())return;const now=Date.now();if(!force&
  else{pgApply(d);pgSetMeta({rev,h:pgHash(JSON.stringify(pgData()))});}}
 function pgApply(d){const keep={id:P.id,cuenta:P.cuenta,uid:P.uid,cur:P.cur},base=newProfile(d.name||P.name,d.avatar||P.avatar);
  for(const k of Object.keys(P))delete P[k];Object.assign(P,base,d,keep);if(keep.cur===undefined)delete P.cur;if(keep.uid===undefined)delete P.uid;
+ if(meAdm()&&ONL.acc.nombre)P.name=ONL.acc.nombre;
  PG.mute=true;try{try{checkStreak();ensureDaily();}catch(e){}save();}finally{PG.mute=false;}
  try{renderHeader();}catch(e){}
  if(['inicio','camino','progreso','aprender','modulo','ejercicios','retos','liga','partidas'].includes(currentTab)&&!$('.modalbg'))go(currentTab,currentArg);}
