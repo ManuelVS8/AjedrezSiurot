@@ -276,7 +276,7 @@ const fdate=ms=>ms?new Date(ms).toLocaleString('es-ES',{day:'2-digit',month:'2-d
 const fhora=ms=>ms?new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
-const A={grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:''},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
+const A={grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',aviso:'',avisoUrl:''},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
 window.ADMIN_A=A;
 const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
 const TT=Object.fromEntries(TABS.map(([k,e,t])=>[k,t]));
@@ -291,7 +291,7 @@ async function pubSync(withIns){
  const open=A.torneos.filter(t=>t.estado!=='terminado');
  const T={};open.forEach(t=>T[t.id]=pubT1(t));
  const hof=A.hof.slice().sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
- const upd={t:T,hof,cfg:{aviso:A.cfg.aviso||''},seed:1,v:RT.SV};
+ const upd={t:T,hof,cfg:{aviso:A.cfg.aviso||'',avisoUrl:A.cfg.avisoUrl||''},seed:1,v:RT.SV};
  if(withIns){const ins={};for(const t of open){try{const js=await FB.list(`torneos/${t.id}/jugadores`);ins[t.id]={};js.forEach(j=>ins[t.id][j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});}catch(e){}}upd.ins=ins;}
  else{try{const cur=await RT.get('pub/ins')||{};const ids=new Set(open.map(t=>t.id));for(const k of Object.keys(cur))if(!ids.has(k))upd['ins/'+k]=null;}catch(e){}}
  await RT.patch('pub',upd);}
@@ -478,8 +478,8 @@ const ritmoHTML=r=>{const{m,i}=ritmoOf(r);return `<div class="row" style="flex-w
 const mkRitmo=(m,i)=>Math.min(60,Math.max(1,Math.round(+m||3)))+'+'+Math.min(60,Math.max(0,Math.round(+i||0)));
 async function delTorneo(t){if(!await confirmM('Eliminar torneo',`¿Eliminar «${esc(t.nombre)}» y todos sus resultados?${t.estado==='terminado'?'<br><br>Los puntos ya sumados al salón de la fama NO se restan.':''}`,'Eliminar',true))return false;
  try{let js=[];try{js=await FB.list(`torneos/${t.id}/jugadores`);}catch(e){}for(const j of js)await FB.del(`torneos/${t.id}/jugadores/${j.id}`);await FB.del('torneos/'+t.id);if(t.estado!=='terminado'){RT.del('arena/'+t.id).catch(()=>{});RT.del('ahb/'+t.id).catch(()=>{});}RT.del('pub/ins/'+t.id).catch(()=>{});A.torneos=A.torneos.filter(x=>x!==t);pubPing();toast('Torneo eliminado');return true;}catch(er){toast(FB.msg(er),1);return false;}}
-async function newTorneo(){const d=new Date(Date.now()+864e5);d.setHours(11,30,0,0);const dv=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
- const r=await askM('🏟️ Programar torneo',`<label class="f">Nombre</label><input placeholder="Arena del recreo" autocomplete="off"><label class="f">Día y hora de inicio</label><input type="datetime-local" value="${dv}">
+async function newTorneo(){const d=new Date();if(d.getHours()*60+d.getMinutes()>=11*60+55)d.setDate(d.getDate()+1);d.setHours(12,0,0,0);const dv=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
+ const r=await askM('🏟️ Programar torneo',`<label class="f">Nombre</label><input placeholder="Arena del recreo" autocomplete="off"><label class="f">Día y hora de inicio</label><input type="datetime-local" value="${dv}"><p class="muted" style="margin:4px 0 0;font-size:.85rem">⏱️ Arena: quien llegue tarde entra igual (solo juega menos tiempo). Suizo y todos contra todos: la 1ª ronda se empareja 1 minuto después de la hora con quien esté conectado; si tardan en llegar, pon 12:05 o 12:10.</p>
   <label class="f">Tipo de torneo</label><select id="ttp"><option value="arena">🏟️ Arena (por tiempo, emparejamiento continuo)</option><option value="suizo">🇨🇭 Suizo (por rondas)</option><option value="rr">🔁 Todos contra todos</option></select>
   ${ritmoHTML('3+0')}
   <div id="tdur"><label class="f">Duración del torneo (minutos)</label><input type="number" value="20" min="5" max="120" inputmode="numeric"></div>
@@ -665,13 +665,13 @@ function vHof(m){const l=[...A.hof].sort((a,b)=>(b.puntos||0)-(a.puntos||0)).sli
    try{backup();for(const h of A.hof)await FB.del('hof/'+h.id);A.hof=[];toast('Salón de la fama vacío');render();}catch(e){toast(FB.msg(e),1);}}};}
 /* ---------- ajustes ---------- */
 function vAjustes(m){const groups=allGroups();
- m.innerHTML=`<details class="box"><summary>📣 Aviso en la portada${A.cfg.aviso?' <span class="pill activo">activo</span>':''}</summary><div><p class="muted" style="margin:0 0 8px">Lo ve todo el alumnado. Déjalo vacío para quitarlo.</p><input id="av" maxlength="140" placeholder="Hoy torneo en el recreo a las 11:30" value="${esc(A.cfg.aviso)}"><label class="f">Dirección de la app (sale en las tarjetas de claves)</label><input id="ur" value="${esc(A.cfg.url)}" inputmode="url"><button class="btn big" id="sv" style="margin-top:12px">Guardar</button></div></details>
+ m.innerHTML=`<details class="box"><summary>📣 Aviso en la portada${A.cfg.aviso?' <span class="pill activo">activo</span>':''}</summary><div><p class="muted" style="margin:0 0 8px">Lo ve todo el alumnado. Déjalo vacío para quitarlo.</p><input id="av" maxlength="140" placeholder="Hoy torneo en el recreo a las 12:00" value="${esc(A.cfg.aviso)}"><label class="f">Enlace (opcional): al pulsar el aviso se abre esta dirección</label><input id="avl" inputmode="url" placeholder="https://lichess.org/tournament/…" value="${esc(A.cfg.avisoUrl||'')}"><label class="f">Dirección de la app (sale en las tarjetas de claves)</label><input id="ur" value="${esc(A.cfg.url)}" inputmode="url"><button class="btn big" id="sv" style="margin-top:12px">Guardar</button></div></details>
  <details class="box"><summary>⬆️ Subir de curso</summary><div><p class="muted" style="margin:0 0 8px">Cambia el nombre de los grupos de golpe (ej. 4ºA → 5ºA). Deja en blanco los que no cambien.</p>${groups.length?groups.map(g=>`<div class="row" style="margin:6px 0;flex-wrap:nowrap"><b style="min-width:84px">${esc(g)}</b><span class="muted">(${A.users.filter(u=>u.grupo===g).length})</span><span>→</span><input class="ng" data-g="${esc(g)}" placeholder="Nuevo" style="flex:1;min-width:0"></div>`).join('')+'<button class="btn big" id="up" style="margin-top:10px">Aplicar cambios</button>':'<p class="muted">Aún no hay grupos.</p>'}</div></details>
  <details class="box"><summary>📤 Exportar</summary><div><button class="btn ghost wide" id="cu">⬇️ Todo el alumnado (CSV)</button></div></details>
  <details class="box"><summary>🔒 Protección de datos</summary><div><p class="muted" style="margin:0">Solo se guardan un usuario (nombre + inicial), el grupo y la fecha del último acceso. Sin apellidos completos, sin correos ni datos personales. Servidor en la UE (Firestore eur3). Al eliminar un usuario se borra su cuenta y su puntuación.</p></div></details>
  ${standalone()?'':'<button class="btn ghost big" id="ins" style="margin-top:6px">📲 Instalar esta app en el móvil</button>'}
  <button class="btn ghost big" id="lo" style="margin-top:10px;color:var(--rd);border-color:var(--rd)">🚪 Cerrar sesión</button>`;
- $('#sv',m).onclick=async()=>{const c={aviso:$('#av',m).value.trim(),url:$('#ur',m).value.trim()||'https://ajedrezsiurot.com/'};try{await FB.set('config/main',c);Object.assign(A.cfg,c);toast('Guardado ✔️');}catch(e){toast(FB.msg(e),1);}};
+ $('#sv',m).onclick=async()=>{let lk=$('#avl',m).value.trim();if(lk&&!/^https?:\/\//i.test(lk))lk='https://'+lk;if(lk){try{new URL(lk);}catch(e){return toast('El enlace no es válido',1);}}const c={aviso:$('#av',m).value.trim(),avisoUrl:lk,url:$('#ur',m).value.trim()||'https://ajedrezsiurot.com/'};try{await FB.set('config/main',c);Object.assign(A.cfg,c);try{await pubSync();}catch(e){}toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}};
  $('#cu',m).onclick=()=>download('usuarios-ajedrez.csv',csvUsers(A.users),'text/csv');
  if($('#ins',m))$('#ins',m).onclick=doInstall;$('#lo',m).onclick=logout;
  if($('#up',m))$('#up',m).onclick=async()=>{const map={};$$('.ng',m).forEach(i=>{if(i.value.trim())map[i.dataset.g]=i.value.trim();});const ks=Object.keys(map);if(!ks.length)return toast('No hay cambios',1);
