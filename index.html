@@ -2095,7 +2095,7 @@ function goBack(fb){
  while(NAV.length){const e=NAV.pop();if(e.tab===currentTab&&e.arg===currentArg)continue;BACKING=true;try{go(e.tab,e.arg);}finally{BACKING=false;}return;}
  if(typeof fb==='function')fb();else go(fb||'inicio');
 }
-const TABS=[['inicio','🏠','Inicio'],['youtubers','🎥','YouTubers'],['camino','🗺️','Mi camino'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏆','Retos'],['liga','🥇','Liga semanal'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
+const TABS=[['inicio','🏠','Inicio'],['youtubers','🎥','YouTubers'],['camino','🗺️','Mi camino'],['aprender','📚','Aprender'],['ejercicios','🧩','Ejercicios'],['jugar','🤖','Jugar'],['estudios','📓','Estudios'],['retos','🏅','Retos'],['liga','🏆','Clasificación general'],['aula','🏫','Aula'],['online','🌐','Online'],['amigos','👥','Amigos'],['torneos','🏟️','Torneos'],['partidas','📜','Mis partidas'],['progreso','📈','Progreso'],['laboratorio','🔬','Análisis y aperturas']];
 function go(tab,arg){
  if(!BACKING&&P&&VIEW>0&&currentTab!==tab&&!NAV_SKIP.has(currentTab)){NAV.push({tab:currentTab,arg:currentArg});if(NAV.length>40)NAV.shift();}
  if(tab==='inicio')NAV.length=0;
@@ -2178,7 +2178,7 @@ function viewHome(m){
  const nl=nextLesson();const hour=new Date().getHours();const hi=hour<14?'¡Buenos días':hour<21?'¡Buenas tardes':'¡Buenas noches';
  const rk=RANKS[rankIdx(P.xp)];const mdone=(ensureDaily(),P.daily.ms.filter(x=>x.done).length);
  m.innerHTML=`<div class="card brand"><img src="${LOGO_URL}" alt="Ajedrez Siurot"><div><h1>Ajedrez Siurot</h1><p>CEIP Manuel Siurot · La Palma del Condado</p></div></div>
- <button class="ligalink" id="hliga">🏆 Liga semanal</button>
+ <button class="ligalink" id="hliga">🏆 Clasificación general</button>
  <div class="hello2"><div class="bgk">♞</div><div class="hl"><h2>${hi}, ${esc(P.name)}! ${P.avatar}</h2><p>${rk.icono} ${rk.nombre}</p></div><div class="hchips"><span class="hchip">⭐ ${P.xp} XP</span><span class="hchip">♟ ELO ${P.elo||800}</span><span class="hchip">🔥 ${P.days.streak||0}</span></div></div>
  <div id="cmhome"></div><div id="tcard"></div><div id="tkcard"></div>
  <div class="quick">
@@ -2851,7 +2851,7 @@ function viewGame(m,{level,color,resume,tc,ev,undo,v960,camino}){
 function viewChallenges(m){
  const finales=MODULES.find(x=>x.id==='finales');P.retos=P.retos||{};const hoy=P.retos[today()];
  const last7=[];for(let k=6;k>=0;k--){const d=new Date();d.setDate(d.getDate()-k);const r=P.retos[today(d)];last7.push(`<div style="text-align:center"><div class="muted" style="font-size:.7rem;font-weight:800">${d.toLocaleDateString('es-ES',{weekday:'short'})}</div><div style="font-size:1.3rem">${r?(r.ok===5?'🌟':r.ok>=3?'✅':'☑️'):'⬜'}</div><div style="font-size:.72rem;font-weight:800">${r?r.ok+'/5':''}</div></div>`);}
- m.innerHTML=`<div class="sectitle"><h2>🏆 Retos</h2></div>
+ m.innerHTML=`<div class="sectitle"><h2>🏅 Retos</h2></div>
  <div class="card" style="background:linear-gradient(135deg,#fff3cf,#fffdf8);border-color:#f2d58a;margin-bottom:16px">
   <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center"><div style="font-size:3.2rem">📆</div><div style="flex:1;min-width:220px"><h3 style="font-size:1.35rem">Reto diario</h3>
    <p style="margin:4px 0">5 ejercicios <b>nuevos cada día</b> (de fácil a difícil), los mismos para toda la clase. Si fallas puedes reintentar, pero cuenta como fallo.</p>
@@ -5465,15 +5465,15 @@ function ligaRank(d,g,prev,md){const w=prev?wkPrev():wkId();const out=[];
  return out.sort((a,b)=>b.pts-a.pts||String(a.n).localeCompare(String(b.n),'es'));}
 const ligaLeft=()=>{const d=new Date();const end=new Date(wkId());end.setDate(end.getDate()+7);end.setHours(0,0,0,0);const h=Math.max(0,Math.round((end-d)/36e5));return h>=48?`quedan ${Math.ceil(h/24)} días`:h>=1?`quedan ${h} h`:'termina ya';};
 async function ligaCard(el){if(!el)return;
- if(!onlLogged()||ONL.acc.guest){el.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>🥇 Liga semanal</h3><p class="muted" style="margin:4px 0 10px">Compite cada semana con tu clase y con todo el cole. Entra con tu usuario del cole para participar.</p><button class="btn ghost" data-lg>Ver la liga</button></div>`;$('[data-lg]',el).onclick=()=>go('liga');return;}
- el.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>🥇 Liga semanal</h3><p class="muted" style="margin:4px 0 0">Cargando…</p></div>`;
+ if(!onlLogged()||ONL.acc.guest){el.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>🏆 Clasificación general</h3><p class="muted" style="margin:4px 0 10px">Compite cada semana con tu clase y con todo el cole. Entra con tu usuario del cole para participar.</p><button class="btn ghost" data-lg>Ver la liga</button></div>`;$('[data-lg]',el).onclick=()=>go('liga');return;}
+ el.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>🏆 Clasificación general</h3><p class="muted" style="margin:4px 0 0">Cargando…</p></div>`;
  await ligaSync();const d=await ligaLoad();if(!el.isConnected)return;
  const me=myUid(),cls=ligaRank(d,ONL.acc.grupo),all=ligaRank(d),pc=cls.findIndex(x=>x.id===me),pa=all.findIndex(x=>x.id===me),L=wkNow();
- el.innerHTML=`<div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#eef4ff,#fffdf8);border-color:#b9cdf5"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="font-size:2.6rem">🥇</div><div style="flex:1;min-width:200px"><h3>Liga semanal</h3>
+ el.innerHTML=`<div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#eef4ff,#fffdf8);border-color:#b9cdf5"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="font-size:2.6rem">🏆</div><div style="flex:1;min-width:200px"><h3>Clasificación general</h3>
   <p style="margin:4px 0">Esta semana llevas <b>${L.x} XP</b>. ${pc>=0?`Vas <b>${pc+1}º</b> en ${esc(ONL.acc.grupo||'tu clase')} y <b>${pa+1}º</b> en el cole.`:'¡Gana XP para entrar en la clasificación!'}</p><p class="muted" style="margin:0;font-size:.85rem">Se reinicia cada lunes · ${ligaLeft()}</p></div><button class="btn acc" data-lg>Ver clasificación</button></div></div>`;
  $('[data-lg]',el).onclick=()=>go('liga');}
 async function viewLiga(m,arg){arg=arg||{};const tok=VIEW;const sc=arg.sc||'clase',prev=false,md=['sem','tot','elo'].includes(arg.md)?arg.md:'sem',U=md==='elo'?'ELO':'XP';
- const head=`<div class="sectitle"><h2>🥇 Liga</h2>${md==='sem'?`<span class="pill">⏳ ${ligaLeft()}</span>`:''}</div><p class="muted" style="margin:0 0 12px">${{sem:'Cuenta la <b>XP ganada desde el lunes</b> (lecciones, ejercicios, retos, partidas…). Cada lunes empieza una liga nueva.',tot:'La <b>XP total</b> que has ganado desde que empezaste. No se reinicia nunca.',elo:'Tu <b>nivel de juego (ELO)</b>: sube cuando ganas partidas y ejercicios difíciles. Solo salen quienes ya tienen ELO.'}[md]}</p>`;
+ const head=`<div class="sectitle"><h2>🏆 Clasificación general</h2>${md==='sem'?`<span class="pill">⏳ ${ligaLeft()}</span>`:''}</div><p class="muted" style="margin:0 0 12px">${{sem:'Cuenta la <b>XP ganada desde el lunes</b> (lecciones, ejercicios, retos, partidas…). Cada lunes empieza una liga nueva.',tot:'La <b>XP total</b> que has ganado desde que empezaste. No se reinicia nunca.',elo:'Tu <b>nivel de juego (ELO)</b>: sube cuando ganas partidas y ejercicios difíciles. Solo salen quienes ya tienen ELO.'}[md]}</p>`;
  if(!onlLogged()||ONL.acc.guest){m.innerHTML=head+`<div class="card"><p style="margin:0 0 10px">Para aparecer en la liga, entra con tu usuario del cole.</p><button class="btn acc" id="lgin">🔑 Iniciar sesión</button></div>`;$('#lgin',m).onclick=()=>go('online');return;}
  m.innerHTML=head+'<div class="card"><p class="muted" style="margin:0">Cargando clasificación…</p></div>';
  await ligaSync(true);const d=await ligaLoad(true);if(!alive(tok))return;
