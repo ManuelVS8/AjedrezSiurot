@@ -5455,13 +5455,13 @@ const wkPrev=()=>{const d=new Date();d.setDate(d.getDate()-7);return wkId(d);};
 function wkNow(){if(!P)return null;const w=wkId();const L=P.lw=P.lw||{w,x:0};if(L.w!==w){if(L.x>0){L.pw=L.w;L.px=L.x;}L.w=w;L.x=0;}return L;}
 function wkXP(n){const L=wkNow();if(L&&n>0)L.x+=n;}
 async function ligaSync(force){try{if(!onlLogged()||ONL.acc.guest||!P||P.cuenta!==ONL.acc.alias)return;
- const L=wkNow();const v={n:ONL.acc.nombre,g:ONL.acc.grupo||'',av:P.avatar||'🧑‍🎓',w:L.w,x:L.x};if(L.pw){v.pw=L.pw;v.px=L.px||0;}
+ const L=wkNow();const v={n:ONL.acc.nombre,g:ONL.acc.grupo||'',av:P.avatar||'🧑‍🎓',w:L.w,x:L.x,t:Math.round(P.xp||0),e:Math.round(myElo())};if(L.pw){v.pw=L.pw;v.px=L.px||0;}
  const j=JSON.stringify(v),K='siurot_lg_'+myUid();if(!force){let last=null;try{last=localStorage.getItem(K);}catch(e){}if(last===j)return;}
  await RT.putS('liga/'+myUid(),v);try{localStorage.setItem(K,j);}catch(e){}}catch(e){}}
 const LIGA={d:null,t:0};
 async function ligaLoad(force){if(!force&&LIGA.d&&Date.now()-LIGA.t<60000)return LIGA.d;try{LIGA.d=await RT.get('liga')||{};LIGA.t=Date.now();}catch(e){LIGA.d=LIGA.d||{};}return LIGA.d;}
-function ligaRank(d,g,prev){const w=prev?wkPrev():wkId();const out=[];
- for(const [id,x] of Object.entries(d||{})){if(!x||typeof x!=='object')continue;if(g&&x.g!==g)continue;if(isAdmG(x.g)&&!meAdm())continue;const pts=x.w===w?x.x:(prev&&x.pw===w?x.px:0);if(pts>0)out.push({id,n:x.n,g:x.g,av:x.av,pts});}
+function ligaRank(d,g,prev,md){const w=prev?wkPrev():wkId();const out=[];
+ for(const [id,x] of Object.entries(d||{})){if(!x||typeof x!=='object')continue;if(g&&x.g!==g)continue;if(isAdmG(x.g)&&!meAdm())continue;let pts;if(md==='tot')pts=+x.t||0;else if(md==='elo')pts=(+x.e&&+x.e!==800)?+x.e:0;else pts=x.w===w?x.x:(prev&&x.pw===w?x.px:0);if(pts>0)out.push({id,n:x.n,g:x.g,av:x.av,pts});}
  return out.sort((a,b)=>b.pts-a.pts||String(a.n).localeCompare(String(b.n),'es'));}
 const ligaLeft=()=>{const d=new Date();const end=new Date(wkId());end.setDate(end.getDate()+7);end.setHours(0,0,0,0);const h=Math.max(0,Math.round((end-d)/36e5));return h>=48?`quedan ${Math.ceil(h/24)} días`:h>=1?`quedan ${h} h`:'termina ya';};
 async function ligaCard(el){if(!el)return;
@@ -5472,23 +5472,30 @@ async function ligaCard(el){if(!el)return;
  el.innerHTML=`<div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#eef4ff,#fffdf8);border-color:#b9cdf5"><div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div style="font-size:2.6rem">🥇</div><div style="flex:1;min-width:200px"><h3>Liga semanal</h3>
   <p style="margin:4px 0">Esta semana llevas <b>${L.x} XP</b>. ${pc>=0?`Vas <b>${pc+1}º</b> en ${esc(ONL.acc.grupo||'tu clase')} y <b>${pa+1}º</b> en el cole.`:'¡Gana XP para entrar en la clasificación!'}</p><p class="muted" style="margin:0;font-size:.85rem">Se reinicia cada lunes · ${ligaLeft()}</p></div><button class="btn acc" data-lg>Ver clasificación</button></div></div>`;
  $('[data-lg]',el).onclick=()=>go('liga');}
-async function viewLiga(m,arg){arg=arg||{};const tok=VIEW;const sc=arg.sc||'clase',prev=!!arg.prev;
- const head=`<div class="sectitle"><h2>🥇 Liga semanal</h2><span class="pill">⏳ ${ligaLeft()}</span></div><p class="muted" style="margin:0 0 12px">Cuenta la <b>XP ganada desde el lunes</b> (lecciones, ejercicios, retos, partidas…). Cada lunes empieza una liga nueva.</p>`;
+async function viewLiga(m,arg){arg=arg||{};const tok=VIEW;const sc=arg.sc||'clase',prev=false,md=['sem','tot','elo'].includes(arg.md)?arg.md:'sem',U=md==='elo'?'ELO':'XP';
+ const head=`<div class="sectitle"><h2>🥇 Liga</h2>${md==='sem'?`<span class="pill">⏳ ${ligaLeft()}</span>`:''}</div><p class="muted" style="margin:0 0 12px">${{sem:'Cuenta la <b>XP ganada desde el lunes</b> (lecciones, ejercicios, retos, partidas…). Cada lunes empieza una liga nueva.',tot:'La <b>XP total</b> que has ganado desde que empezaste. No se reinicia nunca.',elo:'Tu <b>nivel de juego (ELO)</b>: sube cuando ganas partidas y ejercicios difíciles. Solo salen quienes ya tienen ELO.'}[md]}</p>`;
  if(!onlLogged()||ONL.acc.guest){m.innerHTML=head+`<div class="card"><p style="margin:0 0 10px">Para aparecer en la liga, entra con tu usuario del cole.</p><button class="btn acc" id="lgin">🔑 Iniciar sesión</button></div>`;$('#lgin',m).onclick=()=>go('online');return;}
  m.innerHTML=head+'<div class="card"><p class="muted" style="margin:0">Cargando clasificación…</p></div>';
  await ligaSync(true);const d=await ligaLoad(true);if(!alive(tok))return;
  const me=myUid(),g=ONL.acc.grupo||'';
- const list=ligaRank(d,sc==='clase'?g:null,prev);const pos=list.findIndex(x=>x.id===me);
+ const list=ligaRank(d,sc==='clase'?g:null,prev,md);const pos=list.findIndex(x=>x.id===me);
  const medal=i=>['🥇','🥈','🥉'][i]||(i+1)+'º';
- const row=(x,i)=>`<div class="lgrow${x.id===me?' me':''}" data-pl="${x.id}"><b class="lgp">${medal(i)}</b><span class="lga">${esc(x.av||'🧑‍🎓')}</span><span class="lgn">${esc(x.n)}${sc==='todos'?` <small>· ${esc(x.g||'')}</small>`:''}${x.id===me?' <small>(tú)</small>':''}</span><b class="lgx">${x.pts} XP</b></div>`;
+ const row=(x,i)=>`<div class="lgrow${x.id===me?' me':''}" data-pl="${x.id}"><b class="lgp">${medal(i)}</b><span class="lga">${esc(x.av||'🧑‍🎓')}</span><span class="lgn">${esc(x.n)}${sc==='todos'?` <small>· ${esc(x.g||'')}</small>`:''}${x.id===me?' <small>(tú)</small>':''}</span><b class="lgx">${x.pts} ${U}</b></div>`;
  const top=list.slice(0,30);
- const podium=list.length?`<div style="display:flex;justify-content:center;align-items:flex-end;gap:10px;margin:6px 0 14px">${[1,0,2].map(k=>list[k]?`<div style="text-align:center;width:31%;max-width:150px"><div style="font-size:1.9rem">${esc(list[k].av||'🧑‍🎓')}</div><div style="font-weight:900;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(list[k].n)}</div><div style="background:${['#f2c94c','#c9ced6','#d79b62'][k]};border-radius:12px 12px 0 0;height:${[86,62,46][k]}px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-weight:900"><div style="font-size:1.4rem">${medal(k)}</div><div style="font-size:.85rem">${list[k].pts} XP</div></div></div>`:'').join('')}</div>`:'';
- m.innerHTML=head+`<div class="chips" style="margin-bottom:10px"><button class="btn sm ${sc==='clase'?'':'ghost'}" data-sc="clase">🏫 Mi clase${g?' · '+esc(g):''}</button><button class="btn sm ${sc==='todos'?'':'ghost'}" data-sc="todos">🌍 Todo el cole</button><span style="flex:1"></span><button class="btn sm ${prev?'':'ghost'}" data-pv>${prev?'⬅ Esta semana':'🏅 Semana pasada'}</button></div>
-  <div class="card">${prev?'<h3 style="margin-bottom:6px">🏅 Ganadores de la semana pasada</h3>':''}${podium}${list.length?`<div class="lglist">${top.map(row).join('')}</div>${pos>=30?`<p class="muted" style="margin:8px 0 4px;text-align:center">⋯</p><div class="lglist">${row(list[pos],pos)}</div>`:''}`:`<p class="muted" style="margin:0">${prev?'No hubo participantes la semana pasada.':'Todavía nadie ha ganado XP esta semana. ¡Sé el primero!'}</p>`}
-  ${!prev&&pos<0?'<p class="muted" style="margin:10px 0 0">Aún no apareces: gana XP haciendo lecciones, ejercicios o partidas.</p>':''}</div>`;
- $$('[data-sc]',m).forEach(b=>b.onclick=()=>go('liga',{sc:b.dataset.sc,prev}));
- $('[data-pv]',m).onclick=()=>go('liga',{sc,prev:!prev});
- $$('[data-pl]',m).forEach(r=>r.onclick=()=>{const x=list.find(y=>y.id===r.dataset.pl);if(x&&typeof playerCard==='function')playerCard({id:x.id,n:x.n,g:x.g});});}
+ const podium=list.length?`<div style="display:flex;justify-content:center;align-items:flex-end;gap:10px;margin:6px 0 14px">${[1,0,2].map(k=>list[k]?`<div style="text-align:center;width:31%;max-width:150px"><div style="font-size:1.9rem">${esc(list[k].av||'🧑‍🎓')}</div><div style="font-weight:900;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(list[k].n)}</div><div style="background:${['#f2c94c','#c9ced6','#d79b62'][k]};border-radius:12px 12px 0 0;height:${[86,62,46][k]}px;display:flex;align-items:center;justify-content:center;flex-direction:column;font-weight:900"><div style="font-size:1.4rem">${medal(k)}</div><div style="font-size:.85rem">${list[k].pts} ${U}</div></div></div>`:'').join('')}</div>`:'';
+ m.innerHTML=head+`<div class="chips" style="margin-bottom:8px">${[['sem','⭐ XP esta semana'],['tot','📈 XP total'],['elo','♟ ELO']].map(([k,t])=>`<button class="btn sm ${md===k?'':'ghost'}" data-md="${k}">${t}</button>`).join('')}</div><div class="chips" style="margin-bottom:10px"><button class="btn sm ${sc==='clase'?'':'ghost'}" data-sc="clase">🏫 Mi clase${g?' · '+esc(g):''}</button><button class="btn sm ${sc==='todos'?'':'ghost'}" data-sc="todos">🌍 Todo el cole</button></div>
+  <div class="card">${prev?'<h3 style="margin-bottom:6px">🏅 Ganadores de la semana pasada</h3>':''}${list.length?`<input id="lgq" type="search" placeholder="🔎 Buscar por nombre…" autocomplete="off" style="width:100%;margin:0 0 10px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;font:inherit">`:''}<div id="lgpod">${podium}</div><div id="lgl">${list.length?`<div class="lglist">${top.map(row).join('')}</div>${pos>=30?`<p class="muted" style="margin:8px 0 4px;text-align:center">⋯</p><div class="lglist">${row(list[pos],pos)}</div>`:''}`:`<p class="muted" style="margin:0">${md==='tot'?'Todavía nadie tiene XP.':md==='elo'?'Todavía nadie tiene ELO. ¡Juega una partida!':'Todavía nadie ha ganado XP esta semana. ¡Sé el primero!'}</p>`}</div>
+  ${pos<0?`<p class="muted" style="margin:10px 0 0">${md==='elo'?'Aún no apareces: juega alguna partida para tener ELO.':'Aún no apareces: gana XP haciendo lecciones, ejercicios o partidas.'}</p>`:''}</div>`;
+ $$('[data-sc]',m).forEach(b=>b.onclick=()=>go('liga',{sc:b.dataset.sc,md}));
+ $$('[data-md]',m).forEach(b=>b.onclick=()=>go('liga',{sc,md:b.dataset.md}));
+ const bind=()=>$$('[data-pl]',m).forEach(r=>r.onclick=()=>{const x=list.find(y=>y.id===r.dataset.pl);if(x&&typeof playerCard==='function')playerCard({id:x.id,n:x.n,g:x.g});});
+ bind();
+ /* buscador: filtra la lista ya descargada (no lee nada de Firebase) y muestra el puesto real de cada uno */
+ const qi=$('#lgq',m),lgl=$('#lgl',m),pod=$('#lgpod',m),orig=lgl?lgl.innerHTML:'',nz=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+ if(qi)qi.oninput=()=>{const t=nz(qi.value.trim());
+  if(!t){lgl.innerHTML=orig;pod.style.display='';bind();return;}
+  pod.style.display='none';const hits=list.map((x,i)=>[x,i]).filter(([x])=>nz(x.n).includes(t));
+  lgl.innerHTML=hits.length?`<div class="lglist">${hits.map(([x,i])=>row(x,i)).join('')}</div>`:'<p class="muted" style="margin:0">Nadie con ese nombre en esta lista.</p>';bind();};}
 
 /* tarjeta de jugador: progreso + amigo + retar + silenciar (desde cualquier lista: conectados, torneos, salón de la fama, rival…) */
 async function playerCard(p,o){o=o||{};if(!p||!p.id)return;if(!onlLogged()){toast('Entra con tu usuario del cole para ver perfiles','bad');return;}
