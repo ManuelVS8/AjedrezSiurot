@@ -2910,7 +2910,7 @@ function viewRush(m,arg){
      // se enseña la jugada buena en el tablero y después el resumen
      setTimeout(()=>{if(!alive(tok))return;try{R.solution();const ar=board.arrows[0],bp=board.pos;const mm=ar&&bp&&bp.legal().find(x=>x.from===ar[0]&&x.to===ar[1]);if(mm)goodSan=E.sanES(bp.san(mm));}catch(e){}},750);
      setTimeout(()=>{if(alive(tok)){running=true;end();}},2300);return;}
-    setFb('❌ ¡No era esa!','bad');if(lives<=0){end();return;}setTimeout(()=>{if(alive(tok)&&running)nextPz();},700);},
+    setFb('❌ ¡No era esa!','bad');if(lives<=0){board.interactive=false;clearInterval(timerId);setFb('💔 ¡Te has quedado sin vidas!','bad');setTimeout(()=>{if(alive(tok))end();},1100);return;}setTimeout(()=>{if(alive(tok)&&running)nextPz();},700);},
    msg:setFb},tok);
  }
  function records(){const out=[];
@@ -2920,7 +2920,7 @@ function viewRush(m,arg){
   if(!surv&&dur===3&&score>(P.rushBestMix||0))P.rushBestMix=score;save();return out;}
  async function end(){
   if(!running)return;running=false;finished=true;clearInterval(timerId);board.interactive=false;
-  const recs=records();track('rush',score,true);if(score>=10)award('rush10');
+  const recs=records(),noLives=!surv&&lives<=0&&left>0;track('rush',score,true);if(score>=10)award('rush10');
   const xp=score*5;if(xp)addXP(xp,'Contrarreloj');sound('done');
   if(duelId){try{await RT.patch(`rush/${duelId}/${meK}`,{s:score,l:Math.max(0,lives),d:1,t:RT.SV});}catch(e){}
    setFb('⏳ Esperando a que termine tu rival…','info');
@@ -2934,7 +2934,7 @@ function viewRush(m,arg){
     if(v==='r'&&typeof sendReto==='function'){go('online');setTimeout(()=>sendReto({id:D[opK],n:opN},'rush:'+dur),400);}else go('online');});
    return;}
   if(recs.length)confetti(60);
-  modal({title:surv?(recs.length?'💥 ¡Fin… y nuevo récord!':'💥 ¡Fin de la supervivencia!'):recs.length?'🏆 ¡Récord!':'¡Tiempo!',html:`<div class="bigicon">${recs.length?'🏆':surv?'♾️':'⚡'}</div>${surv&&failSan?`<p class="muted" style="margin:0 0 6px">Fallaste con <b>${E.sanES(failSan)}</b>${goodSan?`; la buena era <b>${goodSan}</b>`:''}.</p>`:''}<p>${surv?`Has resuelto <b>${score}</b> ejercicio${score===1?'':'s'} seguido${score===1?'':'s'} sin fallar.`:`Has resuelto <b>${score}</b> ejercicios en ${dur} min.`}</p>${recs.length?`<div style="text-align:left"><b>Récords conseguidos:</b><br>${recs.join('<br>')}</div>`:`<p class="muted">${surv?'Récord de supervivencia: '+(P.rushBestS||0):'Récord en '+dur+' min: '+(P[RUSH_K(dur)]||0)}</p>`}`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'Otra vez',v:'o'}],dismiss:false}).then(v=>{if(v==='o')go('contrarreloj',surv?{surv:true}:{dur});else go('retos');});
+  modal({title:surv?(recs.length?'💥 ¡Fin… y nuevo récord!':'💥 ¡Fin de la supervivencia!'):noLives?(recs.length?'💔 Sin vidas… ¡y nuevo récord!':'💔 ¡Sin vidas!'):recs.length?'🏆 ¡Récord!':'⏰ ¡Tiempo!',html:`<div class="bigicon">${noLives?'💔':recs.length?'🏆':surv?'♾️':'⚡'}</div>${surv&&failSan?`<p class="muted" style="margin:0 0 6px">Fallaste con <b>${E.sanES(failSan)}</b>${goodSan?`; la buena era <b>${goodSan}</b>`:''}.</p>`:''}<p>${surv?`Has resuelto <b>${score}</b> ejercicio${score===1?'':'s'} seguido${score===1?'':'s'} sin fallar.`:noLives?`Has fallado 3 veces y te has quedado sin vidas con <b>${Math.floor(left/60)}:${String(left%60).padStart(2,'0')}</b> por jugar.<br>Has resuelto <b>${score}</b> ejercicio${score===1?'':'s'}.`:`Has resuelto <b>${score}</b> ejercicios en ${dur} min.`}</p>${recs.length?`<div style="text-align:left"><b>Récords conseguidos:</b><br>${recs.join('<br>')}</div>`:`<p class="muted">${surv?'Récord de supervivencia: '+(P.rushBestS||0):'Récord en '+dur+' min: '+(P[RUSH_K(dur)]||0)}</p>`}`,buttons:[{t:'Salir',cls:'ghost',v:'s'},{t:'Otra vez',v:'o'}],dismiss:false}).then(v=>{if(v==='o')go('contrarreloj',surv?{surv:true}:{dur});else go('retos');});
  }
  function paintOpp(){const el=$('#op',body);if(!el||!D)return;const o=D[opK]||{};el.innerHTML=`🆚 <b>${esc(D[opK+'n']||'Rival')}</b> · ${o.s||0} aciertos · ${'❤️'.repeat(o.l==null?3:o.l)}${o.d?' · terminó':''}`;}
  function go2(){running=true;hud();nextPz();if(surv)return;
@@ -3054,15 +3054,22 @@ function showSettings(){
 //   Para eso hay una entrada «guarda» en el historial solo mientras no se está en el inicio; en el inicio se quita.
 // - Ordenador/Chromebook: navega dentro de la app y nunca saca de la página (como siempre).
 const BK_MOBILE=(()=>{const u=navigator.userAgent||'';return !/CrOS/.test(u)&&(/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1));})();
-const BK={ign:0,t:null};
+const BK={ign:0,t:null,act:true,R:6};
+// Chrome marca como «saltables» las entradas del historial creadas tras pulsar «atrás» si el usuario no ha tocado la pantalla
+// entre medias, y el siguiente «atrás» se salta todas y CIERRA la app. Por eso se deja una reserva de varias entradas
+// creadas siempre justo después de un toque (BK.act), y nunca se crean nuevas como respuesta a un «atrás».
 const bkOverlay=()=>$('.drawerbg')||$$('.modalbg').pop()||$('.tvov')||$('.projov')||$('.sheetov');
 const bkNeed=()=>!BK_MOBILE||!!bkOverlay()||(!!P&&currentTab!=='inicio');
-function bkSync(){clearTimeout(BK.t);BK.t=setTimeout(()=>{try{const g=history.state&&history.state.app===2;
- if(bkNeed()){if(!g)history.pushState({app:2},'');}
- else if(g){BK.ign++;history.back();}}catch(e){}},60);}
+const bkDepth=()=>{const s=history.state;return s&&s.app===2?(s.d||1):0;};
+function bkSync(){clearTimeout(BK.t);BK.t=setTimeout(()=>{try{const d=bkDepth();
+ if(bkNeed()){if(BK.act&&d<BK.R)for(let i=d+1;i<=BK.R;i++)history.pushState({app:2,d:i},'');}
+ else if(d>0){BK.ign++;history.go(-d);}}catch(e){}},60);}
 function initBack(){
- try{history.replaceState({app:1},'');if(!BK_MOBILE)history.pushState({app:2},'');}catch(e){}
+ try{history.replaceState({app:1},'');}catch(e){}
+ // un toque o una tecla del usuario permite volver a crear la reserva
+ const act=()=>{BK.act=true;bkSync();};['click','pointerup','touchend','keydown'].forEach(t=>window.addEventListener(t,act,true));
  window.addEventListener('popstate',()=>{
+  BK.act=false;   // hasta el próximo toque no se crean entradas nuevas
   if(BK.ign>0){BK.ign--;return;}   // la quitó la propia app (al llegar al inicio)
   const ov=bkOverlay();
   if(ov){if(ov.classList.contains('drawerbg'))closeMenu();
@@ -3074,6 +3081,7 @@ function initBack(){
   bkSync();
  });
  new MutationObserver(bkSync).observe(document.body,{childList:true});   // se abren o cierran ventanas
+ bkSync();
 }
 function closeMenu(){const d=$('.drawerbg');if(d)d.remove();}
 function openMenu(){
@@ -4413,7 +4421,13 @@ function cmState(){const flat=[];CAMINO.forEach((w,wi)=>w.st.forEach((s,si)=>fla
 function cmGo(x){if(!x)return go('camino');const {w,s}=x;
  if(s.k==='lec')return go('leccion',{mod:s.mod,l:s.l,camino:1});
  if(s.k==='pz')return go('caminopz',{w:w.id,i:x.si});
- if(s.k==='boss')return go('partida',{level:s.level,color:s.color,camino:cmKey(w,s)});}
+ if(s.k==='boss'){const key=cmKey(w,s),b=BOTS[s.level-1];
+  // si ya le ganó en el modo Jugar (fuera del camino), puede pasar la puerta sin repetir la partida
+  if(!cmDone(w,s)&&(((P.games||{})[s.level]||{}).w||0)>0){
+   modal({title:'🛡️ '+esc(b.nombre),html:`<div class="bigicon">${b.emoji}</div><p style="text-align:center">Ya has vencido a <b>${esc(b.nombre)}</b> en el modo <b>Jugar</b>.</p><p style="text-align:center">¿Quieres pasar la puerta o prefieres enfrentarte a él de nuevo?</p>`,buttons:[{t:'⚔️ Enfrentarme',cls:'ghost',v:'j'},{t:'🚪 Pasar',v:'p'}]}).then(v=>{
+    if(v==='p'){cmBossWin(key);go('camino');}else if(v==='j')go('partida',{level:s.level,color:s.color,camino:key});});
+   return;}
+  return go('partida',{level:s.level,color:s.color,camino:key});}}
 /* tarjeta de la portada */
 function cmCardHTML(){if(!P)return'';const S=cmState();
  if(S.complete)return `<div class="cmcard done"><div class="cmce">🎓</div><div class="cmct"><b>¡Has completado el camino!</b><span>Eres un ajedrecista de verdad. Sigue entrenando en la liga y los torneos.</span></div><button class="btn" data-cm="map">🗺️ Ver</button></div>`;
