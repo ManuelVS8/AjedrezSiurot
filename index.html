@@ -4428,6 +4428,20 @@ function cmGo(x){if(!x)return go('camino');const {w,s}=x;
     if(v==='p'){cmBossWin(key);go('camino');}else if(v==='j')go('partida',{level:s.level,color:s.color,camino:key});});
    return;}
   return go('partida',{level:s.level,color:s.color,camino:key});}}
+/* ---------- diploma (imprimible y descargable) ---------- */
+const DIP_CSS='.dip{background:#fffdf5;border:10px double #b7950b;border-radius:12px;padding:32px;max-width:700px;width:100%;margin:0 auto;text-align:center;font-family:Georgia,serif;color:#3b2f10;box-sizing:border-box}.dip h1{font-size:2.2rem;margin:8px 0}.dip .nm{font-size:1.8rem;font-weight:bold;border-bottom:2px solid #b7950b;display:inline-block;padding:0 16px 4px;margin:14px 0}.dip .fe{margin-top:22px}.dip .pie{margin-top:18px;font-size:.9rem}';
+const DIP_OVERLAY_CSS='#cmdip{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;overflow:auto}#cmdip .bar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}@media print{body *{visibility:hidden}#cmdip,#cmdip *{visibility:visible}#cmdip{position:absolute;left:0;top:0;width:100%;height:auto;background:#fff;padding:0;display:block}#cmdip .bar{display:none}}';
+function cmDiplomaHTML(){const nm=esc((P&&P.name)||'Alumno/a');const f=new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'});return `<div class="dip"><div style="font-size:3rem">🎓</div><h1>Diploma</h1><p>Se concede a</p><div class="nm">${nm}</div><p>por completar el <b>Camino de Ajedrez Siurot</b>, superando todos los mundos y guardianes.</p><p class="fe">${f}</p><p class="pie">Ajedrez Siurot · CEIP Manuel Siurot</p></div>`;}
+function cmDiploma(){
+ if(!document.getElementById('dipcss')){const st=document.createElement('style');st.id='dipcss';st.textContent=DIP_CSS+DIP_OVERLAY_CSS;document.head.appendChild(st);}
+ let o=document.getElementById('cmdip');if(o)o.remove();
+ o=document.createElement('div');o.id='cmdip';
+ o.innerHTML=cmDiplomaHTML()+'<div class="bar"><button class="btn acc" id="dipPrint">🖨️ Imprimir</button><button class="btn" id="dipDl">⬇️ Descargar</button><button class="btn ghost" id="dipClose">Cerrar</button></div>';
+ document.body.appendChild(o);
+ o.querySelector('#dipPrint').onclick=()=>window.print();
+ o.querySelector('#dipClose').onclick=()=>o.remove();
+ o.querySelector('#dipDl').onclick=()=>{const html='<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Diploma</title><style>body{margin:0;padding:24px;background:#fff}'+DIP_CSS+'</style></head><body>'+cmDiplomaHTML()+'</body></html>';const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download='diploma-ajedrez-siurot.html';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);};
+}
 /* tarjeta de la portada */
 function cmCardHTML(){if(!P)return'';const S=cmState();
  if(S.complete)return `<div class="cmcard done"><div class="cmce">🎓</div><div class="cmct"><b>¡Has completado el camino!</b><span>Eres un ajedrecista de verdad. Sigue entrenando en la liga y los torneos.</span></div><button class="btn" data-cm="map">🗺️ Ver</button></div>`;
@@ -4451,13 +4465,13 @@ function viewCamino(m){
  m.innerHTML=`<div class="sectitle"><h2>🗺️ Mi camino</h2><span class="pill">${S.complete?'🎓 Completado':`Mundo ${S.curW+1} de ${CAMINO.length}`}</span></div>
   <p class="muted" style="margin:0 0 12px">Lecciones, prácticas y un <b>guardián</b> al final de cada mundo: gánale para abrir el siguiente.</p>
   <div class="cmmap">${CAMINO.map(worldHTML).join('')}<div class="cmend">${S.complete?'🎓 <b>¡Camino completado!</b>':'🎓 <b>Meta</b><br><span class="muted">Al final te espera tu diploma</span>'}</div></div>
-  <div class="cmfab"><button class="btn acc big" id="cmgo">${S.complete?'🎓 ¡Completado!':'▶ Continuar'}</button></div>`;
+  <div class="cmfab"><button class="btn acc big" id="cmgo">${S.complete?'🎓 Ver diploma':'▶ Continuar'}</button></div>`;
  $$('[data-s]',m).forEach(el=>el.onclick=()=>{const wi=+el.dataset.w,si=+el.dataset.s,w=CAMINO[wi],s=w.st[si];
   const done=cmDone(w,s),isCur=S.cur&&S.cur.w===w&&S.cur.si===si;
   if(!done&&!isCur){toast(wi>S.curW?'🔒 Este mundo aún está cerrado':'🔒 Primero completa los pasos anteriores');return;}
   const txt=s.k==='lec'?'Lección':s.k==='pz'?`${s.n} ejercicios de nivel ${s.lv}. Acierta al menos ${s.n-1} a la primera.`:`Gana la partida a <b>${esc(BOTS[s.level-1].nombre)}</b> con ${s.color==='w'?'blancas':'negras'} para abrir el siguiente mundo.`;
   modal({title:`${cmIcon(s)} ${esc(cmTitle(s))}`,html:`<p style="text-align:center">${txt}</p>${done?'<p style="text-align:center" class="muted">✅ Ya lo has superado. Puedes repetirlo.</p>':''}`,buttons:[{t:'Cerrar',cls:'ghost',v:false},{t:done?'🔁 Repetir':'▶ Empezar',v:true}]}).then(v=>{if(v)cmGo({w,wi,s,si});});});
- $('#cmgo',m).onclick=()=>S.complete?toast('🎓 ¡Ya has completado todo el camino!'):cmGo(S.cur);
+ $('#cmgo',m).onclick=()=>S.complete?cmDiploma():cmGo(S.cur);
  // colocar la vista en el paso actual
  setTimeout(()=>{if(!alive(tok))return;const c=$('.cmnode.cur,.cmgate.cur',m);if(c)c.scrollIntoView({block:'center',behavior:'instant'});},60);
  // conquista: mundos recién abiertos que aún no se han visto
