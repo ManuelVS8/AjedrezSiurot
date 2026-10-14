@@ -2012,13 +2012,13 @@ class Board{
  }
  _arrows(){
   let s='<defs>';const cols={g:'#15a34a',o:'#f59e0b',b:'#2563eb',r:'#dc2626'};
-  for(const k in cols)s+=`<marker id="ah${k}${this._uid||(this._uid=Math.random().toString(36).slice(2,7))}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${cols[k]}"/></marker>`;
+  for(const k in cols)s+=`<marker id="ah${k}${this._uid||(this._uid=Math.random().toString(36).slice(2,7))}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${cols[k]}" fill-opacity=".6"/></marker>`;
   s+='</defs>';
   for(const a of this.arrows){
    const from=typeof a[0]==='string'?E.sqIndex(a[0]):a[0],to=typeof a[1]==='string'?E.sqIndex(a[1]):a[1],col=a[2]||'g';
    const d1=this.dispOf(from),d2=this.dispOf(to);const x1=(d1&7)+.5,y1=(d1>>3)+.5,x2=(d2&7)+.5,y2=(d2>>3)+.5;
    const L=Math.hypot(x2-x1,y2-y1),k=(L-.38)/L;
-   s+=`<line x1="${x1}" y1="${y1}" x2="${x1+(x2-x1)*k}" y2="${y1+(y2-y1)*k}" stroke="${cols[col]}" stroke-width=".17" stroke-linecap="round" opacity=".85" marker-end="url(#ah${col}${this._uid})"/>`;
+   s+=`<line x1="${x1}" y1="${y1}" x2="${x1+(x2-x1)*k}" y2="${y1+(y2-y1)*k}" stroke="${cols[col]}" stroke-width=".17" stroke-linecap="round" opacity=".6" marker-end="url(#ah${col}${this._uid})"/>`;
   }
   this.svg.innerHTML=s;
  }
@@ -2298,9 +2298,9 @@ function bfsPar(fen,stars){
 }
 
 // ================= LECCIÓN =================
-function viewLesson(m,{mod:modId,l:lid,camino}){
- const tok=VIEW;const mod=MODULES.find(x=>x.id===modId),les=mod.lecciones.find(x=>x.id===lid);
- const {board,body,under,nav,speakBtn}=trainerShell(m,les.titulo,()=>goBack(()=>go('modulo',modId)));let speakTxt='';const say=t=>{if(modId!=='tactica'||idx===0)speak(t);};
+function viewLesson(m,{mod:modId,l:lid,camino,custom,tarea}){
+ const tok=VIEW;const mod=MODULES.find(x=>x.id===modId)||{id:'estudio',icono:'📓',lecciones:[]},les=custom||mod.lecciones.find(x=>x.id===lid);
+ const {board,body,under,nav,speakBtn}=trainerShell(m,les.titulo,()=>goBack(()=>tarea?go('aula'):go('modulo',modId)));let speakTxt='';const say=t=>{if(modId!=='tactica'||idx===0)speak(t);};
  if(speakBtn){speakBtn.classList.remove('hidden');speakBtn.onclick=()=>speak(speakTxt,true);}
  let idx=0,mistakes=0,stepDone=[];let timers=[];
  const later=(fn,ms)=>{const t=setTimeout(()=>{if(alive(tok))fn();},ms);timers.push(t);};
@@ -2383,7 +2383,7 @@ function viewLesson(m,{mod:modId,l:lid,camino}){
    const back=()=>{if(!k)return;lp.undo();k--;draw(false);};
    let auto=null;const stopAuto=()=>{clearInterval(auto);auto=null;};
    $('#b0',under).onclick=()=>{stopAuto();while(k)back();};$('#b1',under).onclick=()=>{stopAuto();back();};$('#b2',under).onclick=()=>{stopAuto();fwd();};
-   board.orient=les.lado||'w';draw(false);
+   board.orient=st.lado||les.lado||board.orient;draw(false);
    if(stepDone[idx])complete();else{next.disabled=true;skip.classList.remove('hidden');skip.onclick=()=>{complete();next.click();};}
   }
   else if(st.t==='drill'){
@@ -2420,7 +2420,7 @@ function viewLesson(m,{mod:modId,l:lid,camino}){
     mode='guide';stopAuto();timers.forEach(clearTimeout);timers=[];lp=new E.Pos(fen);k=0;board.interactive=false;board.premoveOK=false;board.premove=null;board.orient=side;board.hl=[];board.arrows=[];
     $('#ph',sb).innerHTML='1️⃣ Mira y aprende';
     under.innerHTML='<button class="btn acc sm" id="gp" title="Practicar" aria-label="Practicar">✍️</button><button class="btn ghost sm" id="b0" title="Al inicio">⏮</button><button class="btn ghost sm" id="b1" title="Anterior">◀</button><button class="btn sm" id="b2" title="Siguiente jugada">▶</button>';
-    const draw=anim=>{drawML();const last=lp.played[lp.played.length-1]||null;board.arrows=last?[[last.from,last.to,'g']]:[];board.set(lp,{last,anim});};
+    const draw=anim=>{drawML();const last=lp.played[lp.played.length-1]||null;const ex=(k&&st.arr)?st.arr[k-1]:null;board.arrows=(ex&&ex.length)?ex.slice():(last?[[last.from,last.to,'g']]:[]);board.marks={};((k&&st.sq)?st.sq[k-1]||[]:[]).forEach(q=>{board.marks[E.sqIndex(q)]='mk-sel';});board.set(lp,{last,anim});};
     const fwd=()=>{if(k>=N)return false;const mm=lp.fromSan(st.moves[k]);lp.play(mm);k++;playSound(lp,mm);draw(true);showMove(k-1);if(k===N){cm($('#cm',sb).innerHTML+'<div class="fb ok" style="margin-top:8px">🎉 ¡Línea completa! Ahora pulsa <b>✍️ Practicar</b> y repítela tú.</div>');}return true;};
     const back=()=>{if(!k)return;lp.undo();k--;draw(false);if(k)showMove(k-1);else cm('Pulsa <b>▶</b> para ver la primera jugada. Verás una flecha y por qué se juega.');};
     $('#b0',under).onclick=()=>{stopAuto();while(k)back();};$('#b1',under).onclick=()=>{stopAuto();back();};$('#b2',under).onclick=()=>{stopAuto();fwd();};
@@ -2430,7 +2430,7 @@ function viewLesson(m,{mod:modId,l:lid,camino}){
    // ---- fase 2: repítela tú ----
    function practice(){
     mode='practice';stopAuto();timers.forEach(clearTimeout);timers=[];lp=new E.Pos(fen);k=0;errHere=0;oppBusy=false;
-    board.orient=side;board.movable=side;board.interactive=true;board.premoveOK=true;board.premove=null;board.hl=[];board.arrows=[];board.legalFn=null;board.autoQueen=false;
+    board.orient=side;board.movable=side;board.interactive=true;board.premoveOK=true;board.premove=null;board.hl=[];board.arrows=[];board.marks={};board.legalFn=null;board.autoQueen=false;
     $('#ph',sb).innerHTML='2️⃣ Ahora tú: repite la línea';
     under.innerHTML='<button class="btn ghost sm" id="sg">👀 Ver guiado</button><button class="btn ghost sm" id="h1">💡 Pista</button><button class="btn ghost sm" id="rs">↻ Reiniciar</button>';
     $('#sg',under).onclick=guide;$('#rs',under).onclick=practice;
@@ -2489,6 +2489,7 @@ function viewLesson(m,{mod:modId,l:lid,camino}){
   }
  }
  function finish(){
+  if(tarea){sound('done');confetti();tkFinish(tarea,Math.max(0,10-2*mistakes),10,[mistakes],false);return;}
   const key=lessonKey(modId,lid);const prev=P.lessons[key];const stars=mistakes===0?3:mistakes<=2?2:1;
   if(!prev){P.lessons[key]={stars,date:today()};save();addXP(les.xp+stars*5,'Lección: '+les.titulo);track('lec');award('primera');
    if(modProgress(mod).done===mod.lecciones.length){award(mod.id);}}
@@ -3627,7 +3628,7 @@ function importDialog(done){
 function viewStudy(m,{id,ch:chIdx,mode:mode0}){
  const tok=VIEW;const st=(DB.studies||[]).find(s=>s.id===id);if(!st){go('estudios');return;}
  const {board,body,under}=trainerShell(m,'📓 '+esc(st.title),()=>go('estudios'));
- let ci=Math.max(0,Math.min(chIdx||0,st.chapters.length-1)),mode=mode0||'ver',pidx=[],arrowTool=false,arrowCol='g',pickFrom=null,hintArrow=null,engArrow=null,errs=0,pdone=false,busy=false;
+ let ci=Math.max(0,Math.min(chIdx||0,st.chapters.length-1)),mode=mode0||'ver',pidx=[],arrowTool=false,sqTool=false,arrowCol='g',pickFrom=null,hintArrow=null,engArrow=null,errs=0,pdone=false,busy=false;
  const chp=()=>st.chapters[ci];
  const atIdx=ix=>{let n=chp().root;const out=[];for(const k of ix){n=n.ch[k];if(!n)break;out.push(n);}return out;};
  const curNode=()=>{const a=atIdx(pidx);return a.length?a[a.length-1]:chp().root;};
@@ -3645,7 +3646,7 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
  $('#n0',under).onclick=()=>{pidx=[];draw();};$('#n1',under).onclick=back;$('#n2',under).onclick=fwd;$('#n3',under).onclick=()=>{let n=curNode(),ix=[...pidx];while(n.ch.length){ix.push(0);n=n.ch[0];}pidx=ix;draw();};
  $('#nf',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();};
  $$('#mseg button',body).forEach(b=>b.onclick=()=>setMode(b.dataset.m));
- function setMode(mm){mode=mm;arrowTool=false;pickFrom=null;board.pickSq=null;hintArrow=null;engArrow=null;errs=0;pdone=false;if(mm==='prac'){startPractice();}draw();}
+ function setMode(mm){mode=mm;arrowTool=false;sqTool=false;pickFrom=null;board.pickSq=null;hintArrow=null;engArrow=null;errs=0;pdone=false;if(mm==='prac'){startPractice();}draw();}
  function userColor(){return board.orient;}
  function startPractice(){pidx=[];errs=0;pdone=false;busy=false;oppMaybe();}
  function oppMaybe(){const p=curPos();if(curNode().ch.length===0){finishPractice();return;}if(p.turn!==userColor()){busy=true;setTimeout(()=>{if(!alive(tok)||mode!=='prac')return;pidx=[...pidx,0];busy=false;const pp=curPos();playSound(pp,pp.played[pp.played.length-1]);if(!curNode().ch.length)finishPractice();draw();},750);}}
@@ -3663,6 +3664,7 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
   if(mode!=='prac'||pdone)(nd.ar||[]).forEach(a=>A.push([E.sqIndex(a[0]),E.sqIndex(a[1]),a[2]||'g']));
   if(hintArrow)A.push(hintArrow);if(engArrow)A.push(engArrow);
   board.arrows=A;
+  board.marks={};if(mode!=='prac'||pdone)(nd.sq||[]).forEach(q=>{board.marks[E.sqIndex(q)]='mk-sel';});
  }
  function treeHTML(parent,idxs,fen,first,onlyIdx){
   let s='';const p=new E.Pos(fen||undefined);let needNum=first,cur=parent,ci2=idxs,lvl0=true;const curKey=pidx.join('.');
@@ -3686,7 +3688,7 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
   // tablero
   board.hl=[];board.interactive=(mode==='edit')||(mode==='prac'&&!pdone&&!busy&&p.turn===userColor());board.movable=p.turn;board.premoveOK=false;board.legalFn=null;
   board.set(p,{last});drawArrows();board.render();
-  if(mode==='edit'&&arrowTool){board.pickSq=s=>{const nm=E.sqName(s);if(!pickFrom){pickFrom=nm;board.hl=[s];board.render();}else{const a=pickFrom;pickFrom=null;board.hl=[];if(a===nm){board.render();return;}const L=nd.ar=nd.ar||[];const k=L.findIndex(x=>x[0]===a&&x[1]===nm);if(k>=0)L.splice(k,1);else L.push([a,nm,arrowCol]);save();draw();}};}else board.pickSq=null;
+  if(mode==='edit'&&arrowTool){board.pickSq=s=>{const nm=E.sqName(s);if(!pickFrom){pickFrom=nm;board.hl=[s];board.render();}else{const a=pickFrom;pickFrom=null;board.hl=[];if(a===nm){board.render();return;}const L=nd.ar=nd.ar||[];const k=L.findIndex(x=>x[0]===a&&x[1]===nm);if(k>=0)L.splice(k,1);else L.push([a,nm,arrowCol]);save();draw();}};}else if(mode==='edit'&&sqTool){board.pickSq=s=>{const nm=E.sqName(s);const L=nd.sq=nd.sq||[];const k=L.indexOf(nm);if(k>=0)L.splice(k,1);else L.push(nm);save();draw();};}else board.pickSq=null;
   // comentario
   if(mode==='edit'){const nags=['!','?','!!','??','!?','?!'];
    showCmt(`<div class="card" style="padding:10px"><div class="muted" style="font-weight:800;font-size:.8rem;margin-bottom:4px">💬 COMENTARIO DE ${pidx.length?'ESTA JUGADA':'LA POSICIÓN INICIAL'}</div><textarea id="ctx" placeholder="Escribe aquí por qué se juega esta jugada…" style="width:100%;min-height:70px;padding:8px;border:2px solid var(--line);border-radius:10px;font-family:inherit;font-size:.95rem">${esc(nd.c||'')}</textarea>
@@ -3704,8 +3706,9 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
   const tools=$('#tools',body);
   if(mode==='edit'){
    const par=pidx.length?atIdx(pidx.slice(0,-1)).slice(-1)[0]||c.root:null;const kIdx=pidx.length?pidx[pidx.length-1]:0;
-   tools.innerHTML=`<div class="btnrow" style="gap:5px;align-items:center"><button class="btn sm ${arrowTool?'':'ghost'}" id="tar">🏹 Flechas${arrowTool?' (ON)':''}</button>${arrowTool?['g','r','b','o'].map(k=>`<button class="btn sm ${arrowCol===k?'':'ghost'}" data-col="${k}" style="min-width:34px"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${{g:'#15a34a',r:'#dc2626',b:'#2563eb',o:'#f59e0b'}[k]}"></span></button>`).join('')+'<button class="btn sm ghost" id="tcl">🧹</button>':''}${pidx.length&&kIdx>0?'<button class="btn sm ghost" id="tmain">⬆️ Hacer principal</button>':''}${pidx.length?'<button class="btn sm ghost" id="tdel">🗑️ Borrar jugada</button>':''}</div>${arrowTool?'<div class="muted" style="font-size:.85rem;font-weight:700">Toca la casilla de origen y luego la de destino. Si repites la misma flecha, se quita.</div>':''}`;
-   $('#tar',tools).onclick=()=>{arrowTool=!arrowTool;pickFrom=null;draw();};
+   tools.innerHTML=`<div class="btnrow" style="gap:5px;align-items:center"><button class="btn sm ${arrowTool?'':'ghost'}" id="tar">🏹 Flechas${arrowTool?' (ON)':''}</button><button class="btn sm ${sqTool?'':'ghost'}" id="tsq">🟦 Casillas${sqTool?' (ON)':''}</button>${arrowTool?['g','r','b','o'].map(k=>`<button class="btn sm ${arrowCol===k?'':'ghost'}" data-col="${k}" style="min-width:34px"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${{g:'#15a34a',r:'#dc2626',b:'#2563eb',o:'#f59e0b'}[k]}"></span></button>`).join('')+'<button class="btn sm ghost" id="tcl">🧹</button>':''}${pidx.length&&kIdx>0?'<button class="btn sm ghost" id="tmain">⬆️ Hacer principal</button>':''}${pidx.length?'<button class="btn sm ghost" id="tdel">🗑️ Borrar jugada</button>':''}</div>${arrowTool?'<div class="muted" style="font-size:.85rem;font-weight:700">Toca la casilla de origen y luego la de destino. Si repites la misma flecha, se quita.</div>':''}${sqTool?'<div class="muted" style="font-size:.85rem;font-weight:700">Toca las casillas que quieras señalar. Si tocas una ya marcada, se quita.</div>':''}`;
+   $('#tar',tools).onclick=()=>{arrowTool=!arrowTool;sqTool=false;pickFrom=null;draw();};
+   $('#tsq',tools).onclick=()=>{sqTool=!sqTool;arrowTool=false;pickFrom=null;draw();};
    $$('[data-col]',tools).forEach(b=>b.onclick=()=>{arrowCol=b.dataset.col;draw();});
    if($('#tcl',tools))$('#tcl',tools).onclick=()=>{nd.ar=[];save();draw();};
    if($('#tmain',tools))$('#tmain',tools).onclick=()=>{const [x]=par.ch.splice(kIdx,1);par.ch.unshift(x);pidx=[...pidx.slice(0,-1),0];save();draw();};
@@ -4200,9 +4203,22 @@ const tkOn=()=>typeof onlLogged==='function'&&onlLogged()&&!ONL.acc.guest;
 const tkList=()=>Object.entries(TK.d||{}).filter(([id,t])=>t&&typeof t==='object'&&t.ti).map(([id,t])=>Object.assign({id},t)).sort((a,b)=>(b.c||0)-(a.c||0));
 const tkOpen=t=>RT.srv()<(t.dl||0);
 const tkPending=()=>tkList().filter(t=>!t.r&&tkOpen(t));
+function studyTaskPayload(st,ci){
+ const ch=st.chapters[ci]||st.chapters[0];const p=new E.Pos(ch.fen||undefined);const fen=p.fen();
+ const mv0=(+fen.split(' ')[5])||1;const steps=[];let n=ch.root;
+ while(n&&n.ch&&n.ch.length){const c=n.ch[0];const mv=p.fromUci(c.uci);if(!mv)break;
+  const stp={m:p.san(mv),w:c.c||'Fíjate en esta jugada.'};const a=(c.ar||[]).map(x=>[x[0],x[1],x[2]||'g']);if(a.length)stp.a=a;if(c.sq&&c.sq.length)stp.q=c.sq.slice();
+  steps.push(stp);p.play(mv);n=c;}
+ return {n:st.title+' · '+ch.name,idea:(ch.root&&ch.root.c)||'Mira la línea con atención y repítela.',lado:ch.orient||'w',fen,mv0,steps};
+}
+function studyTaskLesson(t){const p=t.st;const S=p.steps||[];
+ return {id:'est',titulo:p.n,xp:0,pasos:[{t:'opening',tag:'📓 Estudio',n:p.n,idea:p.idea,lado:p.lado||'w',fen:p.fen,mv0:p.mv0,
+  moves:S.map(x=>x.m),why:S.map(x=>x.w),arr:S.map(x=>x.a||null),sq:S.map(x=>x.q||null)}]};
+}
 function tkSum(t){
  if(t.k==='mix')return (t.bl||[]).map(b=>{const T=THEME_OF(b.th);return `${b.n}× ${T.icono} ${T.nombre} (nivel ${b.lv})`;}).join(' · ');
  if(t.k==='lec'){const md=MODULES.find(x=>x.id===t.mod),l=md&&md.lecciones.find(x=>x.id===t.l);return `📚 Lección: ${l?l.titulo:'?'}`;}
+ if(t.k==='est')return `📓 Estudio: ${t.st?t.st.n:'?'}`;
  if(t.k==='esc')return `🔍 Escáner de amenazas (${t.n} posiciones)`;
  return 'Tarea';
 }
@@ -4233,6 +4249,7 @@ function runTask(t,opt){
  if(t.k==='mix')return go('tarea',{task:t,practice:!!opt.practice});
  if(t.k==='esc')return go('escaner',{seed:t.s%100000,total:t.n,back:()=>go('aula'),onDone:r=>tkFinish(t,r.score,r.max,[r.score],!!opt.practice)});
  if(t.k==='lec'){toast('📚 Haz la lección; tu profe verá que la has terminado');return go('leccion',{mod:t.mod,l:t.l});}
+ if(t.k==='est'){if(!t.st)return toast('Esta tarea no tiene contenido');return go('leccion',{custom:studyTaskLesson(t),tarea:t});}
 }
 async function tkSend(t,sc,mx,bs){
  const r={sc,mx,bs,t:RT.SV};await RT.put(`tareas/${myUid()}/${t.id}/r`,r);
@@ -4320,7 +4337,7 @@ function secTareas(box){
   <div style="display:grid;gap:12px;margin-top:10px;max-width:640px">
    <input id="tti" placeholder="Título (p. ej. «Táctica · semana 3»)" style="${inpStyle}">
    <div><b>1. ¿A quién?</b><div class="btnrow" style="margin-top:6px"><select id="tg" style="${inpStyle}">${groups.length?optList(groups.map(g=>[g,g]),groups[0]):'<option value="">(sin grupos)</option>'}</select></div><div id="tst" style="margin-top:8px"></div></div>
-   <div><b>2. ¿Qué?</b><select id="tty" style="${inpStyle};width:100%;margin-top:6px">${optList([['mix','🧩 Ejercicios (puedes combinar temas)'],['esc','🔍 Escáner de amenazas'],['lec','📚 Una lección']],'mix')}</select><div id="tfi" style="display:grid;gap:8px;margin-top:8px"></div></div>
+   <div><b>2. ¿Qué?</b><select id="tty" style="${inpStyle};width:100%;margin-top:6px">${optList([['mix','🧩 Ejercicios (puedes combinar temas)'],['esc','🔍 Escáner de amenazas'],['lec','📚 Una lección'],['est','📓 Un estudio mío']],'mix')}</select><div id="tfi" style="display:grid;gap:8px;margin-top:8px"></div></div>
    <p class="muted" style="margin:0">⏳ Plazo: <b>1 semana</b> desde que la envías. Solo cuenta el primer intento. Al alumnado le sale un aviso y un punto rojo en 🏫 Aula.</p>
    <div class="btnrow"><button class="btn acc" id="tmk">📨 Enviar tarea</button></div>
   </div></div>
@@ -4338,6 +4355,7 @@ function secTareas(box){
    $$('select[data-f]',fi).forEach(s=>s.onchange=()=>{bl[+s.dataset.i][s.dataset.f]=s.dataset.f==='th'?s.value:+s.value;drawFi();});
    $$('[data-rb]',fi).forEach(b=>b.onclick=()=>{bl.splice(+b.dataset.rb,1);drawFi();});
    $('#addb',fi).onclick=()=>{const last=bl[bl.length-1];bl.push({th:themes.find(t=>!bl.some(b=>b.th===t[0]))[0],n:3,lv:last?last.lv:2});drawFi();};}
+  else if(ty==='est'){const eo=(DB.studies||[]).flatMap(x=>x.chapters.map((c,ci)=>[x.id+'|'+ci,x.title+' · '+c.name]));fi.innerHTML=eo.length?`<label>Estudio<select id="fes" style="${inpStyle};width:100%">${optList(eo,'')}</select></label><p class="muted" style="margin:6px 0 0">El alumnado verá la línea principal del capítulo: primero la mira y luego la repite.</p>`:'<p class="muted">Todavía no tienes estudios. Créalos en 📓 Estudios.</p>';}
   else if(ty==='lec'){fi.innerHTML=`<label>Módulo<select id="fmo" style="${inpStyle};width:100%">${optList(mods,MODULES[0].id)}</select></label><label>Lección<select id="fle" style="${inpStyle};width:100%"></select></label>`;const f2=()=>{const md=MODULES.find(x=>x.id===$('#fmo',box).value);$('#fle',box).innerHTML=optList(md.lecciones.map(l=>[l.id,l.titulo]),'');};$('#fmo',box).onchange=f2;f2();}
   else fi.innerHTML=`<label>Posiciones<select id="fn" style="${inpStyle}">${optList([3,4,5,6,8].map(x=>[x,x]),5)}</select></label>`;};
  $('#tty',box).onchange=drawFi;drawFi();
@@ -4348,6 +4366,7 @@ function secTareas(box){
   const t={ti,k:ty,g:$('#tg',box).value,c:now,dl:now+7*864e5,s:Math.floor(Math.random()*1e6)};
   if(ty==='mix'){const tot=bl.reduce((a,b)=>a+b.n,0);if(tot>30)return toast('Máximo 30 ejercicios por tarea');t.bl=bl.map(b=>({th:b.th,n:b.n,lv:b.lv}));}
   else if(ty==='lec'){t.mod=$('#fmo',box).value;t.l=$('#fle',box).value;}
+  else if(ty==='est'){const [sid_,ci]=($('#fes',box)||{value:''}).value.split('|');const es=(DB.studies||[]).find(x=>x.id===sid_);if(!es)return toast('Elige un estudio');const pl=studyTaskPayload(es,+ci||0);if(!pl.steps.length)return toast('Ese capítulo no tiene jugadas');t.st=pl;}
   else t.n=+$('#fn',box).value;
   const id=rid()+rid();const btn=$('#tmk',box);btn.disabled=true;
   try{
@@ -5578,13 +5597,17 @@ function refreshInstallUI(){const r=document.getElementById('instrow');if(r)r.st
 function installRowHTML(){return IS_STANDALONE()?'<p class="muted" style="font-size:.8rem;margin:8px 0 0">✅ Estás usando la app instalada.</p>':`<div id="instrow" class="btnrow" style="margin-top:8px;${(!deferredInstall&&!IS_IOS)?'display:none':''}"><button class="btn sm" id="setinst">📲 Instalar la app</button></div>`;}
 // ---- actualizaciones ----
 let swReg=null,hadController=!!(navigator.serviceWorker&&navigator.serviceWorker.controller),updShown=false,pageSig=null;
-function showUpdateToast(){
- if(updShown)return;updShown=true;
+function updSeenGet(){try{return localStorage.getItem('siurot_upd_seen')||'';}catch(e){return '';}}
+function updSeenSet(v){try{localStorage.setItem('siurot_upd_seen',v||'');}catch(e){}}
+function showUpdateToast(sig){
+ if(updShown||!sig)return;
+ if(sig===updSeenGet()||sig===pageSig)return;   // esta versión ya se avisó, o es la que está cargada
+ updShown=true;
  const t=document.createElement('div');t.id='updbar';
  t.innerHTML='<div class="it"><b>🔄 ¡Hay una versión nueva!</b><span>Pulsa para actualizar (se guarda tu progreso).</span></div><button class="btn sm" id="updgo">Actualizar</button><button class="btn sm ghost" id="updno" aria-label="Más tarde">✕</button>';
  document.body.appendChild(t);
- document.getElementById('updgo').onclick=()=>location.reload();
- document.getElementById('updno').onclick=()=>{t.remove();setTimeout(()=>{updShown=false;},10*60*1000);};
+ document.getElementById('updgo').onclick=()=>{updSeenSet(sig);location.reload();};
+ document.getElementById('updno').onclick=()=>{updSeenSet(sig);t.remove();updShown=false;};
 }
 async function pageSignature(){
  try{const r=await fetch(location.pathname,{method:'HEAD',cache:'no-store'});if(!r.ok)return null;return [r.headers.get('etag'),r.headers.get('last-modified'),r.headers.get('content-length')].join('|');}catch(e){return null;}
@@ -5593,7 +5616,7 @@ async function checkForUpdate(){
  if(swReg){try{await swReg.update();}catch(e){}}
  const s=await pageSignature();if(!s||s==='||')return;
  if(pageSig===null){pageSig=s;return;}
- if(s!==pageSig)showUpdateToast();
+ if(s!==pageSig)showUpdateToast(s);
 }
 function initPWA(){
  if(!/^https?:$/.test(location.protocol))return;
@@ -5601,9 +5624,9 @@ function initPWA(){
  if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(reg=>{
    swReg=reg;
-   reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)showUpdateToast();});});
+   reg.addEventListener('updatefound',()=>{const w=reg.installing;if(!w)return;w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)pageSignature().then(s=>showUpdateToast(s));});});
   }).catch(()=>{});
-  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController)showUpdateToast();hadController=true;});
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController)pageSignature().then(s=>showUpdateToast(s));hadController=true;});
  }
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkForUpdate();});
  setInterval(checkForUpdate,30*60*1000);
