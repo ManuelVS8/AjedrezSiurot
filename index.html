@@ -3644,7 +3644,7 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
  function fwd(){const n=curNode();if(n.ch.length){pidx=[...pidx,0];const pp=curPos();playSound(pp,pp.played[pp.played.length-1]);draw();}}
  function back(){if(pidx.length){pidx=pidx.slice(0,-1);draw();}}
  $('#n0',under).onclick=()=>{pidx=[];draw();};$('#n1',under).onclick=back;$('#n2',under).onclick=fwd;$('#n3',under).onclick=()=>{let n=curNode(),ix=[...pidx];while(n.ch.length){ix.push(0);n=n.ch[0];}pidx=ix;draw();};
- $('#nf',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';board.render();};
+ $('#nf',under).onclick=()=>{board.orient=board.orient==='w'?'b':'w';const cc=chp();if(cc&&mode==='edit'){cc.orient=board.orient;save();}board.render();};
  $$('#mseg button',body).forEach(b=>b.onclick=()=>setMode(b.dataset.m));
  function setMode(mm){mode=mm;arrowTool=false;sqTool=false;pickFrom=null;board.pickSq=null;hintArrow=null;engArrow=null;errs=0;pdone=false;if(mm==='prac'){startPractice();}draw();}
  function userColor(){return board.orient;}
@@ -3682,9 +3682,10 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
   // modos
   $$('#mseg button',body).forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
   // capítulos
-  $('#chips',body).innerHTML=st.chapters.map((x,i)=>`<button class="btn sm ${i===ci?'':'ghost'}" data-c="${i}">${esc(x.name)}</button>`).join('')+(mode==='edit'?'<button class="btn sm ghost" id="cadd">➕ Capítulo</button>':'');
+  $('#chips',body).innerHTML=st.chapters.map((x,i)=>`<button class="btn sm ${i===ci?'':'ghost'}" data-c="${i}">${esc(x.name)}</button>`).join('')+(mode==='edit'?'<button class="btn sm ghost" id="cadd">➕ Capítulo</button><button class="btn sm ghost" id="cside">⇆ Cambiar bando</button>':'')+`<span class="pill">${chp().orient==='b'?'♚ Juegas con negras':'♔ Juegas con blancas'}</span>`;
   $$('#chips [data-c]',body).forEach(b=>b.onclick=()=>{ci=+b.dataset.c;pidx=[];board.orient=chp().orient||'w';setMode(mode==='prac'?'prac':mode);});
   if($('#cadd',body))$('#cadd',body).onclick=addChapter;
+  if($('#cside',body))$('#cside',body).onclick=()=>{chp().orient=chp().orient==='b'?'w':'b';board.orient=chp().orient;save();draw();};
   // tablero
   board.hl=[];board.interactive=(mode==='edit')||(mode==='prac'&&!pdone&&!busy&&p.turn===userColor());board.movable=p.turn;board.premoveOK=false;board.legalFn=null;
   board.set(p,{last});drawArrows();board.render();
