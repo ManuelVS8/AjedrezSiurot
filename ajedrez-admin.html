@@ -300,7 +300,7 @@ async function pubSync(withIns){
  const open=A.torneos.filter(t=>t.estado!=='terminado');
  const T={};open.forEach(t=>T[t.id]=pubT1(t));
  try{const cur=await RT.get('pub/t')||{};for(const [id,x] of Object.entries(cur))if(x&&x.club&&!T[id])T[id]=x;}catch(e){}   // los torneos del Club los gestiona su profe GM: no se tocan
- const hof=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
+ const hof=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.alias||h.nombre||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
  const upd={t:T,hof,cfg:{avisos:(A.cfg.avisos||[]).filter(a=>a.on).map(a=>({texto:a.texto,url:a.url||''}))},seed:1,v:RT.SV};
  if(withIns){const ins={};for(const t of open){try{const js=await FB.list(`torneos/${t.id}/jugadores`);ins[t.id]={};js.forEach(j=>ins[t.id][j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});}catch(e){}}upd.ins=ins;}
  else{try{const cur=await RT.get('pub/ins')||{};const ids=new Set(open.map(t=>t.id));for(const k of Object.keys(cur))if(!ids.has(k))upd['ins/'+k]=null;}catch(e){}}
@@ -315,24 +315,28 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dInst=e;});
 async function doInstall(){if(dInst){dInst.prompt();try{await dInst.userChoice;}catch(e){}dInst=null;}else modal({title:'📲 Instalar',html:'<p>En Chrome (móvil): menú <b>⋮</b> → <b>Instalar aplicación</b> o <b>Añadir a pantalla de inicio</b>.<br><br>En iPhone (Safari): <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.</p>',buttons:[{t:'Entendido'}]});}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw-admin.js',{scope:'./ajedrez-admin.html'}).catch(()=>{});
 async function boot(){let u=null,g=null;try{u=JSON.parse(localStorage.getItem('adm')||'null');}catch(e){}try{g=JSON.parse(localStorage.getItem('admgm')||'null');}catch(e){}
- if(u&&u.email===FBC.admin){A.gm=false;FB.restore(u);$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><p class="muted">Cargando…</p></div>`;try{await loadAll();pubSync(true).catch(()=>{});return shell();}catch(e){FB.logout();}}
+ if(u&&u.email===FBC.admin){A.gm=false;FB.restore(u);$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><p class="muted">Cargando…</p></div>`;try{await loadAll();pubSync(true).catch(()=>{});syncAdm();return shell();}catch(e){FB.logout();}}
  if(g&&g.uid){A.gm=true;FB.restore(g);$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><p class="muted">Cargando…</p></div>`;try{await loadGM();return shell();}catch(e){FB.logout();A.gm=false;}}
  loginView();}
 function loginView(){let last='';try{last=localStorage.getItem('admlast')||'';}catch(e){}
  $('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><h2 style="margin:16px 0 2px">Ajedrez Siurot</h2><p class="muted" style="margin:0 0 18px">Administración y profesorado</p><input id="em" type="text" placeholder="Correo o usuario" value="${esc(last)}" autocomplete="username" autocapitalize="none"><input id="pw" type="password" placeholder="Contraseña / clave" autocomplete="current-password"><button class="btn" id="go">Entrar</button><p class="err" id="er"></p></div>`;
  const go=async()=>{$('#er').textContent='';const b=$('#go');b.disabled=true;b.textContent='Entrando…';const em=$('#em').value.trim().toLowerCase();
   try{const u=await FB.signIn(em,$('#pw').value);FB.restore(u);
-   if(u.email===FBC.admin){A.gm=false;FB.S.onChange(u);try{localStorage.setItem('admlast',em);}catch(e){}await loadAll();pubSync(true).catch(()=>{});shell();}
+   if(u.email===FBC.admin){A.gm=false;FB.S.onChange(u);try{localStorage.setItem('admlast',em);}catch(e){}await loadAll();pubSync(true).catch(()=>{});syncAdm();shell();}
    else{let g=null;try{g=await RT.get('gm/'+u.uid);}catch(e){}
     if(!g||g.on!==true){FB.restore(null);throw {code:'NO_ADMIN',off:!!g};}
     A.gm=true;FB.S.onChange(u);try{localStorage.setItem('admlast',em);}catch(e){}await loadGM();shell();}}
   catch(e){FB.restore(null);b.disabled=false;b.textContent='Entrar';$('#er').textContent=e.code==='NO_ADMIN'?(e.off?'Tu acceso está desactivado. Habla con Manuel.':'Esta cuenta no tiene acceso a este panel.'):FB.msg(e);}};
  $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go();};}
+const isAdmOnly=g=>String(g||'').trim().toLowerCase()==='admin';
+/* los jugadores del grupo Admin se anotan en «adm/» para que las reglas les dejen ver al profesorado GM */
+async function syncAdm(){try{const cur=await RT.get('adm')||{},want={};A.users.filter(u=>isAdmOnly(u.grupo)).forEach(u=>want[u.id]=true);const up={};
+ Object.keys(want).forEach(id=>{if(!cur[id])up[id]=true;});Object.keys(cur).forEach(id=>{if(!want[id])up[id]=null;});if(Object.keys(up).length)await RT.patch('adm',up);}catch(e){}}
 async function loadGM(){const uid=FB.S.user.uid;const[g,c]=await Promise.all([RT.get('gm/'+uid),RT.get('club')]);
  if(!g||g.on!==true)throw {code:'NO_ADMIN'};
  A.gmq=g;A.club=c||{};A.grupos=['Club'];A.hof=[];
  try{A.torneos=(await FB.query('torneos',{where:['owner','==',uid]})).sort((a,b)=>(b.inicio||0)-(a.inicio||0));}catch(e){A.torneos=[];}
- A.users=Object.entries(A.club).map(([id,x])=>({id,nombre:x.n||id,alias:'',grupo:'Club',cg:x.g||''})).sort((a,b)=>nm(a).localeCompare(nm(b),'es'));}
+ A.users=Object.entries(A.club).map(([id,x])=>({id,nombre:x.n||id,alias:x.n||id,grupo:'Club',cg:x.g||''})).sort((a,b)=>nm(a).localeCompare(nm(b),'es'));}
 async function loadAll(){lastRefresh=Date.now();needRefresh=false;const[u,t,h,c,gr]=await Promise.all([FB.list('users'),FB.query('torneos',{orderBy:['inicio','desc'],limit:60}),FB.list('hof'),FB.get('config/main'),FB.get('config/grupos').catch(()=>null)]);A.grupos=(gr&&gr.lista)||[];A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.filter(x=>!x.club).sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;try{A.club=await RT.get('club')||{};A.gmq=await RT.get('gm')||{};}catch(e){A.club=A.club||{};A.gmq=A.gmq||{};}
  if(c){A.cfg={...A.cfg,...c};if(!Array.isArray(A.cfg.avisos))A.cfg.avisos=c.aviso?[{id:'m1',texto:c.aviso,url:c.avisoUrl||'',on:true}]:[];delete A.cfg.aviso;delete A.cfg.avisoUrl;}}
 async function logout(){if(!await confirmM('Cerrar sesión','¿Salir de la administración en este dispositivo?','Salir',true))return;FB.logout();A.gm=false;A.tab='inicio';A.tid=null;loginView();}
@@ -506,9 +510,10 @@ async function userAct(a,u){
    await FB.set('users/'+u.id,{nombre,alias,grupo},['nombre','alias','grupo']);
    if(A.hof.some(x=>x.id===u.id)){try{await FB.set('hof/'+u.id,{nombre,alias,grupo},['nombre','alias','grupo']);}catch(e){}A.hof.forEach(x=>{if(x.id===u.id){x.nombre=nombre;x.alias=alias;x.grupo=grupo;}});}
    const wasGM=isGMg(u.grupo);u.nombre=nombre;u.alias=alias;u.grupo=grupo;
-   try{if(A.club[u.id]){if(isGMg(grupo)){await RT.del('club/'+u.id);delete A.club[u.id];}else{A.club[u.id]={n:nombre,g:grupo};await RT.put('club/'+u.id,A.club[u.id]);}}
+   try{if(A.club[u.id]){if(isGMg(grupo)){await RT.del('club/'+u.id);delete A.club[u.id];}else{A.club[u.id]={n:alias,g:grupo};await RT.put('club/'+u.id,A.club[u.id]);}}
     if(isGMg(grupo)&&!A.gmq[u.id]){A.gmq[u.id]={on:true,q:0,u:0};await RT.put('gm/'+u.id,A.gmq[u.id]);}
     if(isGMg(grupo)!==wasGM){await FB.set('users/'+u.id,{rol:isGMg(grupo)?'gm':''},['rol']);}
+    syncAdm();
     if(wasGM&&!isGMg(grupo)&&A.gmq[u.id]){await RT.del('gm/'+u.id);delete A.gmq[u.id];}}catch(e){}
    toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}}}
 /* ---------- alta ---------- */
@@ -591,7 +596,7 @@ async function vTorneo(m,t){if(!t){A.tid=null;return render();}
    if(k==='cs')download(`torneo-${t.nombre.replace(/\W+/g,'_')}.csv`,csv([['Puesto','Usuario','Nombre','Grupo','Puntos','Partidas','Salidas de pestaña'],...js.map((j,i)=>[i+1,j.alias,j.nombre,j.grupo,j.puntos||0,j.partidas||0,j.fx||0])]),'text/csv');
    if(k==='add'){const have=new Set(js.map(j=>j.id));const c=A.users.filter(u=>!have.has(u.id));if(!c.length)return toast('No hay más alumnos',1);
     const r=await askM('➕ Añadir jugador',`<select>${c.map(u=>`<option value="${u.id}">${esc(nm(u))} · ${esc(u.grupo||'')}</option>`).join('')}</select>`,'Añadir');if(!r)return;
-    const u=A.users.find(x=>x.id===r[0]);const j={alias:u.alias||'',nombre:nm(u),grupo:u.cg||u.grupo||'',puntos:0,partidas:0,fuera:false};try{await FB.set(`torneos/${t.id}/jugadores/${u.id}`,j);RT.put(`pub/ins/${t.id}/${u.id}`,{n:j.nombre,g:j.grupo,a:j.alias}).catch(()=>{});js.push({id:u.id,...j});draw();}catch(e){toast(FB.msg(e),1);}}
+    const u=A.users.find(x=>x.id===r[0]);const j={alias:u.alias||'',nombre:u.alias||nm(u),grupo:u.cg||u.grupo||'',puntos:0,partidas:0,fuera:false};try{await FB.set(`torneos/${t.id}/jugadores/${u.id}`,j);RT.put(`pub/ins/${t.id}/${u.id}`,{n:j.nombre,g:j.grupo,a:j.alias}).catch(()=>{});js.push({id:u.id,...j});draw();}catch(e){toast(FB.msg(e),1);}}
    if(k==='ed'){const dI=new Date(t.inicio||Date.now()),dv=new Date(dI-dI.getTimezoneOffset()*6e4).toISOString().slice(0,16);
     const r=await askM('✏️ Editar torneo',`<label class="f">Nombre</label><input value="${esc(t.nombre)}">
      <label class="f">Día y hora de inicio</label><input type="datetime-local" value="${dv}">
@@ -665,9 +670,9 @@ async function roundTick(t){const now=Date.now();if(!t.inicioReal)return false;
    const cwA=a.cw||0,cwB=b.cw||0;pairs.push(cwA<=cwB?[a.id,b.id]:[b.id,a.id]);}}
  const tcO=ritmoOf(t.ritmo),G={},bt=Date.now();
  for(const [w,b] of pairs){const W=lv[w],B=lv[b],gid='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  await RT.put('games/'+gid,{w,b,wn:W.n,bn:B.n,we:W.e||800,be:B.e||800,tc:t.ritmo||'3+0',tb:tcO.m*60000,ti:tcO.i*1000,moves:'',clk:{w:tcO.m*60000,b:tcO.m*60000},ts:{'.sv':'timestamp'},turn:'w',st:'play',draw:'',res:'',why:'',ar:t.id,af:0,fu:t.furia===false?0:1});
+  await RT.put('games/'+gid,{w,b,wn:W.n,bn:B.n,we:W.e||800,be:B.e||800,tc:t.ritmo||'3+0',tb:tcO.m*60000,ti:tcO.i*1000,moves:'',clk:{w:tcO.m*60000,b:tcO.m*60000},ts:{'.sv':'timestamp'},turn:'w',st:'play',draw:'',res:'',why:'',ar:t.id,af:0,fu:t.furia===false?0:1,...(t.club?{cl:1}:{})});
   await Promise.all([RT.patch(`arena/${t.id}/p/${w}`,{busy:gid,bt:{'.sv':'timestamp'},wait:null,cw:(W.cw||0)+1}),RT.patch(`arena/${t.id}/p/${b}`,{busy:gid,bt:{'.sv':'timestamp'},wait:null,cw:(B.cw||0)-1})]);
-  RT.put('live/'+gid,{wn:W.n,bn:B.n,tc:t.ritmo||'3+0',ar:t.id,t:{'.sv':'timestamp'}}).catch(()=>{});G[gid]={w,b};}
+  if(!t.club)RT.put('live/'+gid,{wn:W.n,bn:B.n,tc:t.ritmo||'3+0',ar:t.id,t:{'.sv':'timestamp'}}).catch(()=>{});G[gid]={w,b};}
  if(bye&&lv[bye]){const p=lv[bye];await RT.patch(`arena/${t.id}/p/${bye}`,{pts:(p.pts||0)+2,pa:(p.pa||0)+1,bye:true});}
  await RT.put(`arena/${t.id}/r`,{n:k,g:G,t:bt,bye:bye||null,...(roster?{rr:roster}:{})});
  toast(`♟ «${t.nombre}»: ronda ${k} emparejada (${pairs.length} partidas)`);return true;}
@@ -691,9 +696,11 @@ async function finishTorneo(t){
  for(const [uid,p] of Object.entries(lv))if(!p.guest)await FB.set(`torneos/${t.id}/jugadores/${uid}`,{alias:p.a||'',nombre:p.n||'',grupo:p.g||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera});
  const rk=arenaRank(Object.entries(lv).filter(([id,p])=>p&&!p.fuera).map(([id,p])=>({id,...p}))),pos=Object.fromEntries(rk.map((r,i)=>[r.id,i]));
  const js=(await FB.list(`torneos/${t.id}/jugadores`)).sort((a,b)=>(pos[a.id]??1e6)-(pos[b.id]??1e6)||(b.puntos||0)-(a.puntos||0)||(b.partidas||0)-(a.partidas||0));
+ const pn=(id,f)=>{const u=A.users.find(x=>x.id===id);return u&&u.alias?u.alias:f;};   // protección de datos: en lo público solo el usuario (alias)
+ js.forEach(j=>{j.nombre=pn(j.id,j.alias||j.nombre);});
  const ok=js.filter(j=>!j.fuera&&((j.partidas||0)>0||(j.puntos||0)>0));
  const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
- const clasif=rk.filter(r=>(r.pa||0)>0||(r.pts||0)>0).slice(0,60).map(r=>({u:r.guest?'':r.id,n:r.n,g:r.g||'',p:r.pts||0,w:r.w||0,d:r.d||0,l:r.l||0}));
+ const clasif=rk.filter(r=>(r.pa||0)>0||(r.pts||0)>0).slice(0,60).map(r=>({u:r.guest?'':r.id,n:r.guest?r.n:pn(r.id,r.a||r.n),g:r.g||'',p:r.pts||0,w:r.w||0,d:r.d||0,l:r.l||0}));
  if(t.club){for(const j of ok.filter(x=>(x.puntos||0)>0)){try{const h=await RT.get('clubhof/'+j.id)||{};await RT.put('clubhof/'+j.id,{n:j.nombre,g:j.grupo||'',p:(h.p||0)+(j.puntos||0),t:(h.t||0)+1,m:Math.max(h.m||0,j.puntos||0)});}catch(e){}}}
  else for(const j of ok.filter(x=>!isAdm(x.grupo))){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
  const fin=(t.tipo||'arena')==='arena'&&tFin(t)?Math.min(Date.now(),tFin(t)):Date.now();
@@ -739,7 +746,7 @@ function projector(t,get,load){const ov=document.createElement('div');ov.classNa
 
 /* ---------- Club y profesorado GM ---------- */
 async function setClub(list,on){if(!list.length)return toast('No hay nadie',1);const up={};
- list.forEach(u=>{up[u.id]=on?{n:nm(u),g:u.grupo||''}:null;});
+ list.forEach(u=>{up[u.id]=on?{n:u.alias||nm(u),g:u.grupo||''}:null;});
  try{await RT.patch('club',up);list.forEach(u=>{if(on)A.club[u.id]=up[u.id];else delete A.club[u.id];});toast(on?`🏅 ${list.length} en el Club`:`${list.length} fuera del Club`);}
  catch(e){toast(FB.msg(e),1);}}
 const gmLeft=g=>Math.max(0,((g&&g.q)||0)-((g&&g.u)||0));
@@ -831,6 +838,7 @@ function vAjustes(m){const groups=allGroups(),avs=A.cfg.avisos||[];
  </div></details>
  <details class="box"><summary>🌐 Dirección de la app</summary><div><label class="f">Sale en las tarjetas de claves</label><input id="ur" value="${esc(A.cfg.url)}" inputmode="url"><button class="btn big" id="sv" style="margin-top:12px">Guardar</button></div></details>
  <details class="box"><summary>⬆️ Subir de curso</summary><div><p class="muted" style="margin:0 0 8px">Cambia el nombre de los grupos de golpe (ej. 4ºA → 5ºA). Deja en blanco los que no cambien.</p>${groups.length?groups.map(g=>`<div class="row" style="margin:6px 0;flex-wrap:nowrap"><b style="min-width:84px">${esc(g)}</b><span class="muted">(${A.users.filter(u=>u.grupo===g).length})</span><span>→</span><input class="ng" data-g="${esc(g)}" placeholder="Nuevo" style="flex:1;min-width:0"></div>`).join('')+'<button class="btn big" id="up" style="margin-top:10px">Aplicar cambios</button>':'<p class="muted">Aún no hay grupos.</p>'}</div></details>
+ <details class="box"><summary>🔒 Proteger nombres</summary><div><p class="muted" style="margin:0 0 8px">En público (clasificaciones, salón de la fama, torneos) solo se muestra el <b>usuario</b>. Esto cambia los nombres que quedaron guardados de antes por el usuario. Se hace una vez (es seguro repetirlo).</p><button class="btn ghost wide" id="pn">🔒 Cambiar nombres antiguos por usuarios</button></div></details>
  <details class="box"><summary>📤 Exportar</summary><div><button class="btn ghost wide" id="cu">⬇️ Todo el alumnado (CSV)</button></div></details>
  <details class="box"><summary>🔒 Protección de datos</summary><div><p class="muted" style="margin:0">Solo se guardan un usuario (nombre + inicial), el grupo y la fecha del último acceso. Sin apellidos completos, sin correos ni datos personales. Servidor en la UE (Firestore eur3). Al eliminar un usuario se borra su cuenta y su puntuación.</p></div></details>
  ${standalone()?'':'<button class="btn ghost big" id="ins" style="margin-top:6px">📲 Instalar esta app en el móvil</button>'}
@@ -843,6 +851,22 @@ function vAjustes(m){const groups=allGroups(),avs=A.cfg.avisos||[];
   if(k==='on'||k==='off')await toggleAviso(av.id);
   if(k==='ed')await editAviso(av);
   if(k==='del'){if(await confirmM('Eliminar aviso',`¿Eliminar «${esc(av.texto)}»?`,'Eliminar',true)){A.cfg.avisos=A.cfg.avisos.filter(x=>x!==av);await saveAvisos();render();}}});
+$('#pn',m).onclick=async()=>{if(!await confirmM('Proteger nombres','Se sustituirán por el usuario los nombres guardados en el salón de la fama, los torneos y los historiales. Tarda un poco.','Hacerlo'))return;
+  const al=Object.fromEntries(A.users.map(u=>[u.id,u.alias]));let n=0;
+  try{
+   for(const h of A.hof){if(al[h.id]&&h.nombre!==al[h.id]){await FB.set('hof/'+h.id,{nombre:al[h.id]},['nombre']);h.nombre=al[h.id];n++;}toast('Salón de la fama…');}
+   const ts=await FB.query('torneos',{orderBy:['inicio','desc'],limit:300});let i=0;
+   for(const t of ts){toast(`Torneos ${++i} de ${ts.length}…`);
+    const p={};if(t.podio)p.podio=t.podio.map(x=>({...x,nombre:x.alias||x.nombre}));
+    if(t.clasif)p.clasif=t.clasif.map(x=>({...x,n:(x.u&&al[x.u])||x.n}));
+    if(Object.keys(p).length){await FB.set('torneos/'+t.id,p,Object.keys(p));n++;}
+    let js=[];try{js=await FB.list(`torneos/${t.id}/jugadores`);}catch(e){}
+    for(const j of js){const a=al[j.id]||j.alias;if(a&&j.nombre!==a){await FB.set(`torneos/${t.id}/jugadores/${j.id}`,{nombre:a},['nombre']);n++;}}}
+   try{const h=await RT.get('hist/t')||{};for(const [id,x] of Object.entries(h)){if(!x||!x.c)continue;const c=x.c.map(r=>({...r,n:(r.u&&al[r.u])||r.n}));await RT.patch('hist/t/'+id,{c});}}catch(e){}
+   try{const lg=await RT.get('liga')||{};const up={};for(const [id,x] of Object.entries(lg))if(x&&al[id]&&x.n!==al[id])up[id+'/n']=al[id];if(Object.keys(up).length)await RT.patch('liga',up);}catch(e){}
+   try{await pubSync(true);}catch(e){}
+   toast('🔒 Hecho: nombres protegidos ('+n+' cambios)');
+  }catch(e){toast(FB.msg(e),1);}};
  $('#cu',m).onclick=()=>download('usuarios-ajedrez.csv',csvUsers(A.users),'text/csv');
  if($('#ins',m))$('#ins',m).onclick=doInstall;$('#lo',m).onclick=logout;
  if($('#up',m))$('#up',m).onclick=async()=>{const map={};$$('.ng',m).forEach(i=>{if(i.value.trim())map[i.dataset.g]=i.value.trim();});const ks=Object.keys(map);if(!ks.length)return toast('No hay cambios',1);
