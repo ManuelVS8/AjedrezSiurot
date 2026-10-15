@@ -277,21 +277,29 @@ const fdate=ms=>ms?new Date(ms).toLocaleString('es-ES',{day:'2-digit',month:'2-d
 const fhora=ms=>ms?new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
-const A={grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',avisos:[]},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
+const A={gm:false,club:{},gmq:{},grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',avisos:[]},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
 window.ADMIN_A=A;
-const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
+const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['club','🏅','Club y GM'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
+const GMTABS=[['inicio','🏠','Inicio'],['profe','📝','Tareas'],['torneos','🏟️','Torneos del Club'],['hof','🏆','Salón del Club']];
+const tabsNow=()=>A.gm?GMTABS:TABS;
 const TT=Object.fromEntries(TABS.map(([k,e,t])=>[k,t]));
 const nm=u=>u.nombre||u.alias;
-const isAdm=g=>String(g||'').trim().toLowerCase()==='admin';   // grupo del profesorado: no suma al salón de la fama
+const isGMg=g=>String(g||'').trim().toLowerCase()==='gm';
+const isAdm=g=>['admin','gm'].includes(String(g||'').trim().toLowerCase());   // grupo del profesorado: no suma al salón de la fama
 const ICON='icon-admin192.png';
 /* ---------- sesión e instalación ---------- */
 /* cada cambio público (torneos, salón de la fama, aviso) avisa a la app del alumnado al instante */
 /* lo público se copia en Realtime Database («pub»): la app del alumnado lo escucha en directo y no gasta lecturas de Firestore */
-const PUBF=['nombre','estado','inicio','duracion','fin','inicioReal','tipo','ritmo','rondas','rondasRR','furia'];
+const PUBF=['club','own','nombre','estado','inicio','duracion','fin','inicioReal','tipo','ritmo','rondas','rondasRR','furia'];
 const pubT1=t=>{const o={};PUBF.forEach(k=>{if(t[k]!==undefined&&t[k]!==null)o[k]=t[k];});return o;};
 async function pubSync(withIns){
+ if(A.gm){const uid=FB.S.user.uid,upd={v:RT.SV};let cur={};try{cur=await RT.get('pub/t')||{};}catch(e){}
+  for(const t of A.torneos){if(t.estado==='terminado'){if(cur[t.id])upd['t/'+t.id]=null;}else upd['t/'+t.id]={...pubT1(t),club:true,own:uid};}
+  for(const t of A.torneos.filter(x=>x.estado!=='terminado')){if(withIns){try{const js=await FB.list(`torneos/${t.id}/jugadores`);const o={};js.forEach(j=>o[j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});upd['ins/'+t.id]=o;}catch(e){}}}
+  await RT.patch('pub',upd);return;}
  const open=A.torneos.filter(t=>t.estado!=='terminado');
  const T={};open.forEach(t=>T[t.id]=pubT1(t));
+ try{const cur=await RT.get('pub/t')||{};for(const [id,x] of Object.entries(cur))if(x&&x.club&&!T[id])T[id]=x;}catch(e){}   // los torneos del Club los gestiona su profe GM: no se tocan
  const hof=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10).map(h=>({id:h.id,nombre:h.nombre||h.alias||'',grupo:h.grupo||'',puntos:h.puntos||0,alias:h.alias||''}));
  const upd={t:T,hof,cfg:{avisos:(A.cfg.avisos||[]).filter(a=>a.on).map(a=>({texto:a.texto,url:a.url||''}))},seed:1,v:RT.SV};
  if(withIns){const ins={};for(const t of open){try{const js=await FB.list(`torneos/${t.id}/jugadores`);ins[t.id]={};js.forEach(j=>ins[t.id][j.id]={n:j.nombre||j.alias||'',g:j.grupo||'',a:j.alias||''});}catch(e){}}upd.ins=ins;}
@@ -301,19 +309,33 @@ let pubT=null;const pubPing=()=>{clearTimeout(pubT);pubT=setTimeout(()=>pubSync(
 {const isPub=p=>/^(torneos|hof|config)\//.test(p||''),_s=FB.set,_d=FB.del;
  FB.set=async function(p,...a){const r=await _s.call(FB,p,...a);if(isPub(p))pubPing();return r;};
  FB.del=async function(p,...a){const r=await _d.call(FB,p,...a);if(isPub(p))pubPing();return r;};}
-FB.S.onChange=u=>{try{u?localStorage.setItem('adm',JSON.stringify(u)):localStorage.removeItem('adm');}catch(e){}};
+FB.S.onChange=u=>{const k=A.gm?'admgm':'adm';try{u?localStorage.setItem(k,JSON.stringify(u)):localStorage.removeItem(k);}catch(e){}};
 let dInst=null;const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();dInst=e;});
 async function doInstall(){if(dInst){dInst.prompt();try{await dInst.userChoice;}catch(e){}dInst=null;}else modal({title:'📲 Instalar',html:'<p>En Chrome (móvil): menú <b>⋮</b> → <b>Instalar aplicación</b> o <b>Añadir a pantalla de inicio</b>.<br><br>En iPhone (Safari): <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>.</p>',buttons:[{t:'Entendido'}]});}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw-admin.js',{scope:'./ajedrez-admin.html'}).catch(()=>{});
-async function boot(){let u=null;try{u=JSON.parse(localStorage.getItem('adm')||'null');}catch(e){}
- if(u&&u.email===FBC.admin){FB.restore(u);$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><p class="muted">Cargando…</p></div>`;try{await loadAll();pubSync(true).catch(()=>{});return shell();}catch(e){FB.logout();}}
+async function boot(){let u=null,g=null;try{u=JSON.parse(localStorage.getItem('adm')||'null');}catch(e){}try{g=JSON.parse(localStorage.getItem('admgm')||'null');}catch(e){}
+ if(u&&u.email===FBC.admin){A.gm=false;FB.restore(u);$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><p class="muted">Cargando…</p></div>`;try{await loadAll();pubSync(true).catch(()=>{});return shell();}catch(e){FB.logout();}}
+ if(g&&g.uid){A.gm=true;FB.restore(g);$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><p class="muted">Cargando…</p></div>`;try{await loadGM();return shell();}catch(e){FB.logout();A.gm=false;}}
  loginView();}
-function loginView(){$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><h2 style="margin:16px 0 2px">Ajedrez Siurot</h2><p class="muted" style="margin:0 0 18px">Administración</p><input id="em" type="email" placeholder="Correo" value="${FBC.admin}" autocomplete="username"><input id="pw" type="password" placeholder="Contraseña" autocomplete="current-password"><button class="btn" id="go">Entrar</button><p class="err" id="er"></p></div>`;
- const go=async()=>{$('#er').textContent='';const b=$('#go');b.disabled=true;b.textContent='Entrando…';try{const u=await FB.login($('#em').value.trim().toLowerCase(),$('#pw').value);if(u.email!==FBC.admin){FB.logout();throw {code:'NO_ADMIN'};}await loadAll();pubSync(true).catch(()=>{});shell();}catch(e){b.disabled=false;b.textContent='Entrar';$('#er').textContent=e.code==='NO_ADMIN'?'Esta cuenta no es de administración.':FB.msg(e);}};
+function loginView(){let last='';try{last=localStorage.getItem('admlast')||'';}catch(e){}
+ $('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><h2 style="margin:16px 0 2px">Ajedrez Siurot</h2><p class="muted" style="margin:0 0 18px">Administración y profesorado</p><input id="em" type="text" placeholder="Correo o usuario" value="${esc(last)}" autocomplete="username" autocapitalize="none"><input id="pw" type="password" placeholder="Contraseña / clave" autocomplete="current-password"><button class="btn" id="go">Entrar</button><p class="err" id="er"></p></div>`;
+ const go=async()=>{$('#er').textContent='';const b=$('#go');b.disabled=true;b.textContent='Entrando…';const em=$('#em').value.trim().toLowerCase();
+  try{const u=await FB.signIn(em,$('#pw').value);FB.restore(u);
+   if(u.email===FBC.admin){A.gm=false;FB.S.onChange(u);try{localStorage.setItem('admlast',em);}catch(e){}await loadAll();pubSync(true).catch(()=>{});shell();}
+   else{let g=null;try{g=await RT.get('gm/'+u.uid);}catch(e){}
+    if(!g||g.on!==true){FB.restore(null);throw {code:'NO_ADMIN',off:!!g};}
+    A.gm=true;FB.S.onChange(u);try{localStorage.setItem('admlast',em);}catch(e){}await loadGM();shell();}}
+  catch(e){FB.restore(null);b.disabled=false;b.textContent='Entrar';$('#er').textContent=e.code==='NO_ADMIN'?(e.off?'Tu acceso está desactivado. Habla con Manuel.':'Esta cuenta no tiene acceso a este panel.'):FB.msg(e);}};
  $('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key==='Enter')go();};}
-async function loadAll(){lastRefresh=Date.now();needRefresh=false;const[u,t,h,c,gr]=await Promise.all([FB.list('users'),FB.query('torneos',{orderBy:['inicio','desc'],limit:60}),FB.list('hof'),FB.get('config/main'),FB.get('config/grupos').catch(()=>null)]);A.grupos=(gr&&gr.lista)||[];A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;if(c){A.cfg={...A.cfg,...c};if(!Array.isArray(A.cfg.avisos))A.cfg.avisos=c.aviso?[{id:'m1',texto:c.aviso,url:c.avisoUrl||'',on:true}]:[];delete A.cfg.aviso;delete A.cfg.avisoUrl;}}
-async function logout(){if(!await confirmM('Cerrar sesión','¿Salir de la administración en este dispositivo?','Salir',true))return;FB.logout();A.tab='inicio';A.tid=null;loginView();}
+async function loadGM(){const uid=FB.S.user.uid;const[g,c]=await Promise.all([RT.get('gm/'+uid),RT.get('club')]);
+ if(!g||g.on!==true)throw {code:'NO_ADMIN'};
+ A.gmq=g;A.club=c||{};A.grupos=['Club'];A.hof=[];
+ try{A.torneos=(await FB.query('torneos',{where:['owner','==',uid]})).sort((a,b)=>(b.inicio||0)-(a.inicio||0));}catch(e){A.torneos=[];}
+ A.users=Object.entries(A.club).map(([id,x])=>({id,nombre:x.n||id,alias:'',grupo:'Club',cg:x.g||''})).sort((a,b)=>nm(a).localeCompare(nm(b),'es'));}
+async function loadAll(){lastRefresh=Date.now();needRefresh=false;const[u,t,h,c,gr]=await Promise.all([FB.list('users'),FB.query('torneos',{orderBy:['inicio','desc'],limit:60}),FB.list('hof'),FB.get('config/main'),FB.get('config/grupos').catch(()=>null)]);A.grupos=(gr&&gr.lista)||[];A.users=u.sort((a,b)=>nm(a).localeCompare(nm(b),'es'));A.torneos=t.filter(x=>!x.club).sort((a,b)=>(b.inicio||0)-(a.inicio||0));A.hof=h;try{A.club=await RT.get('club')||{};A.gmq=await RT.get('gm')||{};}catch(e){A.club=A.club||{};A.gmq=A.gmq||{};}
+ if(c){A.cfg={...A.cfg,...c};if(!Array.isArray(A.cfg.avisos))A.cfg.avisos=c.aviso?[{id:'m1',texto:c.aviso,url:c.avisoUrl||'',on:true}]:[];delete A.cfg.aviso;delete A.cfg.avisoUrl;}}
+async function logout(){if(!await confirmM('Cerrar sesión','¿Salir de la administración en este dispositivo?','Salir',true))return;FB.logout();A.gm=false;A.tab='inicio';A.tid=null;loginView();}
 /* ---------- armazón: barra, cajón y navegación ---------- */
 function shell(){$('#app').innerHTML=`<header class="top"><button class="ib" id="bk" aria-label="Atrás">←</button><img class="lg" id="lg" src="${ICON}" alt=""><h1 id="ttl"></h1><button class="ib" id="mn" aria-label="Menú">☰<span class="dot" id="mdot" style="display:none"></span></button></header><main id="main"></main>`;
  $('#bk').onclick=goBack;$('#mn').onclick=openMenu;$('#lg').onclick=()=>nav('inicio');
@@ -329,16 +351,17 @@ window.addEventListener('popstate',()=>{
  if(handled){try{history.pushState({adm:1},'');}catch(e){}}else{try{history.back();}catch(e){}}});
 function closeMenu(){const d=$('.drbg');if(d)d.remove();}
 function openMenu(){closeMenu();const bg=document.createElement('div');bg.className='drbg';
- bg.innerHTML=`<div class="drw"><div class="hd"><img src="${ICON}" alt=""><div><b>Siurot Admin</b><div style="font-size:.8rem;opacity:.85">${esc(FB.S.user.email)}</div></div></div>
- ${TABS.map(([k,e,t])=>`<button class="it ${A.tab===k?'on':''}" data-k="${k}"><span class="e">${e}</span>${t}${k==='torneos'&&A.reqN?`<span class="dot">${A.reqN}</span>`:''}</button>`).join('')}<hr>
+ bg.innerHTML=`<div class="drw"><div class="hd"><img src="${ICON}" alt=""><div><b>${A.gm?'Siurot Club':'Siurot Admin'}</b><div style="font-size:.8rem;opacity:.85">${esc(String(FB.S.user.email).replace('@'+FBC.domain,''))}</div></div></div>
+ ${tabsNow().map(([k,e,t])=>`<button class="it ${A.tab===k?'on':''}" data-k="${k}"><span class="e">${e}</span>${t}${k==='torneos'&&A.reqN?`<span class="dot">${A.reqN}</span>`:''}</button>`).join('')}<hr>
  ${standalone()?'':'<button class="it" id="din"><span class="e">📲</span>Instalar la app</button>'}<button class="it" id="dout"><span class="e">🚪</span>Cerrar sesión</button></div>`;
  bg.addEventListener('pointerdown',e=>{if(e.target===bg)closeMenu();});document.body.appendChild(bg);
  $$('[data-k]',bg).forEach(b=>b.onclick=()=>nav(b.dataset.k));if($('#din',bg))$('#din',bg).onclick=()=>{closeMenu();doInstall();};$('#dout',bg).onclick=()=>{closeMenu();logout();};}
 function badges(){const d=$('#mdot');if(d){d.style.display=A.reqN?'':'none';d.textContent=A.reqN;}const t=$('#tdot');if(t){t.style.display=A.reqN?'':'none';t.textContent=A.reqN;}}
 function render(){clearInterval(A.timer);const m=$('#main');if(!m)return;
  const home=A.tab==='inicio';$('#bk').style.display=home?'none':'';$('#lg').style.display=home?'':'none';
- const t=A.tid&&A.torneos.find(x=>x.id===A.tid);$('#ttl').textContent=home?'Siurot Admin':t?t.nombre:TT[A.tab];
- document.body.classList.toggle('framed',A.tab==='profe');({inicio:vInicio,usuarios:vUsers,alta:vAlta,torneos:vTorneos,hof:vHof,profe:vProfe,ajustes:vAjustes})[A.tab](m);badges();}
+ const t=A.tid&&A.torneos.find(x=>x.id===A.tid);$('#ttl').textContent=home?(A.gm?'Siurot Club':'Siurot Admin'):t?t.nombre:TT[A.tab];
+ document.body.classList.toggle('framed',A.tab==='profe');if(A.gm&&!GMTABS.some(x=>x[0]===A.tab))A.tab='inicio';
+ ({inicio:A.gm?vGInicio:vInicio,usuarios:vUsers,alta:vAlta,torneos:vTorneos,hof:vHof,club:vClub,profe:vProfe,ajustes:vAjustes})[A.tab](m);badges();}
 const active=()=>A.users.filter(u=>u.ultimoLogin);
 /* ---------- inicio ---------- */
 function vInicio(m){const h=new Date().getHours(),sal=h<14?'¡Buenos días!':h<21?'¡Buenas tardes!':'¡Buenas noches!';
@@ -353,6 +376,7 @@ function vInicio(m){const h=new Date().getHours(),sal=h<14?'¡Buenos días!':h<2
   ${tile('alta','➕','Dar de alta','Alumno o grupo')}
   ${tile('torneos','🏟️','Torneos',act.length?`${act.length} en marcha`:esp.length?`Próximo: ${fdate(esp[0].inicio)}`:'Programar torneo','<span class="dot" id="tdot" style="display:none"></span>')}
   ${tile('hof','🏆','Salón de la fama',A.hof.length?`${A.hof.length} jugadores`:'Sin datos aún')}
+  ${tile('club','🏅','Club y GM',`${Object.keys(A.club).length} del Club · ${A.users.filter(u=>isGMg(u.grupo)).length} profes GM`)}
   ${tile('profe','📝','Tareas y fichas','Tareas con QR, notas, fichas')}
   ${tile('ajustes','⚙️','Ajustes','Aviso, cursos, exportar')}
  </div>
@@ -393,8 +417,8 @@ function vUsers(m){
  const q=$('#q',m);q.oninput=()=>{A.q=q.value;drawUsers(m);};
  $$('[data-e]',m).forEach(b=>b.onclick=()=>{A.est=b.dataset.e;vUsers(m);});
  $('#more',m).onclick=async()=>{const l=filtered();const s=l.filter(u=>A.sel.has(u.id));
-  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},{k:'pall',e:'🖨️',t:'Imprimir todos los grupos'},s.length&&{k:'mdel',e:'🗑',t:`Borrar los marcados (${A.sel.size})…`,cls:'red'},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'ng',e:'🏷️',t:'Crear grupo'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
-  if(k==='pdfl')l.length?printCards(l):toast('No hay nadie en la lista',1);if(k==='pdfs')printCards(s);if(k==='pall')printAllGroups();if(k==='clr'){A.sel.clear();drawUsers(m);}if(k==='mdel')delMarked();
+  const k=await sheet('Alumnado',[{k:'pdfl',e:'🖨️',t:`PDF de claves de la lista (${l.length})`},s.length&&{k:'pdfs',e:'🖨️',t:`PDF de claves de los marcados (${s.length})`},{k:'pall',e:'🖨️',t:'Imprimir todos los grupos'},s.length&&{k:'cadd',e:'🏅',t:`Añadir los marcados al Club (${s.length})`},s.length&&{k:'crem',e:'🚫',t:`Quitar los marcados del Club (${s.length})`},s.length&&{k:'mdel',e:'🗑',t:`Borrar los marcados (${A.sel.size})…`,cls:'red'},A.sel.size&&{k:'clr',e:'☐',t:'Quitar las marcas'},{k:'csv',e:'⬇️',t:'Descargar CSV'},{k:'ng',e:'🏷️',t:'Crear grupo'},{k:'alta',e:'➕',t:'Dar de alta'},{k:'bdel',e:'🗑',t:'Borrar un grupo entero…',cls:'red'}]);
+  if(k==='pdfl')l.length?printCards(l):toast('No hay nadie en la lista',1);if(k==='pdfs')printCards(s);if(k==='pall')printAllGroups();if(k==='clr'){A.sel.clear();drawUsers(m);}if(k==='mdel')delMarked();if(k==='cadd'){await setClub(s.filter(u=>!isGMg(u.grupo)),true);drawUsers(m);}if(k==='crem'){await setClub(s,false);drawUsers(m);}
   if(k==='csv')download('usuarios-ajedrez.csv',csvUsers(l),'text/csv');if(k==='alta')nav('alta');if(k==='ng'){const g=await askNewGroup();if(g){A.open.add(g);drawUsers(m);}}if(k==='bdel')bulkDel('');};
  drawUsers(m);}
 function selBar(m){const b=$('#selbar',m);if(!b)return;const n=A.sel.size;
@@ -402,23 +426,23 @@ function selBar(m){const b=$('#selbar',m);if(!b)return;const n=A.sel.size;
  if(n){$('#sbp',b).onclick=()=>printCards(A.users.filter(u=>A.sel.has(u.id)));$('#sbd',b).onclick=delMarked;$('#sbc',b).onclick=()=>{A.sel.clear();drawUsers(m);};}}
 function drawUsers(m){const box=$('#ul',m);if(!box)return;selBar(m);const l=filtered();
  const gs={};l.forEach(u=>(gs[gOf(u)]=gs[gOf(u)]||[]).push(u));if(!A.q&&!A.est)A.grupos.forEach(g=>{gs[g]=gs[g]||[];});const keys=Object.keys(gs).sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
- const row=u=>`<div class="li" data-u="${u.id}"><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}><div class="t"><b>${esc(nm(u))}</b><span><span class="mono">${esc(u.alias)}</span> · clave <span class="mono">${esc(u.clave)}</span></span></div><span title="${u.ultimoLogin?'Ha entrado: '+fdate(u.ultimoLogin):'Aún no ha entrado'}">${u.ultimoLogin?'✔️':'🎟'}</span></div>`;
+ const row=u=>`<div class="li" data-u="${u.id}"><input type="checkbox" class="ck" data-id="${u.id}" ${A.sel.has(u.id)?'checked':''}><div class="t"><b>${esc(nm(u))}</b><span><span class="mono">${esc(u.alias)}</span> · clave <span class="mono">${esc(u.clave)}</span></span></div><span title="${u.ultimoLogin?'Ha entrado: '+fdate(u.ultimoLogin):'Aún no ha entrado'}">${A.club[u.id]?'🏅':''}${u.ultimoLogin?'✔️':'🎟'}</span></div>`;
  box.innerHTML=keys.map(g=>`<details class="grp" data-g="${esc(g)}" ${A.q||A.open.has(g)?'open':''}><summary><span class="grow">${esc(g)} <span class="pill">${gs[g].length}</span></span><button class="ib2" data-gm="${esc(g)}" aria-label="Opciones del grupo">⋯</button></summary>${gs[g].map(row).join('')||'<p class="muted" style="padding:10px 14px;margin:0">Grupo vacío: pulsa ⋯ → «Añadir alumnos a este grupo».</p>'}</details>`).join('')||`<div class="card empty">${A.users.length?'Nadie coincide con la búsqueda.':'Aún no hay alumnado. Pulsa ⋯ → Dar de alta.'}</div>`;
  $$('details.grp',box).forEach(d=>d.ontoggle=()=>{if(A.q)return;d.open?A.open.add(d.dataset.g):A.open.delete(d.dataset.g);});
  const ns=()=>{const e=$('#nsel',m);if(e)e.textContent=A.sel.size?A.sel.size+' marcados':'toca un grupo para verlo';selBar(m);};
  $$('.ck',box).forEach(c=>{c.onclick=e=>e.stopPropagation();c.onchange=()=>{c.checked?A.sel.add(c.dataset.id):A.sel.delete(c.dataset.id);ns();};});
  $$('[data-gm]',box).forEach(b=>b.onclick=async e=>{e.preventDefault();e.stopPropagation();const g=b.dataset.gm,gl=A.users.filter(u=>gOf(u)===g);
-  const k=await sheet(`Grupo ${esc(g)} · ${gl.length} alumnos`,gl.length?[{k:'gp',e:'📊',t:'Progreso del grupo'},{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'pdf',e:'🖨️',t:'PDF de claves del grupo'},{k:'regen',e:'🔄',t:'Rehacer usuarios / claves del grupo…'},{k:'sel',e:'☑',t:'Marcar a todo el grupo'},g!=='(sin grupo)'&&{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'del',e:'🗑',t:'Borrar el grupo entero…',cls:'red'}]:[{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'rm',e:'🗑',t:'Quitar este grupo vacío',cls:'red'}]);
+  const k=await sheet(`Grupo ${esc(g)} · ${gl.length} alumnos`,gl.length?[{k:'gp',e:'📊',t:'Progreso del grupo'},{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'pdf',e:'🖨️',t:'PDF de claves del grupo'},{k:'regen',e:'🔄',t:'Rehacer usuarios / claves del grupo…'},{k:'sel',e:'☑',t:'Marcar a todo el grupo'},!isGMg(g)&&g!=='(sin grupo)'&&{k:'clubon',e:'🏅',t:'Añadir todo el grupo al Club'},g!=='(sin grupo)'&&{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'del',e:'🗑',t:'Borrar el grupo entero…',cls:'red'}]:[{k:'add',e:'➕',t:'Añadir alumnos a este grupo'},{k:'ren',e:'✏️',t:'Cambiar el nombre del grupo'},{k:'rm',e:'🗑',t:'Quitar este grupo vacío',cls:'red'}]);
   if(k==='rm'){A.grupos=A.grupos.filter(x=>x!==g);try{await saveGroups();toast('Grupo quitado');}catch(er){toast(FB.msg(er),1);}drawUsers(m);return;}
   if(k==='ren'){const r=await askM('✏️ Cambiar nombre del grupo',`<label class="f">Nuevo nombre</label><input value="${esc(g)}" maxlength="20">`,'Guardar');const nn=r&&r[0].trim();if(!nn||nn===g)return;
    if(allGroups().some(x=>x.toLowerCase()===nn.toLowerCase()&&x!==g))return toast('Ya existe un grupo con ese nombre',1);
    try{for(const u of gl){await FB.set('users/'+u.id,{grupo:nn},['grupo']);u.grupo=nn;}A.grupos=A.grupos.map(x=>x===g?nn:x);if(!A.grupos.includes(nn))A.grupos.push(nn);await saveGroups();if(A.open.has(g)){A.open.delete(g);A.open.add(nn);}toast('Grupo renombrado');}catch(er){toast(FB.msg(er),1);}drawUsers(m);return;}
   if(k==='gp')return groupProg(g,gl);
   if(k==='regen')return regenGroup(g,gl,m);
-  if(k==='pdf')printCards(gl,g);if(k==='sel'){gl.forEach(u=>A.sel.add(u.id));drawUsers(m);ns();}if(k==='add'){A.alta='grupo';A.altaG=g==='(sin grupo)'?'':g;nav('alta');}if(k==='del')bulkDel(g);});
+  if(k==='clubon'){await setClub(gl,true);drawUsers(m);return;}if(k==='pdf')printCards(gl,g);if(k==='sel'){gl.forEach(u=>A.sel.add(u.id));drawUsers(m);ns();}if(k==='add'){A.alta='grupo';A.altaG=g==='(sin grupo)'?'':g;nav('alta');}if(k==='del')bulkDel(g);});
  $$('[data-u]',box).forEach(r=>r.onclick=async()=>{const u=A.users.find(x=>x.id===r.dataset.u);if(!u)return;
-  const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'prog',e:'📊',t:'Ver su progreso'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'ed',e:'✏️',t:'Editar jugador'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
-  if(k==='prog')showProg(u.id,nm(u));else if(k==='card')printCards([u]);else if(k)userAct(k,u);});}
+  const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'prog',e:'📊',t:'Ver su progreso'},!isGMg(u.grupo)&&{k:'club',e:'🏅',t:A.club[u.id]?'Quitar del Club':'Añadir al Club'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'ed',e:'✏️',t:'Editar jugador'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
+  if(k==='prog')showProg(u.id,nm(u));else if(k==='club'){await setClub([u],!A.club[u.id]);drawUsers(m);}else if(k==='card')printCards([u]);else if(k)userAct(k,u);});}
 /* rehace los usuarios de un grupo con la regla actual (nombre + inicial de la 2ª palabra) y, si se pide, genera claves nuevas */
 async function regenGroup(g,gl,m){
  const used=new Set(A.users.map(u=>u.alias)),plan=[];
@@ -458,7 +482,7 @@ async function delUsers(list,de,de2,btn,after,okMsg){
  let n=0,fail=0;
  for(const u of list){toast(`Borrando ${++n} de ${list.length}…`);
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
-   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}try{await RT.del('liga/'+u.id);}catch(e){}try{await RT.del('prog/'+u.id);}catch(e){}
+   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}try{await RT.del('liga/'+u.id);}catch(e){}try{await RT.del('prog/'+u.id);}catch(e){}try{await RT.del('club/'+u.id);await RT.del('gm/'+u.id);}catch(e){}delete A.club[u.id];delete A.gmq[u.id];
    A.users=A.users.filter(x=>x.id!==u.id);A.hof=A.hof.filter(x=>x.id!==u.id);A.sel.delete(u.id);}catch(e){fail++;}}
  if(after)after();
  toast(fail?`Borrados ${list.length-fail}; fallaron ${fail}`:`${okMsg||'Eliminados'} (${list.length})`,!!fail);render();}
@@ -466,7 +490,7 @@ const delMarked=()=>{const l=A.users.filter(u=>A.sel.has(u.id));if(!l.length)ret
 async function userAct(a,u){
  if(a==='del'){if(!await confirmM('Eliminar usuario',`¿Eliminar a <b>${esc(nm(u))}</b> (${esc(u.alias)})? Se borra su cuenta y su puntuación del salón de la fama.`,'Eliminar',true))return;
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
-   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}try{await RT.del('prog/'+u.id);}catch(e){}try{await RT.del('liga/'+u.id);}catch(e){}
+   await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}try{await RT.del('prog/'+u.id);}catch(e){}try{await RT.del('liga/'+u.id);}catch(e){}try{await RT.del('club/'+u.id);await RT.del('gm/'+u.id);}catch(e){}delete A.club[u.id];delete A.gmq[u.id];
    A.users=A.users.filter(x=>x.id!==u.id);A.hof=A.hof.filter(x=>x.id!==u.id);A.sel.delete(u.id);toast('Usuario eliminado');render();}catch(e){toast(FB.msg(e),1);}}
  if(a==='rs'){if(!await confirmM('Nueva clave',`Se generará una clave nueva para <b>${esc(nm(u))}</b>. La anterior dejará de funcionar.`,'Generar'))return;
   try{const nc=genClave();const s=await FB.signIn(u.alias,u.clave);await FB.setPass(s.idToken,nc);await FB.set('users/'+u.id,{clave:nc},['clave']);u.clave=nc;
@@ -481,7 +505,12 @@ async function userAct(a,u){
    if(alias!==u.alias){const s=await FB.signIn(u.alias,u.clave);await FB.setAlias(s.idToken,alias);}
    await FB.set('users/'+u.id,{nombre,alias,grupo},['nombre','alias','grupo']);
    if(A.hof.some(x=>x.id===u.id)){try{await FB.set('hof/'+u.id,{nombre,alias,grupo},['nombre','alias','grupo']);}catch(e){}A.hof.forEach(x=>{if(x.id===u.id){x.nombre=nombre;x.alias=alias;x.grupo=grupo;}});}
-   u.nombre=nombre;u.alias=alias;u.grupo=grupo;toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}}}
+   const wasGM=isGMg(u.grupo);u.nombre=nombre;u.alias=alias;u.grupo=grupo;
+   try{if(A.club[u.id]){if(isGMg(grupo)){await RT.del('club/'+u.id);delete A.club[u.id];}else{A.club[u.id]={n:nombre,g:grupo};await RT.put('club/'+u.id,A.club[u.id]);}}
+    if(isGMg(grupo)&&!A.gmq[u.id]){A.gmq[u.id]={on:true,q:0,u:0};await RT.put('gm/'+u.id,A.gmq[u.id]);}
+    if(isGMg(grupo)!==wasGM){await FB.set('users/'+u.id,{rol:isGMg(grupo)?'gm':''},['rol']);}
+    if(wasGM&&!isGMg(grupo)&&A.gmq[u.id]){await RT.del('gm/'+u.id);delete A.gmq[u.id];}}catch(e){}
+   toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}}}
 /* ---------- alta ---------- */
 function vAlta(m){const one=A.alta!=='grupo';const g0=A.altaG||'';A.altaG='';
  m.innerHTML=`<div class="seg"><button data-m="uno" class="${one?'on':''}">👤 Un alumno</button><button data-m="grupo" class="${one?'':'on'}">👥 Un grupo</button></div>
@@ -499,7 +528,7 @@ async function createUsers(names,grupo,m){names=names.map(s=>s.trim()).filter(Bo
  for(let i=0;i<names.length;i++){prog.innerHTML=`<div class="card">⏳ Creando ${i+1} de ${names.length}…</div>`;
   const nombre=names[i];const base=slugAlias(nombre);if(!base){fail.push([nombre,'Nombre no válido']);continue;}
   let ok=false,n=0;while(!ok&&n<30){const alias=n?base+(n+1):base;n++;if(used.has(alias))continue;const clave=genClave();
-   try{const s=await FB.signUp(alias,clave);const u={alias,nombre,grupo,clave,ultimoLogin:null,alta:Date.now()};await FB.set('users/'+s.uid,u);used.add(alias);const nu={id:s.uid,...u};A.users.push(nu);out.push(nu);ok=true;}
+   try{const s=await FB.signUp(alias,clave);const u={alias,nombre,grupo,clave,ultimoLogin:null,alta:Date.now(),...(isGMg(grupo)?{rol:'gm'}:{})};await FB.set('users/'+s.uid,u);used.add(alias);if(isGMg(grupo)){const gq={on:true,q:0,u:0};await RT.put('gm/'+s.uid,gq);A.gmq[s.uid]=gq;}const nu={id:s.uid,...u};A.users.push(nu);out.push(nu);ok=true;}
    catch(e){if(/EMAIL_EXISTS/.test(e.code||'')){used.add(alias);continue;}fail.push([nombre,FB.msg(e)]);break;}}
   if(!ok&&!fail.find(f=>f[0]===nombre))fail.push([nombre,'No se encontró usuario libre']);}
  $$('button',m).forEach(b=>b.disabled=false);
@@ -513,7 +542,12 @@ const ritmoOf=r=>{const[m,i]=String(r||'3+0').split('+').map(Number);return{m:m|
 const ritmoHTML=r=>{const{m,i}=ritmoOf(r);return `<div class="row" style="flex-wrap:nowrap;align-items:flex-end"><div class="grow"><label class="f">Minutos por jugador</label><input type="number" min="1" max="60" value="${m}" inputmode="numeric"></div><div class="grow"><label class="f">Incremento (seg.)</label><input type="number" min="0" max="60" value="${i}" inputmode="numeric"></div></div><p class="muted" style="margin:4px 0 0;font-size:.8rem">Ej.: 3 min + 2 s. El incremento se suma al reloj tras cada jugada.</p>`;};
 const mkRitmo=(m,i)=>Math.min(60,Math.max(1,Math.round(+m||3)))+'+'+Math.min(60,Math.max(0,Math.round(+i||0)));
 async function delTorneo(t){if(!await confirmM('Eliminar torneo',`¿Eliminar «${esc(t.nombre)}» y todos sus resultados?${t.estado==='terminado'?'<br><br>Los puntos ya sumados al salón de la fama NO se restan.':''}`,'Eliminar',true))return false;
- try{let js=[];try{js=await FB.list(`torneos/${t.id}/jugadores`);}catch(e){}for(const j of js)await FB.del(`torneos/${t.id}/jugadores/${j.id}`);await FB.del('torneos/'+t.id);if(t.estado!=='terminado'){RT.del('arena/'+t.id).catch(()=>{});RT.del('ahb/'+t.id).catch(()=>{});}RT.del('pub/ins/'+t.id).catch(()=>{});A.torneos=A.torneos.filter(x=>x!==t);pubPing();toast('Torneo eliminado');return true;}catch(er){toast(FB.msg(er),1);return false;}}
+ try{let js=[];try{js=await FB.list(`torneos/${t.id}/jugadores`);}catch(e){}for(const j of js)await FB.del(`torneos/${t.id}/jugadores/${j.id}`);await FB.del('torneos/'+t.id);if(t.estado!=='terminado'){await RT.del('arena/'+t.id).catch(()=>{});RT.del('ahb/'+t.id).catch(()=>{});}await RT.del('pub/ins/'+t.id).catch(()=>{});if(t.club)await RT.del('pub/t/'+t.id).catch(()=>{});A.torneos=A.torneos.filter(x=>x!==t);pubPing();toast('Torneo eliminado');return true;}catch(er){toast(FB.msg(er),1);return false;}}
+async function gmSpend(){const me=FB.S.user.uid;let cur;try{cur=await RT.get('gm/'+me);}catch(e){toast(FB.msg(e),1);return false;}
+ if(!cur||cur.on!==true){toast('⛔ Tu acceso está desactivado',1);return false;}
+ if((cur.u||0)>=(cur.q||0)){toast('🎟️ No te quedan créditos. Pídeselos a Manuel.',1);return false;}
+ try{await RT.put('gm/'+me+'/u',(cur.u||0)+1);}catch(e){toast(FB.msg(e),1);return false;}
+ A.gmq=Object.assign(A.gmq||{},cur,{u:(cur.u||0)+1});return true;}
 async function newTorneo(){const d=new Date();if(d.getHours()*60+d.getMinutes()>=11*60+55)d.setDate(d.getDate()+1);d.setHours(12,0,0,0);const dv=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);
  const r=await askM('🏟️ Programar torneo',`<label class="f">Nombre</label><input placeholder="Arena del recreo" autocomplete="off"><label class="f">Día y hora de inicio</label><input type="datetime-local" value="${dv}"><p class="muted" style="margin:4px 0 0;font-size:.85rem">⏱️ Arena: quien llegue tarde entra igual (solo juega menos tiempo). Suizo y todos contra todos: la 1ª ronda se empareja 1 minuto después de la hora con quien esté conectado; si tardan en llegar, pon 12:05 o 12:10.</p>
   <label class="f">Tipo de torneo</label><select id="ttp"><option value="arena">🏟️ Arena (por tiempo, emparejamiento continuo)</option><option value="suizo">🇨🇭 Suizo (por rondas)</option><option value="rr">🔁 Todos contra todos</option></select>
@@ -524,7 +558,8 @@ async function newTorneo(){const d=new Date();if(d.getHours()*60+d.getMinutes()>
   <label class="row" style="margin-top:14px;font-weight:700"><input type="checkbox" checked> 🔥 Permitir Modo furia</label>
   <p class="muted" style="margin:10px 0 0" id="tauto"></p>`,'Crear',bg=>{const tp=$('#ttp',bg),up=()=>{const v=tp.value;$('#tdur',bg).style.display=v==='arena'?'':'none';$('#trnd',bg).style.display=v==='suizo'?'':'none';$('#tauto',bg).innerHTML=v==='arena'?'✅ El arena empieza y termina solo a su hora, aunque esta app esté cerrada. Los puntos del salón de la fama se suman cuando vuelvas a abrirla.':'⚠️ <b>Requiere esta app abierta</b> durante todo el torneo: es la que empareja cada ronda.';$('#ttxt',bg).textContent=v==='arena'?'Cada uno juega todas las partidas que pueda hasta que se acabe el tiempo.':v==='suizo'?'Al empezar hay 1 minuto para entrar. En cada ronda se emparejan jugadores con puntos parecidos, sin repetir rival.':'Al empezar hay 1 minuto para entrar. Todos juegan contra todos (con muchos jugadores, ¡son muchas rondas!).';};tp.onchange=up;up();});
  if(!r)return;const nombre=r[0].trim();if(!nombre)return toast('Pon un nombre',1);
- const tipo=r[2]||'arena';const t={nombre,tipo,inicio:new Date(r[1]).getTime()||Date.now(),ritmo:mkRitmo(r[3],r[4]),duracion:Math.min(120,Math.max(5,+r[5]||20)),rondas:Math.min(15,Math.max(2,+r[6]||5)),furia:!!r[7],estado:'espera',creado:Date.now()};
+ if(A.gm&&!await gmSpend())return;
+ const tipo=r[2]||'arena';const t={...(A.gm?{club:true,owner:FB.S.user.uid}:{}),nombre,tipo,inicio:new Date(r[1]).getTime()||Date.now(),ritmo:mkRitmo(r[3],r[4]),duracion:Math.min(120,Math.max(5,+r[5]||20)),rondas:Math.min(15,Math.max(2,+r[6]||5)),furia:!!r[7],estado:'espera',creado:Date.now()};
  try{const x=await FB.set('torneos/'+(Date.now().toString(36)+Math.random().toString(36).slice(2,5)),t);A.torneos.unshift(x);toast('Torneo creado ✔️');render();}catch(e){toast(FB.msg(e),1);}}
 function vTorneos(m){if(A.tid)return vTorneo(m,A.torneos.find(t=>t.id===A.tid));
  const abiertos=A.torneos.filter(t=>t.estado!=='terminado').sort((a,b)=>(a.estado==='activo'?-1:0)-(b.estado==='activo'?-1:0)||(a.inicio||0)-(b.inicio||0)),fin=A.torneos.filter(t=>t.estado==='terminado');
@@ -556,7 +591,7 @@ async function vTorneo(m,t){if(!t){A.tid=null;return render();}
    if(k==='cs')download(`torneo-${t.nombre.replace(/\W+/g,'_')}.csv`,csv([['Puesto','Usuario','Nombre','Grupo','Puntos','Partidas','Salidas de pestaña'],...js.map((j,i)=>[i+1,j.alias,j.nombre,j.grupo,j.puntos||0,j.partidas||0,j.fx||0])]),'text/csv');
    if(k==='add'){const have=new Set(js.map(j=>j.id));const c=A.users.filter(u=>!have.has(u.id));if(!c.length)return toast('No hay más alumnos',1);
     const r=await askM('➕ Añadir jugador',`<select>${c.map(u=>`<option value="${u.id}">${esc(nm(u))} · ${esc(u.grupo||'')}</option>`).join('')}</select>`,'Añadir');if(!r)return;
-    const u=A.users.find(x=>x.id===r[0]);const j={alias:u.alias,nombre:nm(u),grupo:u.grupo||'',puntos:0,partidas:0,fuera:false};try{await FB.set(`torneos/${t.id}/jugadores/${u.id}`,j);RT.put(`pub/ins/${t.id}/${u.id}`,{n:j.nombre,g:j.grupo,a:j.alias}).catch(()=>{});js.push({id:u.id,...j});draw();}catch(e){toast(FB.msg(e),1);}}
+    const u=A.users.find(x=>x.id===r[0]);const j={alias:u.alias||'',nombre:nm(u),grupo:u.cg||u.grupo||'',puntos:0,partidas:0,fuera:false};try{await FB.set(`torneos/${t.id}/jugadores/${u.id}`,j);RT.put(`pub/ins/${t.id}/${u.id}`,{n:j.nombre,g:j.grupo,a:j.alias}).catch(()=>{});js.push({id:u.id,...j});draw();}catch(e){toast(FB.msg(e),1);}}
    if(k==='ed'){const dI=new Date(t.inicio||Date.now()),dv=new Date(dI-dI.getTimezoneOffset()*6e4).toISOString().slice(0,16);
     const r=await askM('✏️ Editar torneo',`<label class="f">Nombre</label><input value="${esc(t.nombre)}">
      <label class="f">Día y hora de inicio</label><input type="datetime-local" value="${dv}">
@@ -651,6 +686,7 @@ async function groupProg(g,gl){const p=modal({title:'📊 Progreso · '+esc(g),h
  draw();return p;}
 const rotate=(a,k)=>{const n=a.length;if(!n)return a;k=k%n;return a.slice(n-k).concat(a.slice(0,n-k));};
 async function finishTorneo(t){
+ if(t.club){try{const cur=await FB.get('torneos/'+t.id);if(cur&&cur.estado==='terminado'){Object.assign(t,cur);return;}}catch(e){}}   // por si otro dispositivo ya lo cerró
  let lv={};try{lv=await RT.get(`arena/${t.id}/p`)||{};}catch(e){}
  for(const [uid,p] of Object.entries(lv))if(!p.guest)await FB.set(`torneos/${t.id}/jugadores/${uid}`,{alias:p.a||'',nombre:p.n||'',grupo:p.g||'',puntos:p.pts||0,partidas:p.pa||0,fuera:!!p.fuera});
  const rk=arenaRank(Object.entries(lv).filter(([id,p])=>p&&!p.fuera).map(([id,p])=>({id,...p}))),pos=Object.fromEntries(rk.map((r,i)=>[r.id,i]));
@@ -658,7 +694,8 @@ async function finishTorneo(t){
  const ok=js.filter(j=>!j.fuera&&((j.partidas||0)>0||(j.puntos||0)>0));
  const podio=ok.slice(0,3).map(j=>({alias:j.alias,nombre:j.nombre,puntos:j.puntos||0}));
  const clasif=rk.filter(r=>(r.pa||0)>0||(r.pts||0)>0).slice(0,60).map(r=>({u:r.guest?'':r.id,n:r.n,g:r.g||'',p:r.pts||0,w:r.w||0,d:r.d||0,l:r.l||0}));
- for(const j of ok.filter(x=>!isAdm(x.grupo))){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
+ if(t.club){for(const j of ok.filter(x=>(x.puntos||0)>0)){try{const h=await RT.get('clubhof/'+j.id)||{};await RT.put('clubhof/'+j.id,{n:j.nombre,g:j.grupo||'',p:(h.p||0)+(j.puntos||0),t:(h.t||0)+1,m:Math.max(h.m||0,j.puntos||0)});}catch(e){}}}
+ else for(const j of ok.filter(x=>!isAdm(x.grupo))){const h=A.hof.find(x=>x.id===j.id)||{id:j.id,puntos:0,torneos:0,mejor:0};const n={alias:j.alias,nombre:j.nombre,grupo:j.grupo||'',puntos:(h.puntos||0)+(j.puntos||0),torneos:(h.torneos||0)+1,mejor:Math.max(h.mejor||0,j.puntos||0)};await FB.set('hof/'+j.id,n);const i=A.hof.findIndex(x=>x.id===j.id);i<0?A.hof.push({id:j.id,...n}):A.hof[i]={id:j.id,...n};}
  const fin=(t.tipo||'arena')==='arena'&&tFin(t)?Math.min(Date.now(),tFin(t)):Date.now();
  const p={estado:'terminado',fin,podio,clasif};await FB.set('torneos/'+t.id,p,Object.keys(p));Object.assign(t,p);
  /* historial para el alumnado (Realtime Database: sin lecturas de Firestore): resumen, clasificación y «mis torneos» */
@@ -669,7 +706,7 @@ async function finishTorneo(t){
    cada 30 s si hay alguno abierto, cada 2 min si no hay ninguno (y al momento si otro dispositivo avisa de un cambio) */
 let autoBusy=false,lastRefresh=0,needRefresh=true;
 async function refreshOpen(){
- const open=await FB.query('torneos',{where:['estado','IN',['espera','activo']]});const ids=new Set(open.map(x=>x.id));
+ const open=A.gm?(await FB.query('torneos',{where:['owner','==',FB.S.user.uid]})).filter(x=>x.estado==='espera'||x.estado==='activo'):(await FB.query('torneos',{where:['estado','IN',['espera','activo']]})).filter(x=>!x.club);const ids=new Set(open.map(x=>x.id));
  for(const f of open){const o=A.torneos.find(x=>x.id===f.id);if(o)Object.assign(o,f);else A.torneos.unshift(f);}
  for(const o of A.torneos.filter(x=>x.estado!=='terminado'&&!ids.has(x.id))){const f=await FB.get('torneos/'+o.id);if(f)Object.assign(o,f);else A.torneos=A.torneos.filter(x=>x!==o);}
  lastRefresh=Date.now();needRefresh=false;}
@@ -689,7 +726,7 @@ setInterval(autoTick,5000);
 try{if(window.EventSource){let pv;const es=new EventSource(RT.B+'pub/v.json');es.addEventListener('put',e=>{try{const v=JSON.parse(e.data).data;if(pv!==undefined&&v!==pv)needRefresh=true;pv=v;}catch(x){}});}}catch(e){}
 const seenReq=new Set();
 function beep(){try{const c=new (window.AudioContext||window.webkitAudioContext)(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();o.stop(c.currentTime+.18);}catch(e){}}
-async function pollReq(){if(!FB.S.user||!$('#main'))return;let n=0,fresh=null;
+async function pollReq(){if(A.gm||!FB.S.user||!$('#main'))return;let n=0,fresh=null;
  try{for(const t of A.torneos.filter(x=>x.estado==='activo')){const r=await RT.get(`arena/${t.id}/req`)||{};for(const [id,x] of Object.entries(r)){if(x&&x.s==='pend'){n++;if(!seenReq.has(id)){seenReq.add(id);fresh=x.n;}}}}}catch(e){return;}
  if(fresh){beep();try{navigator.vibrate&&navigator.vibrate(200);}catch(e){}toast('🙋 '+fresh+' pide entrar al torneo');}
  if(n!==A.reqN){A.reqN=n;badges();if(A.tab==='inicio'&&!$('.mbg')&&!$('.drbg'))render();}
@@ -699,10 +736,67 @@ function projector(t,get,load){const ov=document.createElement('div');ov.classNa
  const close=()=>{clearInterval(iv);ov.remove();};ov._close=close;
  const paint=()=>{const l=get().filter(j=>!j.fuera).slice(0,12);ov.innerHTML=`<button class="btn x" id="px">✕ Cerrar</button><h1>🏆 ${esc(t.nombre)}</h1><table><thead><tr><th>#</th><th>Jugador</th><th>Grupo</th><th class="n">Puntos</th></tr></thead><tbody>${l.map((j,i)=>`<tr><td>${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(j.nombre)}</td><td>${esc(j.grupo)}</td><td class="n"><b>${j.puntos||0}</b></td></tr>`).join('')}</tbody></table>`;$('#px',ov).onclick=close;};
  paint();const iv=setInterval(async()=>{await load();paint();},10000);}
+
+/* ---------- Club y profesorado GM ---------- */
+async function setClub(list,on){if(!list.length)return toast('No hay nadie',1);const up={};
+ list.forEach(u=>{up[u.id]=on?{n:nm(u),g:u.grupo||''}:null;});
+ try{await RT.patch('club',up);list.forEach(u=>{if(on)A.club[u.id]=up[u.id];else delete A.club[u.id];});toast(on?`🏅 ${list.length} en el Club`:`${list.length} fuera del Club`);}
+ catch(e){toast(FB.msg(e),1);}}
+const gmLeft=g=>Math.max(0,((g&&g.q)||0)-((g&&g.u)||0));
+function vClub(m){
+ const gms=A.users.filter(u=>isGMg(u.grupo)),cl=Object.entries(A.club).map(([id,x])=>({id,...x})).sort((a,b)=>String(a.n).localeCompare(String(b.n),'es'));
+ m.innerHTML=`<div class="card"><h3>👨‍🏫 Profesorado GM (${gms.length})</h3>
+  <p class="muted" style="margin:0 0 8px">Crea el grupo <b>GM</b> en «Dar de alta» y añade a los profes: se les genera su clave. Entran en esta misma dirección de administración y solo ven tareas, torneos y salón del Club. <b>Cada tarea o torneo que envían gasta 1 crédito</b>: tú decides cuántos tienen.</p>
+  ${gms.length?`<div class="list" style="margin:0 0 8px">${gms.map(u=>{const g=A.gmq[u.id]||{};return `<div class="li" data-gm="${u.id}"><span style="font-size:1.4rem">${g.on===false?'⛔':'👨‍🏫'}</span><div class="t"><b>${esc(nm(u))}</b><span class="mono">${esc(u.alias)}</span> · clave <span class="mono">${esc(u.clave)}</span></div><span class="pill ${gmLeft(g)?'activo':'espera'}">🎟️ ${gmLeft(g)} / ${g.q||0}</span></div>`;}).join('')}</div>`:'<p class="muted" style="margin:0 0 8px">Aún no hay profes GM.</p>'}
+  <button class="btn ghost wide" id="gmn">➕ Dar de alta un profe GM</button></div>
+ <div class="card"><h3>🏅 Alumnado del Club (${cl.length})</h3>
+  <p class="muted" style="margin:0 0 8px">Solo ellos reciben las tareas y torneos del Club, y tienen su propio salón de la fama. Siguen en su grupo de clase.</p>
+  ${cl.length?`<div class="list" style="margin:0 0 8px">${cl.map(c=>`<div class="li" data-c="${c.id}"><span style="font-size:1.3rem">🏅</span><div class="t"><b>${esc(c.n||'')}</b><span>${esc(c.g||'')}</span></div></div>`).join('')}</div>`:'<p class="muted" style="margin:0 0 8px">Aún no hay nadie en el Club.</p>'}
+  <div class="row"><button class="btn grow" id="cad">➕ Añadir alumnado</button>${cl.length?'<button class="btn ghost" id="cdl">Vaciar</button>':''}</div></div>
+ <div class="card"><h3>🏟️ Torneos del Club</h3><div id="cts"><p class="muted" style="margin:0">Cargando…</p></div></div>
+ <div class="card"><h3>🏆 Salón de la fama del Club</h3><div id="chf"><p class="muted" style="margin:0">Cargando…</p></div></div>`;
+ FB.query('torneos',{where:['club','==',true],limit:40}).then(ts=>{const b=$('#cts',m);if(!b)return;ts.sort((a,b)=>(b.inicio||0)-(a.inicio||0));
+  b.innerHTML=ts.length?`<div class="list" style="margin:0">${ts.map(t=>`<div class="li" data-ct="${t.id}"><span style="font-size:1.4rem">${{activo:'🟢',espera:'⏳',terminado:'🏁'}[tEff(t,Date.now())]||'🏟️'}</span><div class="t"><b>${esc(t.nombre)}</b><span>${fdate(t.inicio)} · ${esc(tdesc(t))}</span></div></div>`).join('')}</div>`:'<p class="muted" style="margin:0">Aún no hay torneos del Club.</p>';
+  $$('[data-ct]',b).forEach(r=>r.onclick=async()=>{const t=ts.find(x=>x.id===r.dataset.ct);const k=await sheet(esc(t.nombre),[{k:'del',e:'🗑',t:'Eliminar torneo',cls:'red'}]);if(k==='del'&&await delTorneo(t))vClub(m);});}).catch(()=>{const b=$('#cts',m);if(b)b.innerHTML='<p class="muted" style="margin:0">No se pudo cargar.</p>';});
+ clubHofList().then(l=>{const b=$('#chf',m);if(!b)return;b.innerHTML=l.length?`<div class="list" style="margin:0 0 8px">${l.slice(0,10).map((h,i)=>`<div class="li" style="cursor:default"><span class="pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="t"><b>${esc(h.n||'')}</b><span>${esc(h.g||'')} · ${h.t||0} torneos</span></div><span class="pts">${h.p||0}</span></div>`).join('')}</div><button class="btn ghost wide red" id="chr" style="color:var(--rd);border-color:var(--rd)">♻️ Vaciar salón del Club…</button>`:'<p class="muted" style="margin:0">Aún sin datos.</p>';
+  if($('#chr',b))$('#chr',b).onclick=async()=>{if(!await confirmM('Vaciar salón del Club',`Se borrarán los puntos acumulados de ${l.length} jugadores. Antes se descarga una copia.`,'Vaciar',true))return;try{download('salon-club-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(l,null,1),'application/json');await RT.del('clubhof');toast('Salón del Club vacío');vClub(m);}catch(e){toast(FB.msg(e),1);}};}).catch(()=>{});
+ $('#gmn',m).onclick=()=>{A.alta='grupo';A.altaG='GM';if(!A.grupos.some(g=>isGMg(g))&&!A.users.some(u=>isGMg(u.grupo))){A.grupos.push('GM');saveGroups().catch(()=>{});}nav('alta');};
+ $('#cad',m).onclick=async()=>{await addClubUI();vClub(m);};
+ if($('#cdl',m))$('#cdl',m).onclick=async()=>{if(!await confirmM('Vaciar el Club','Todo el alumnado dejará de recibir lo del Club. Sus grupos de clase no cambian.','Vaciar',true))return;try{await RT.del('club');A.club={};toast('Club vaciado');}catch(e){toast(FB.msg(e),1);}vClub(m);};
+ $$('[data-c]',m).forEach(r=>r.onclick=async()=>{const id=r.dataset.c,c=A.club[id];const k=await sheet(esc(c.n||''),[{k:'rm',e:'🚫',t:'Quitar del Club',cls:'red'}]);if(k==='rm'){try{await RT.del('club/'+id);delete A.club[id];}catch(e){toast(FB.msg(e),1);}vClub(m);}});
+ $$('[data-gm]',m).forEach(r=>r.onclick=async()=>{const u=A.users.find(x=>x.id===r.dataset.gm),g=A.gmq[u.id]||(A.gmq[u.id]={on:true,q:0,u:0});
+  const k=await sheet(`${esc(nm(u))} · ${gmLeft(g)} créditos disponibles (${g.u||0} usados de ${g.q||0})`,[{k:'add',e:'➕',t:'Añadir créditos'},{k:'set',e:'🎯',t:'Fijar créditos disponibles'},{k:'onoff',e:g.on===false?'✅':'⛔',t:g.on===false?'Reactivar acceso':'Suspender acceso'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'}]);
+  const num=async(tt,lb,v)=>{const r=await askM(tt,`<label class="f">${lb}</label><input type="number" inputmode="numeric" min="0" max="999" value="${v}">`,'Guardar');return r?Math.max(0,Math.min(999,Math.round(+r[0]||0))):null;};
+  try{
+   if(k==='add'){const n=await num('➕ Añadir créditos','Créditos a sumar',5);if(n==null)return;g.q=(g.q||0)+n;await RT.patch('gm/'+u.id,{q:g.q});}
+   if(k==='set'){const n=await num('🎯 Créditos disponibles','Disponibles ahora',gmLeft(g));if(n==null)return;g.q=(g.u||0)+n;await RT.patch('gm/'+u.id,{q:g.q});}
+   if(k==='onoff'){g.on=g.on===false;await RT.patch('gm/'+u.id,{on:g.on});}
+   if(k==='card')return printCards([u]);
+   if(k==='rs'){if(!await confirmM('Nueva clave',`Se generará una clave nueva para <b>${esc(nm(u))}</b>.`,'Generar'))return;const nc=genClave();const ss=await FB.signIn(u.alias,u.clave);await FB.setPass(ss.idToken,nc);await FB.set('users/'+u.id,{clave:nc},['clave']);u.clave=nc;}
+  }catch(e){toast(FB.msg(e),1);}
+  vClub(m);});}
+async function addClubUI(){
+ const gs=allGroups().filter(g=>!isGMg(g)&&!isAdm(g));if(!gs.length){toast('No hay grupos de clase',1);return;}
+ const r=await askM('➕ Añadir al Club',`<label class="f">Grupo de clase</label><select>${gs.map(g=>`<option value="${esc(g)}">${esc(g)} (${A.users.filter(u=>u.grupo===g).length})</option>`).join('')}</select>`,'Elegir');if(!r)return;
+ const us=A.users.filter(u=>u.grupo===r[0]);if(!us.length){toast('Ese grupo está vacío',1);return;}
+ const r2=await askM('🏅 '+esc(r[0]),`<label class="row" style="font-weight:800;margin-bottom:8px"><input type="checkbox" id="cka"> Todo el grupo</label>${us.map(u=>`<label class="row" style="margin:6px 0"><input type="checkbox" class="ckc" ${A.club[u.id]?'checked disabled':''}> ${esc(nm(u))}${A.club[u.id]?' <span class="muted">(ya está)</span>':''}</label>`).join('')}`,'Añadir al Club',bg=>{$('#cka',bg).onchange=e=>$$('.ckc:not(:disabled)',bg).forEach(c=>c.checked=e.target.checked);});
+ if(!r2)return;const pick=us.filter((u,i)=>!A.club[u.id]&&r2[i+1]);if(!pick.length){toast('No has marcado a nadie nuevo');return;}await setClub(pick,true);}
+/* inicio del profesorado GM */
+function vGInicio(m){const uid=FB.S.user.uid;const al=String(FB.S.user.email).replace('@'+FBC.domain,'');
+ const draw=()=>{const g=A.gmq||{},left=gmLeft(g);
+  m.innerHTML=`<div class="hello"><b>Hola, ${esc(al)}</b><span>Panel del profesorado del Club</span></div>
+  <div class="card ${left?'':'alert'}"><b>🎟️ ${left} crédito${left===1?'':'s'} disponible${left===1?'':'s'}</b><div class="muted">Has usado ${g.u||0} de ${g.q||0}. Cada tarea o torneo que envías gasta 1. Si necesitas más, pídeselos a Manuel.</div></div>
+  <div class="tiles">
+   <button class="tile" data-k="profe"><span class="ic">📝</span><b>Tareas</b><span>Enviar y ver resultados</span></button>
+   <button class="tile" data-k="torneos"><span class="ic">🏟️</span><b>Torneos del Club</b><span>Programar y dirigir</span></button>
+   <button class="tile" data-k="hof"><span class="ic">🏆</span><b>Salón del Club</b><span>Clasificación general</span></button>
+  </div><p class="muted" style="text-align:center;margin-top:18px">${A.users.length} alumnos en el Club.</p>`;
+  $$('.tile',m).forEach(b=>b.onclick=()=>nav(b.dataset.k));};
+ draw();RT.get('gm/'+uid).then(g=>{if(g&&A.tab==='inicio'&&A.gm){A.gmq=g;draw();}}).catch(()=>{});}
 /* ---------- tareas, clase y fichas (se abre la herramienta del profe de la app de juego, con la sesión de admin) ---------- */
-function vProfe(m){m.innerHTML=`<iframe src="index.html#profe" title="Tareas y fichas" style="width:100%;height:calc(100vh - 62px - env(safe-area-inset-top));border:0;display:block;background:#fbf7ee"></iframe>`;}
+function vProfe(m){m.innerHTML=`<iframe src="index.html#${A.gm?'gm':'profe'}" title="Tareas y fichas" style="width:100%;height:calc(100vh - 62px - env(safe-area-inset-top));border:0;display:block;background:#fbf7ee"></iframe>`;}
 /* ---------- salón de la fama ---------- */
-function vHof(m){const l=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
+function vHof(m){if(A.gm)return vClubHof(m);const l=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
  m.innerHTML=`<div class="row" style="margin-bottom:10px"><p class="muted grow" style="margin:0 4px">Top 10 · suma de los puntos de todos los torneos terminados.</p><button class="ib2" id="opt" aria-label="Opciones">⋯</button></div>
  ${l.length?`<div class="list">${l.map((h,i)=>`<div class="li" style="cursor:default"><span class="pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="t"><b>${esc(h.nombre)}</b><span>${esc(h.grupo||'')} · ${h.torneos||0} torneos · mejor ${h.mejor||0}</span></div><span class="pts">${h.puntos||0}</span></div>`).join('')}</div>`:'<div class="card empty">Todavía no hay datos: termina algún torneo.</div>'}`;
  const backup=()=>download('salon-fama-'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify(A.hof,null,1),'application/json');
@@ -711,6 +805,12 @@ function vHof(m){const l=A.hof.filter(h=>!isAdm(h.grupo)).sort((a,b)=>(b.puntos|
   if(k==='adm'){const q=A.hof.filter(h=>isAdm(h.grupo));if(!await confirmM('Quitar al grupo Admin',`Se borran del salón de la fama los puntos de ${q.length} jugador${q.length>1?'es':''} del grupo Admin. Sus cuentas no se tocan.`,'Quitar',true))return;try{for(const h of q)await FB.del('hof/'+h.id);A.hof=A.hof.filter(h=>!isAdm(h.grupo));try{await pubSync();}catch(e){}toast('Grupo Admin quitado del salón');render();}catch(e){toast(FB.msg(e),1);}}
   if(k==='rs'){const r=await askM('♻️ Vaciar salón de la fama',`<p>Se borrarán los puntos acumulados de <b>${A.hof.length}</b> jugadores. Antes se descargará una copia.</p><p>Escribe <b>RESTAURAR</b> para confirmar:</p><input autocomplete="off" autocapitalize="characters">`,'Vaciar');if(!r||r[0].trim().toUpperCase()!=='RESTAURAR')return r?toast('No coincide: no se ha borrado nada',1):0;
    try{backup();for(const h of A.hof)await FB.del('hof/'+h.id);A.hof=[];toast('Salón de la fama vacío');render();}catch(e){toast(FB.msg(e),1);}}};}
+
+async function clubHofList(){const h=await RT.get('clubhof')||{};return Object.entries(h).filter(([id,x])=>x&&typeof x==='object').map(([id,x])=>({id,...x})).sort((a,b)=>(b.p||0)-(a.p||0));}
+async function vClubHof(m){m.innerHTML='<div class="card empty">Cargando…</div>';let l=[];try{l=await clubHofList();}catch(e){m.innerHTML='<div class="card empty">No se pudo cargar.</div>';return;}
+ l=l.slice(0,10);
+ m.innerHTML=`<p class="muted" style="margin:0 4px 10px">Top 10 del Club · suma de los puntos de sus torneos terminados. Es independiente del salón de la fama del cole.</p>
+ ${l.length?`<div class="list">${l.map((h,i)=>`<div class="li" style="cursor:default"><span class="pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="t"><b>${esc(h.n||'')}</b><span>${esc(h.g||'')} · ${h.t||0} torneos · mejor ${h.m||0}</span></div><span class="pts">${h.p||0}</span></div>`).join('')}</div>`:'<div class="card empty">Todavía no hay datos: termina algún torneo del Club.</div>'}`;}
 /* ---------- ajustes ---------- */
 async function saveAvisos(){try{await FB.set('config/main',{avisos:A.cfg.avisos},['avisos']);try{await pubSync();}catch(e){}}catch(e){toast(FB.msg(e),1);}}
 async function toggleAviso(id){const a=(A.cfg.avisos||[]).find(x=>x.id===id);if(!a)return;a.on=!a.on;await saveAvisos();render();}

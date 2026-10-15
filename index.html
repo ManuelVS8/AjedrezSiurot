@@ -3107,6 +3107,14 @@ async function hideSplash(){
  s.classList.add('out');setTimeout(()=>s.remove(),700);
 }
 function boot(){
+ if(location.hash==='#gm'){   // panel del profesorado del Club (con la sesión de la app de administración, rol GM)
+  let a=null;try{a=JSON.parse(localStorage.getItem('admgm')||'null');}catch(e){}
+  const sp=document.getElementById('splash');if(sp)sp.remove();document.body.classList.add('profemode');
+  try{applyLook();}catch(e){}
+  const mm=document.querySelector('main');
+  if(!a||!a.uid){mm.innerHTML='<div class="card" style="margin:20px;text-align:center">🔒 Abre esta parte desde la app de administración del Club.</div>';return;}
+  FB.restore(a);FB.S.onChange=u=>{try{u?localStorage.setItem('admgm',JSON.stringify(u)):localStorage.removeItem('admgm');}catch(e){}};
+  PROFE=true;GMMODE=true;AULA_OK=true;teacherView(mm,'tareas');return;}
  if(location.hash==='#profe'){   // panel del profesor: solo desde la app de administración (con su sesión)
   let a=null;try{a=JSON.parse(localStorage.getItem('adm')||'null');}catch(e){}
   const sp=document.getElementById('splash');if(sp)sp.remove();document.body.classList.add('profemode');
@@ -3486,6 +3494,51 @@ function viewLab(m){
  $('#lb1',m).onclick=()=>go('explorador');$('#lb0',m).onclick=()=>go('modulo','aperturas');$('#lb2',m).onclick=()=>go('tablero');
  $('#lb3',m).onclick=async()=>{const e=await importGameDialog();if(e)go('analisis',{id:e.id});};
  $('#lb4',m).onclick=()=>go('partidas');}
+const SETUP_PCS=[['K','♔'],['Q','♕'],['R','♖'],['B','♗'],['N','♘'],['P','♙'],['k','♚'],['q','♛'],['r','♜'],['b','♝'],['n','♞'],['p','♟']];
+const SETUP_CSS='#bsov{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:12px;overflow:auto}#bsov .bsc{background:#fffdf8;border-radius:16px;padding:14px;max-width:460px;width:100%;box-sizing:border-box}#bsov .bsg{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:10px;overflow:hidden;border:4px solid #6b4a2e;user-select:none;touch-action:manipulation}#bsov .bsq{display:grid;place-items:center;font-size:clamp(18px,7vw,40px);line-height:1;cursor:pointer}#bsov .bsq.l{background:#f0d9b5}#bsov .bsq.d{background:#b58863}#bsov .bsp{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}#bsov .bsp button{width:44px;height:44px;font-size:26px;border-radius:10px;border:2px solid #d9cbb0;background:#fff;cursor:pointer}#bsov .bsp button.on{border-color:#16857a;background:#dff5f1}#bsov .row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:8px 0}#bsov .row button{padding:8px 10px;border-radius:10px;border:2px solid #d9cbb0;background:#fff;font-weight:800;cursor:pointer}#bsov .row button.on{background:#16857a;color:#fff;border-color:#16857a}';
+/* Editor de posición: devuelve un FEN (o null si se cancela) */
+function boardSetup(startFen){
+ return new Promise(resolve=>{
+  if(!document.getElementById('bsovcss')){const sty=document.createElement('style');sty.id='bsovcss';sty.textContent=SETUP_CSS;document.head.appendChild(sty);}
+  const arr=Array(64).fill('');
+  const parseInto=(fen)=>{arr.fill('');String(fen||START_FEN).split(' ')[0].split('/').forEach((row,ri)=>{let f=0;for(const ch of row){if(/\d/.test(ch))f+=+ch;else{arr[(7-ri)*8+f]=ch;f++;}}});};
+  parseInto(startFen);
+  const parts=String(startFen||START_FEN).split(' ');
+  const st={sel:'K',turn:parts[1]==='b'?'b':'w',cast:(parts[2]&&parts[2]!=='-')?parts[2]:'',orient:'w'};
+  const ov=document.createElement('div');ov.id='bsov';
+  ov.innerHTML='<div class="bsc"><h3 style="margin:0 0 6px;text-align:center">🧩 Montar posición</h3><div class="bsg" id="bsg"></div><div class="bsp" id="bsp"></div><div class="row" id="bst"></div><div class="row" id="bsc"></div><div class="row"><button id="bsini">Inicial</button><button id="bsvac">Vaciar</button><button id="bsgir">⟳ Girar</button></div><div class="row"><button id="bscan">Cancelar</button><button id="bsok" style="background:#16857a;color:#fff;border-color:#16857a">✔ Usar esta posición</button></div></div>';
+  document.body.appendChild(ov);
+  const close=v=>{ov.remove();resolve(v);};
+  const glyph=p=>{const m=SETUP_PCS.find(x=>x[0]===p);return m?m[1]:'';};
+  const draw=()=>{
+   let h='';
+   for(let dr=0;dr<8;dr++)for(let df=0;df<8;df++){const r=st.orient==='w'?7-dr:dr,f=st.orient==='w'?df:7-df;const i=r*8+f;h+=`<div class="bsq ${(r+f)%2?'l':'d'}" data-i="${i}">${glyph(arr[i])}</div>`;}
+   ov.querySelector('#bsg').innerHTML=h;
+   ov.querySelector('#bsp').innerHTML=SETUP_PCS.map(([L,G])=>`<button data-p="${L}" class="${st.sel===L?'on':''}">${G}</button>`).join('')+`<button data-p="" class="${st.sel===''?'on':''}" title="Borrar">✖</button>`;
+   ov.querySelector('#bst').innerHTML=`<button data-t="w" class="${st.turn==='w'?'on':''}">Mueven blancas</button><button data-t="b" class="${st.turn==='b'?'on':''}">Mueven negras</button>`;
+   ov.querySelector('#bsc').innerHTML=['K','Q','k','q'].map(c=>`<button data-c="${c}" class="${st.cast.includes(c)?'on':''}">Enroque ${c}</button>`).join('');
+  };
+  ov.querySelector('#bsg').onclick=e=>{const q=e.target.closest('.bsq');if(!q)return;const i=+q.dataset.i;if(st.sel===''||arr[i]===st.sel)arr[i]='';else arr[i]=st.sel;draw();};
+  ov.querySelector('#bsp').onclick=e=>{const b=e.target.closest('button');if(!b)return;st.sel=b.dataset.p;draw();};
+  ov.querySelector('#bst').onclick=e=>{const b=e.target.closest('button');if(!b)return;st.turn=b.dataset.t;draw();};
+  ov.querySelector('#bsc').onclick=e=>{const b=e.target.closest('button');if(!b)return;const c=b.dataset.c;st.cast=st.cast.includes(c)?st.cast.replace(c,''):st.cast+c;draw();};
+  ov.querySelector('#bsini').onclick=()=>{parseInto(START_FEN);st.turn='w';st.cast='KQkq';draw();};
+  ov.querySelector('#bsvac').onclick=()=>{arr.fill('');draw();};
+  ov.querySelector('#bsgir').onclick=()=>{st.orient=st.orient==='w'?'b':'w';draw();};
+  ov.querySelector('#bscan').onclick=()=>close(null);
+  ov.querySelector('#bsok').onclick=()=>{
+   const cnt=c=>arr.filter(x=>x===c).length;
+   if(cnt('K')!==1||cnt('k')!==1)return toast('Tiene que haber exactamente un rey blanco y un rey negro');
+   if(arr.some((x,i)=>(x==='P'||x==='p')&&(i<8||i>=56)))return toast('Los peones no pueden estar en la primera ni en la última fila');
+   const rows=[];for(let r=7;r>=0;r--){let row='',e=0;for(let f=0;f<8;f++){const p=arr[r*8+f];if(!p)e++;else{if(e){row+=e;e=0;}row+=p;}}if(e)row+=e;rows.push(row);}
+   const cast=['K','Q','k','q'].filter(c=>st.cast.includes(c)&&(c==='K'?arr[4]==='K'&&arr[7]==='R':c==='Q'?arr[4]==='K'&&arr[0]==='R':c==='k'?arr[60]==='k'&&arr[63]==='r':arr[60]==='k'&&arr[56]==='r')).join('');
+   const fen=`${rows.join('/')} ${st.turn} ${cast||'-'} - 0 1`;
+   try{new E.Pos(fen);}catch(e){return toast('Posición no válida');}
+   close(fen);
+  };
+  draw();
+ });
+}
 // ================= PGN, ESTUDIOS Y PARTIDAS GUARDADAS =================
 const NAGS={1:'!',2:'?',3:'!!',4:'??',5:'!?',6:'?!'};const NAGN={'!':1,'?':2,'!!':3,'??':4,'!?':5,'?!':6};
 const CALC={G:'g',R:'r',Y:'o',B:'b'},CALR={g:'G',r:'R',o:'Y',b:'B'};
@@ -3682,10 +3735,12 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
   // modos
   $$('#mseg button',body).forEach(b=>b.classList.toggle('on',b.dataset.m===mode));
   // capítulos
-  $('#chips',body).innerHTML=st.chapters.map((x,i)=>`<button class="btn sm ${i===ci?'':'ghost'}" data-c="${i}">${esc(x.name)}</button>`).join('')+(mode==='edit'?'<button class="btn sm ghost" id="cadd">➕ Capítulo</button><button class="btn sm ghost" id="cside">⇆ Cambiar bando</button>':'')+`<span class="pill">${chp().orient==='b'?'♚ Juegas con negras':'♔ Juegas con blancas'}</span>`;
+  $('#chips',body).innerHTML=st.chapters.map((x,i)=>`<button class="btn sm ${i===ci?'':'ghost'}" data-c="${i}">${esc(x.name)}</button>`).join('')+(mode==='edit'?'<button class="btn sm ghost" id="cadd">➕ Capítulo</button><button class="btn sm ghost" id="cside">⇆ Cambiar bando</button><button class="btn sm ghost" id="cpos">🧩 Posición</button>':'')+`<span class="pill">${chp().orient==='b'?'♚ Juegas con negras':'♔ Juegas con blancas'}</span><button class="btn sm ghost" id="cfen">📋 Copiar FEN</button>`;
   $$('#chips [data-c]',body).forEach(b=>b.onclick=()=>{ci=+b.dataset.c;pidx=[];board.orient=chp().orient||'w';setMode(mode==='prac'?'prac':mode);});
   if($('#cadd',body))$('#cadd',body).onclick=addChapter;
   if($('#cside',body))$('#cside',body).onclick=()=>{chp().orient=chp().orient==='b'?'w':'b';board.orient=chp().orient;save();draw();};
+  if($('#cpos',body))$('#cpos',body).onclick=async()=>{const f=await boardSetup(chp().fen||START_FEN);if(!f)return;if(chp().root.ch.length&&!(await confirmModal('¿Cambiar la posición?','Se borrarán las jugadas de este capítulo.','Cambiar','Cancelar',true)))return;chp().fen=f;chp().root={c:'',ar:[],ch:[]};pidx=[];save();draw();};
+  if($('#cfen',body))$('#cfen',body).onclick=async()=>{const f=curPos().fen();try{await navigator.clipboard.writeText(f);toast('📋 FEN copiado','ok');}catch(e){await askText('Copia este FEN (Ctrl+C)','',f);}};
   // tablero
   board.hl=[];board.interactive=(mode==='edit')||(mode==='prac'&&!pdone&&!busy&&p.turn===userColor());board.movable=p.turn;board.premoveOK=false;board.legalFn=null;
   board.set(p,{last});drawArrows();board.render();
@@ -3733,9 +3788,10 @@ function viewStudy(m,{id,ch:chIdx,mode:mode0}){
   $('#n0',under).disabled=!pidx.length||mode==='prac';$('#n1',under).disabled=!pidx.length||mode==='prac';$('#n2',under).disabled=!nd.ch.length||mode==='prac';$('#n3',under).disabled=!nd.ch.length||mode==='prac';
  }
  async function addChapter(){
-  const r=await modal({title:'➕ Nuevo capítulo',html:'<p class="muted" style="margin:0 0 8px">¿Desde qué posición empieza?</p>',buttons:[{t:'Cancelar',cls:'ghost',v:null},{t:'Posición actual',cls:'ghost',v:'cur'},{t:'Pegar FEN',cls:'ghost',v:'fen'},{t:'Inicial',v:'ini'}]});
+  const r=await modal({title:'➕ Nuevo capítulo',html:'<p class="muted" style="margin:0 0 8px">¿Desde qué posición empieza?</p>',buttons:[{t:'Cancelar',cls:'ghost',v:null},{t:'Posición actual',cls:'ghost',v:'cur'},{t:'Pegar FEN',cls:'ghost',v:'fen'},{t:'Montar posición',cls:'ghost',v:'set'},{t:'Inicial',v:'ini'}]});
   if(!r)return;let fen=null;
   if(r==='cur')fen=curPos().fen();else if(r==='fen'){const f=await askText('Pega el FEN','rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1','');if(!f)return;try{new E.Pos(f);fen=f;}catch(e){toast('FEN no válido');return;}}
+  else if(r==='set'){fen=await boardSetup(curPos().fen());if(!fen)return;}
   const nm=await askText('Nombre del capítulo','Capítulo '+(st.chapters.length+1),'Capítulo '+(st.chapters.length+1));if(!nm)return;
   st.chapters.push({id:sid(),name:nm,fen,orient:board.orient,root:{c:'',ar:[],ch:[]}});ci=st.chapters.length-1;pidx=[];save();setMode('edit');
  }
@@ -4181,7 +4237,7 @@ function mistTrain(m){
 }
 // ================= AULA: tareas que el profe envía al alumnado (Realtime Database) + panel del profe (fichas, torneos) =================
 function aulaDB(){DB.aula=DB.aula||{};const a=DB.aula;a.pin=a.pin||null;a.tareas=a.tareas||[];a.informes=a.informes||{};a.entregas=a.entregas||[];a.torneos=a.torneos||[];return a;}
-let AULA_OK=false,PROFE=false;
+let AULA_OK=false,PROFE=false,GMMODE=false;
 /* el panel del profe solo se abre desde la app de administración (ajedrez-siurot.html#profe con la sesión del admin) */
 const aulaGo=o=>PROFE?teacherView(document.querySelector('main'),o.sec,o):go('aula',o);
 const nkey=n=>String(n||'').trim().toLowerCase();
@@ -4317,8 +4373,8 @@ async function viewAula(m,arg){
 // ---------- panel del profesor (dentro de la app de administración) ----------
 const SECS=[['tareas','📝','Tareas'],['fichas','🖨️','Fichas']];
 function teacherView(m,sec,arg){
- m.innerHTML=`<div class="sectitle"><h2>🏫 Tareas y fichas</h2></div>
- <div class="chips" style="margin-bottom:14px">${SECS.map(([id,ic,t])=>`<button class="btn sm ${id===sec?'':'ghost'}" data-sec="${id}">${ic} ${t}</button>`).join('')}</div><div id="sec"></div>`;
+ m.innerHTML=`<div class="sectitle"><h2>${GMMODE?'📝 Tareas del Club':'🏫 Tareas y fichas'}</h2></div>
+ <div class="chips" style="margin-bottom:14px;${GMMODE?'display:none':''}">${SECS.map(([id,ic,t])=>`<button class="btn sm ${id===sec?'':'ghost'}" data-sec="${id}">${ic} ${t}</button>`).join('')}</div><div id="sec"></div>`;
  $$('[data-sec]',m).forEach(b=>b.onclick=()=>aulaGo({sec:b.dataset.sec}));
  const box=$('#sec',m);
  ({tareas:secTareas,fichas:secFichas,torneos:secTorneos})[sec](box,arg);
@@ -4369,10 +4425,18 @@ function secTareas(box){
   else if(ty==='lec'){t.mod=$('#fmo',box).value;t.l=$('#fle',box).value;}
   else if(ty==='est'){const [sid_,ci]=($('#fes',box)||{value:''}).value.split('|');const es=(DB.studies||[]).find(x=>x.id===sid_);if(!es)return toast('Elige un estudio');const pl=studyTaskPayload(es,+ci||0);if(!pl.steps.length)return toast('Ese capítulo no tiene jugadas');t.st=pl;}
   else t.n=+$('#fn',box).value;
-  const id=rid()+rid();const btn=$('#tmk',box);btn.disabled=true;
+  let id=rid()+rid();const btn=$('#tmk',box);btn.disabled=true;
   try{
+   if(GMMODE){   // profesorado del Club: cada envío gasta 1 crédito (lo controla el administrador)
+    const me=FB.S.user.uid;const cur=await RT.get('gm/'+me);
+    if(!cur||cur.on!==true){toast('⛔ Tu acceso está desactivado','bad');btn.disabled=false;return;}
+    if((cur.u||0)>=(cur.q||0)){toast('🎟️ No te quedan créditos. Pídeselos a Manuel.','bad');btn.disabled=false;return;}
+    const nu=(cur.u||0)+1;await RT.put('gm/'+me+'/u',nu);id='g'+me+'_'+nu;
+    if(parentA()){const pa=parentA();pa.gmq=Object.assign(pa.gmq||{},cur,{u:nu});}
+   }
    const up={},ib={};ids.forEach((u,i)=>{up[u+'/'+id]=t;ib[u+'/t'+now.toString(36)+i]={k:'tarea',from:FB.S.user.uid,t:{'.sv':'timestamp'}};});
    await RT.patch('tareas',up);
+   if(GMMODE)RT.patch('gm/'+FB.S.user.uid+'/log',{[id]:{ti:t.ti,c:now,dl:t.dl,ids}}).catch(()=>{});
    try{await RT.patch('inbox',ib);}catch(e){}   // el aviso en directo (si falla, la tarea les sale al abrir la app)
    toast(`📨 Tarea enviada a ${ids.length} alumno${ids.length===1?'':'s'}`,'ok');$('#tti',box).value='';loadRes();
   }catch(e){toast('❌ No se pudo enviar: '+(FB.msg?FB.msg(e):e.message),'bad');}
@@ -4381,10 +4445,16 @@ function secTareas(box){
  const nameOf=uid=>{const u=users.find(x=>x.id===uid);return u?u.nombre:'(alumno eliminado)';};
  async function loadRes(){
   const el=$('#tres',box);el.innerHTML='<p class="muted">Cargando…</p>';
-  let all;try{all=await RT.get('tareas')||{};}catch(e){el.innerHTML='<p class="err">No se pudieron leer las tareas.</p>';return;}
+  let all;try{
+   if(GMMODE){   // solo las tareas que ha enviado este profe (últimas 8)
+    const me=FB.S.user.uid;const lg=await RT.get('gm/'+me+'/log')||{};all={};
+    const tids=Object.entries(lg).sort((a,b)=>(b[1].c||0)-(a[1].c||0)).slice(0,8);
+    for(const [tid,x] of tids)for(const u of (x.ids||[])){const v=await RT.get('tareas/'+u+'/'+tid).catch(()=>null);if(v){(all[u]=all[u]||{})[tid]=v;}}
+   }else all=await RT.get('tareas')||{};
+  }catch(e){el.innerHTML='<p class="err">No se pudieron leer las tareas.</p>';return;}
   const by={};const old=Date.now()-60*864e5,gc={};
   for(const [uid,ts] of Object.entries(all))for(const [tid,t] of Object.entries(ts||{})){if(!t||!t.ti)continue;if((t.c||0)<old){gc[uid+'/'+tid]=null;continue;}(by[tid]=by[tid]||{t,rows:[]}).rows.push({uid,r:t.r});}
-  if(Object.keys(gc).length)RT.patch('tareas',gc).catch(()=>{});   // limpieza: se borran solas a los 60 días
+  if(Object.keys(gc).length&&!GMMODE)RT.patch('tareas',gc).catch(()=>{});   // limpieza: se borran solas a los 60 días
   const list=Object.entries(by).sort((a,b)=>(b[1].t.c||0)-(a[1].t.c||0));
   if(!list.length){el.innerHTML='<p class="muted" style="margin:0">Aún no has enviado tareas.</p>';return;}
   const now=Date.now();
@@ -4731,7 +4801,15 @@ function avisoHTML(cfg,st){cfg=cfg||{};let list=Array.isArray(cfg.avisos)?cfg.av
  return list.map(a=>{const u=avisoURL(a.url);return u?`<a class="card avlink" href="${esc(u)}" target="_blank" rel="noopener" style="${css};text-decoration:none;color:inherit">📣 <b style="flex:1">${esc(a.texto)}</b><span class="pill" style="background:#f2b134;color:#2c1d00;white-space:nowrap">🔗 Abrir</span></a>`:`<div class="card" style="${css}">📣 <b>${esc(a.texto)}</b></div>`;}).join('');}
 function pubBuild(d){d=d||{};const ts=Object.entries(d.t||{}).filter(([id,t])=>t&&typeof t==='object').map(([id,t])=>({...t,id}));
  const hof=(Array.isArray(d.hof)?d.hof:Object.values(d.hof||{})).filter(Boolean).filter(h=>!isAdmG(h.grupo)).sort((a,b)=>(b.puntos||0)-(a.puntos||0)).slice(0,10);
- return{torneos:ts.sort((a,b)=>(a.inicio||0)-(b.inicio||0)),hof,cfg:d.cfg||{},ins:d.ins||{},pub:true};}
+ return{torneos:ts.filter(t=>!t.club||ONL.club===true).sort((a,b)=>(a.inicio||0)-(b.inicio||0)),hof,cfg:d.cfg||{},ins:d.ins||{},pub:true};}
+/* Club: quien está en el Club (lo marca el profe) ve además los torneos y el salón de la fama del Club */
+async function clubLoad(force){if(typeof onlLogged!=='function'||!onlLogged()||ONL.acc.guest){ONL.club=false;return false;}
+ if(!force&&ONL.clubT&&Date.now()-ONL.clubT<600000)return ONL.club===true;ONL.clubT=Date.now();
+ try{const v=await RT.get('club/'+myUid());const c=!!v;if(c!==(ONL.club===true)){ONL.club=c;PUB.lc=0;window.dispatchEvent(new Event('onlpub'));}ONL.club=c;}catch(e){}return ONL.club===true;}
+async function clubHofCard(box,tok){try{const h=await RT.get('clubhof')||{};if(!alive(tok)||!box.isConnected)return;const me=ONL.acc;
+ const l=Object.entries(h).filter(([i,x])=>x&&x.n).map(([id,x])=>({id,...x})).sort((a,b)=>(b.p||0)-(a.p||0)).slice(0,10);
+ box.innerHTML=`<div class="card"><h3>🏅 Salón de la fama del Club · Top 10</h3>${l.length?`<table style="width:100%;border-collapse:collapse">${l.map((x,i)=>`<tr class="tapr" data-pc="${x.id}" data-pn="${esc(x.n)}" data-pg="${esc(x.g||'')}" style="${me&&x.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(x.n)}</td><td class="muted">${esc(x.g||'')}</td><td style="text-align:right;padding-right:6px"><b>${x.p||0}</b> pts</td></tr>`).join('')}</table>`:'<p class="muted" style="margin:0">Aún no hay campeones del Club.</p>'}</div>`;
+ $$('[data-pc]',box).forEach(b=>b.onclick=()=>{if(typeof playerCard==='function')playerCard({id:b.dataset.pc,n:b.dataset.pn,g:b.dataset.pg});});}catch(e){}}
 async function onlPublic(force){
  if(PUB.d&&PUB.d.seed)return pubBuild(PUB.d);
  if(!force&&ONL.cache&&Date.now()-ONL.cacheT<25000)return ONL.cache;
@@ -4792,11 +4870,11 @@ async function homeOnline(m,tok){const box=$('#tcard',m);if(!box)return;
  try{const d=await onlPublic();if(!alive(tok)||!box.isConnected)return;const now=RT.srv();
   const av=avisoHTML(d.cfg,'margin-bottom:12px');
   const ts=d.torneos.map(t=>({t,e:tEff(t,now)})).filter(({t,e})=>e!=='terminado'||now-tFin(t)<3*3600e3);
-  const tc=ts.map(({t,e})=>`<div class="card tcard ${e}" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:12px;border:2px solid ${e==='activo'?'#27ae60':e==='terminado'?'#b8b8b8':'#f2b134'}"><div style="font-size:2rem">${e==='terminado'?'🏁':'🏟️'}</div><div style="flex:1"><h3 style="margin:0">${esc(t.nombre)}</h3><div class="muted" style="font-weight:700">${e==='espera'?tPill(e)+' · '+onlFecha(t.inicio):tPill(e)} · ${esc(t.ritmo||'3+0')}</div></div><button class="btn ${e==='terminado'?'ghost':'acc'}">${e==='activo'?'Entrar':e==='terminado'?'Resultados':'Ver'}</button></div>`).join('');
+  const tc=ts.map(({t,e})=>`<div class="card tcard ${e}" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:12px;border:2px solid ${e==='activo'?'#27ae60':e==='terminado'?'#b8b8b8':'#f2b134'}"><div style="font-size:2rem">${e==='terminado'?'🏁':'🏟️'}</div><div style="flex:1"><h3 style="margin:0">${t.club?'🏅 ':''}${esc(t.nombre)}</h3><div class="muted" style="font-weight:700">${e==='espera'?tPill(e)+' · '+onlFecha(t.inicio):tPill(e)} · ${esc(t.ritmo||'3+0')}</div></div><button class="btn ${e==='terminado'?'ghost':'acc'}">${e==='activo'?'Entrar':e==='terminado'?'Resultados':'Ver'}</button></div>`).join('');
   box.innerHTML=av+tc;$$('.tcard',box).forEach((b,i)=>b.onclick=()=>{const {t,e}=ts[i];if(e==='terminado')return go('arena',{tid:t.id,ver:1});e==='activo'&&onlLogged()?go('arena',{tid:t.id}):go('torneos');});}catch(e){}}
 /* pantalla Torneos */
 const tSig=d=>{const now=RT.srv();return(d&&d.torneos||[]).map(t=>t.id+':'+tEff(t,now)).join('|');};
-function viewTorneos(m){const tok=VIEW;let timer=null,paused=false,sig='',n5=0;PUB.lc=Date.now();pubCheck();   // al abrir, se comprueba si hay cambios
+function viewTorneos(m){const tok=VIEW;let timer=null,paused=false,sig='',n5=0;PUB.lc=Date.now();pubCheck();clubLoad();   // al abrir, se comprueba si hay cambios
  const onP=()=>{if(!alive(tok))return window.removeEventListener('onlpub',onP);if(!paused&&!$('.modalbg')&&!$('.pcard'))draw();};window.addEventListener('onlpub',onP);
  const draw=async(force)=>{if(!alive(tok))return clearInterval(timer);
   let d=null,err=false;try{d=await onlPublic(force);}catch(e){err=true;}if(!alive(tok))return;
@@ -4812,13 +4890,14 @@ function viewTorneos(m){const tok=VIEW;let timer=null,paused=false,sig='',n5=0;P
     return'<div><p class="muted" style="margin:0 0 8px">Como invitado no puedes entrar al torneo.</p><button class="btn acc" data-ask="'+t.id+'">🙋 Pedir unirme</button> <button class="btn ghost" data-tv="'+t.id+'">📺 Ver partidas</button></div>';}
    if(!me)return'';
    return mine?`<div class="btnrow" style="align-items:center"><span class="pill" style="background:#d9f5e3;color:#14703a">✔️ Estás apuntado</span><button class="btn ghost sm" data-un="${t.id}">✖ Desapuntarme</button></div>`:`<button class="btn acc" data-j="${t.id}">Apuntarme</button>`;};
-  const tn=rows.map(r=>{const {t,e,js}=r;return`<div class="card" style="${e==='terminado'?'opacity:.92':''}"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">${e==='terminado'?'🏁':'🏟️'} ${esc(t.nombre)}</h3><span class="pill">${e==='activo'?'🟢 Activo':e==='terminado'?'🏁 Terminado':'⏳ En espera'}</span></div><div class="muted" style="font-weight:700;margin:4px 0 10px">${info(t)}</div>
+  const tn=rows.map(r=>{const {t,e,js}=r;return`<div class="card" style="${e==='terminado'?'opacity:.92':''}"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;flex:1">${e==='terminado'?'🏁':'🏟️'} ${t.club?'🏅 ':''}${esc(t.nombre)}</h3><span class="pill">${e==='activo'?'🟢 Activo':e==='terminado'?'🏁 Terminado':'⏳ En espera'}</span></div><div class="muted" style="font-weight:700;margin:4px 0 10px">${info(t)}</div>
    ${acts(r)}
    ${me&&js.length&&e==='espera'?`<div class="muted" style="font-weight:800;margin:12px 0 4px">${js.length} apuntado${js.length>1?'s':''}</div><div class="plwrap">${js.sort((a,b)=>String(a.n).localeCompare(String(b.n),'es')).map(j=>`<button class="chipp ${j.id===me.uid?'me':''}" data-pc="${j.id}" data-pn="${esc(j.n)}" data-pg="${esc(j.g||'')}">${esc(j.n)}</button>`).join('')}</div>`:''}</div>`;}).join('')||`<div class="card"><p class="muted" style="margin:0">Ahora mismo no hay torneos programados. ¡Vuelve pronto!</p></div>`;
   const hof=`<div class="card"><h3>🏆 Salón de la fama · Top 10</h3>${d.hof.length?`<table style="width:100%;border-collapse:collapse">${d.hof.map((h,i)=>`<tr class="${me&&h.id?'tapr':''}" ${me&&h.id?`data-pc="${h.id}" data-pn="${esc(h.nombre)}" data-pg="${esc(h.grupo||'')}"`:''} style="${me&&h.id===me.uid?'background:#e8f6ee;font-weight:800':''}"><td style="padding:4px 6px">${['🥇','🥈','🥉'][i]||i+1}</td><td>${esc(h.nombre)}</td><td class="muted">${esc(h.grupo||'')}</td><td style="text-align:right;padding-right:6px"><b>${h.puntos||0}</b> pts</td></tr>`).join('')}</table>`:'<p class="muted" style="margin:0">Aún no hay campeones: ¡puedes ser el primero!</p>'}</div>`;
-  m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2><button class="btn ghost sm" id="rf">↻ Actualizar</button></div>${avisoHTML(d.cfg)}${acc}${tn}${me&&!me.guest?'<div id="thist"></div>':''}${hof}`;
+  m.innerHTML=`<div class="sectitle"><h2>🏟️ Torneos</h2><button class="btn ghost sm" id="rf">↻ Actualizar</button></div>${avisoHTML(d.cfg)}${acc}${tn}${me&&!me.guest?'<div id="thist"></div>':''}${hof}${me&&ONL.club===true?'<div id="chof"></div>':''}`;
   $('#rf',m).onclick=()=>draw(true);
   if($('#thist',m)&&typeof tHistCard==='function')tHistCard($('#thist',m),tok);
+  if($('#chof',m))clubHofCard($('#chof',m),tok);
   if($('#li',m))$('#li',m).onclick=async()=>{if(await onlLogin())draw(true);};
   $$('[data-ask]',m).forEach(b=>b.onclick=()=>{clearInterval(timer);paused=true;guestUI(b.closest('.card'),{tid:b.dataset.ask,onBack:()=>{paused=false;draw(true);timer=setInterval(()=>{if(!document.hidden&&!$('.modalbg'))draw();},30000);},onGranted:T=>arenaJoinGuest(T)});});
   $$('[data-ar]',m).forEach(b=>b.onclick=()=>go('arena',{tid:b.dataset.ar}));
@@ -4952,7 +5031,7 @@ function inboxCtl(){if(!onlLogged()||ONL.acc.guest||!ON.pres){if(ON.ibw){ON.ibw.
  if(!want&&!document.hidden&&Date.now()-(ON.ibLast||0)>15000){ON.ibLast=Date.now();inboxTick();}}
 async function inboxHandle(m){if(!m||typeof m!=='object')return;ON.ibSeen=ON.ibSeen||new Set();
  for(const id of Object.keys(m)){const x=m[id];if(ON.ibSeen.has(id))continue;ON.ibSeen.add(id);RT.del(`inbox/${myUid()}/${id}`).catch(()=>{});if(x&&typeof x==='object')await onMsg(x);}}
-function onlStart(){if(!onlLogged()||ON.pres||ONL.acc.guest)return;presTick();ON.pres=setInterval(presTick,20000);ON.inb=setInterval(inboxCtl,1000);muteLoad().then(()=>presTick());setTimeout(perfilSync,4000);ON.pfT=setInterval(perfilSync,120000);setTimeout(()=>tkSync(),2500);ON.tkT=setInterval(()=>{if(!document.hidden)tkSync();},300000);}
+function onlStart(){if(!onlLogged()||ON.pres||ONL.acc.guest)return;clubLoad(true);presTick();ON.pres=setInterval(presTick,20000);ON.inb=setInterval(inboxCtl,1000);muteLoad().then(()=>presTick());setTimeout(perfilSync,4000);ON.pfT=setInterval(perfilSync,120000);setTimeout(()=>tkSync(),2500);ON.tkT=setInterval(()=>{if(!document.hidden)tkSync();},300000);}
 function onlStop(){arenaLeave(true);clearInterval(ON.pres);clearInterval(ON.inb);clearInterval(ON.pfT);clearInterval(ON.tkT);TK.d=null;ON.pres=ON.inb=null;if(ON.ibw){ON.ibw.close();ON.ibw=null;}ON.mutes=null;ON.fr=null;if(ON.search)ON.search.stop();}
 async function inboxTick(){if(document.hidden||!onlLogged()||ON.busy)return;ON.busy=true;
  try{const m=await RT.get('inbox/'+myUid());await inboxHandle(m);}catch(e){}
