@@ -4537,7 +4537,8 @@ function cmCardHTML(){if(!P)return'';const S=cmState();
  if(S.complete)return `<div class="cmcard done"><div class="cmce">🎓</div><div class="cmct"><b>¡Has completado el camino!</b><span>Eres un ajedrecista de verdad. Sigue entrenando en la liga y los torneos.</span></div><button class="btn" data-cm="map">🗺️ Ver</button></div>`;
  const w=S.cur.w,tot=w.st.length,dn=S.wDone[S.cur.wi];
  return `<div class="cmcard" style="--cmbg:${w.bg};--cmink:${w.ink}"><div class="cmce">${w.e}</div><div class="cmct"><span class="cmsm">Mundo ${S.cur.wi+1} · ${esc(w.n)}</span><b>${cmIcon(S.cur.s)} ${esc(cmTitle(S.cur.s))}</b><div class="cmbar"><i style="width:${Math.round(dn/tot*100)}%"></i></div></div><div class="cmbtns"><button class="btn acc" data-cm="go">▶ Continuar</button><button class="btn sm ghost" data-cm="map">🗺️ Mapa</button></div></div>`;}
-function cmCardWire(el){if(!el)return;el.innerHTML=cmCardHTML();$$('[data-cm]',el).forEach(b=>b.onclick=()=>b.dataset.cm==='go'?cmGo(cmState().cur):go('camino'));}
+function cmCardWire(el){if(!el)return;if(P&&cmState().complete){el.innerHTML='';return;}   // camino terminado: ya no sale en Inicio (sigue en el menú lateral)
+ el.innerHTML=cmCardHTML();$$('[data-cm]',el).forEach(b=>b.onclick=()=>b.dataset.cm==='go'?cmGo(cmState().cur):go('camino'));}
 /* ---------- el mapa ---------- */
 const CM_ZZ=[0,52,86,52,0,-52,-86,-52];
 function viewCamino(m){
@@ -5199,7 +5200,7 @@ async function viewOnGame(m,{gid}){
  document.addEventListener('visibilitychange',onVis);
  const ar=G.ar||null;if(ar&&!ON.arena)arenaEnsure(ar).catch(()=>{});
  const {board,body,under}=trainerShell(m,ar?'🏟️ Arena':'🌐 Partida online',async()=>{if(!over&&!corr&&!(await confirmModal('¿Salir de la sala?','La partida sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir')))return;leave();go('online');});
- body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b class="tapn" id="oppn" title="Ver su perfil">${esc(oppN)}</b><div class="muted" style="font-size:.85rem">${oppE?'ELO '+oppE+' · ':''}${corr?'📨 A distancia (sin reloj): juega cuando quieras':'⏱️ '+tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div>${G.f0?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div></div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
+ body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b class="tapn" id="oppn" title="Ver su perfil">${esc(oppN)}</b><div class="muted" style="font-size:.85rem">${oppE?'ELO '+oppE+' · ':''}${corr?'📨 A distancia (sin reloj): juega cuando quieras':'⏱️ '+tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div>${G.f0?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div>${ar?'<div id="arleft" class="pill" style="margin-top:6px;font-weight:900"></div>':''}</div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
  under.innerHTML=`${ar&&G.fu?'<button class="btn sm" id="fury" style="background:#e8590c;color:#fff;font-weight:900" title="Antes de tu primer movimiento: tu tiempo se divide a la mitad y, si ganas, +1 punto">🔥 Modo furia</button>':''}<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="tkb" title="Pedir al rival deshacer tu última jugada">↩️ Deshacer</button><button class="btn ghost sm" id="drw">🤝 Pedir tablas</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
  const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
  $('#oppn',body).onclick=()=>playerCard({id:color==='w'?G.b:G.w,n:oppN});
@@ -5209,7 +5210,8 @@ async function viewOnGame(m,{gid}){
  const plies=()=>pos.played.length;const ownMoves=()=>Math.floor((plies()+(color==='w'?1:0))/2);const furyOn=c=>!!(G.fury&&G.fury[c]);const arFinF=()=>G.af||0;
  const remain=c=>{if(corr)return 864e5;const base=(G.clk&&G.clk[c])||0;const tick=!over&&G.st!=='end'&&plies()>=2&&pos.turn===c;return base-(tick?Math.max(0,RT.srv()-(G.ts||0)):0);};
  const names={w:G.wn,b:G.bn},elos={w:G.we,b:G.be};
- function paint(){const topC=board.orient==='w'?'b':'w',botC=topC==='w'?'b':'w';
+ function paint(){const al=ar&&$('#arleft',body);if(al){const f=arFinF()||(ON.arena&&ON.arena.T&&ON.arena.tid===ar?tFin(ON.arena.T):0);al.textContent=f?'🏟️ Torneo: '+(f-RT.srv()>0?'quedan '+fmtT(f-RT.srv()):'¡tiempo terminado!'):'🏟️ Torneo por rondas';}
+  const topC=board.orient==='w'?'b':'w',botC=topC==='w'?'b':'w';
   [[sTop,topC],[sBot,botC]].forEach(([el,c])=>{const r=remain(c);el.innerHTML=`<span class="pn">${c===color?esc(P.avatar+' '+names[c]):'🧑‍🎓 '+esc(names[c])} <span class="muted">${elos[c]?'('+elos[c]+')':''}</span>${furyOn(c)?' 🔥':''}</span><span class="cp"></span><span class="clk ${r<15000?'low':''} ${!over&&(plies()>=2||corr)&&pos.turn===c?'on':''}">${corr?(pos.turn===c&&!over?'Le toca':'—'):fmtT(r)}</span>`;});}
  function panel(){let h='';for(let i=0;i<sans.length;i+=2)h+=`<span class="n">${i/2+1}.</span><span class="${i===sans.length-1?'cur':''}">${E.sanES(sans[i])}</span><span class="${i+1===sans.length-1?'cur':''}">${sans[i+1]?E.sanES(sans[i+1]):''}</span>`;
   const ml=$('#ml',body);ml.innerHTML=h||'<span class="muted" style="grid-column:1/-1">¡Empieza la partida! Juegan blancas.</span>';ml.scrollTop=ml.scrollHeight;
@@ -5598,6 +5600,10 @@ const LIGA={d:null,t:0};
 async function ligaLoad(force){if(!force&&LIGA.d&&Date.now()-LIGA.t<60000)return LIGA.d;try{LIGA.d=await RT.get('liga')||{};LIGA.t=Date.now();}catch(e){LIGA.d=LIGA.d||{};}return LIGA.d;}
 function ligaRank(d,g,prev,md){const w=prev?wkPrev():wkId();const out=[];
  for(const [id,x] of Object.entries(d||{})){if(!x||typeof x!=='object')continue;if(g&&x.g!==g)continue;if(isAdmG(x.g)||gmG(x.g))continue;let pts;if(md==='tot')pts=+x.t||0;else if(md==='elo')pts=(+x.e&&+x.e!==800)?+x.e:0;else pts=x.w===w?x.x:(prev&&x.pw===w?x.px:0);if(pts>0)out.push({id,n:x.n,g:x.g,av:x.av,pts});}
+ /* administración y profesorado GM: no publican nada en la liga, pero cada uno se ve a sí mismo (con sus datos locales) */
+ if((meAdm()||meGM())&&P&&(!g||g===(ONL.acc.grupo||''))){const L=wkNow();let pts;
+  if(md==='tot')pts=Math.round(P.xp||0);else if(md==='elo'){const e=Math.round(myElo());pts=e!==800?e:0;}else pts=prev?(L.pw===w?L.px||0:0):(L.w===w?L.x:0);
+  if(pts>0)out.push({id:myUid(),n:ONL.acc.nombre,g:ONL.acc.grupo||'',av:P.avatar||'🧑‍🎓',pts,self:1});}
  return out.sort((a,b)=>b.pts-a.pts||String(a.n).localeCompare(String(b.n),'es'));}
 const ligaLeft=()=>{const d=new Date();const end=new Date(wkId());end.setDate(end.getDate()+7);end.setHours(0,0,0,0);const h=Math.max(0,Math.round((end-d)/36e5));return h>=48?`quedan ${Math.ceil(h/24)} días`:h>=1?`quedan ${h} h`:'termina ya';};
 async function ligaCard(el){if(!el)return;
