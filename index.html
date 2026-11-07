@@ -1888,14 +1888,24 @@ const CAT_RATING={mate1:700,mate2:1000,tactica:900};
 const RT_CATS={bala:'⚡ Bala',blitz:'🔥 Blitz',rapida:'⏱️ Rápidas',problemas:'🧩 Problemas'};
 const tcCat=tc=>{if(!tc)return'rapida';const o=typeof tc==='string'?(([m,i])=>({m:+m||0,i:+i||0}))(tc.split('+')):tc;const s=(o.m||0)*60+40*(o.i||0);return s<180?'bala':s<600?'blitz':'rapida';};
 function catUpdate(cat,opp,score,K){P.rt=P.rt||{};const c=P.rt[cat]=P.rt[cat]||{r:800,n:0,max:800};const k=K*(c.n<20?1.5:1),exp=1/(1+Math.pow(10,(opp-c.r)/400));c.r=Math.max(100,c.r+Math.round(k*(score-exp)));c.n++;c.max=Math.max(c.max,c.r);return c.r;}
+const PZ_SRC=['ej','reto','rush'];
+function eloFixPuzzles(){try{if(!P||!P.eloBy)return false;const by=P.eloBy;const pd=PZ_SRC.reduce((a,k)=>a+((by[k]&&by[k].d)||0),0);
+ if(!PZ_SRC.some(k=>by[k]))return false;PZ_SRC.forEach(k=>delete by[k]);
+ if(pd){const ne=Math.max(100,Math.round((P.elo||800)-pd));P.elo=ne;P.eloMax=ne;P.eloHist=[ne];}save();return true;}catch(e){return false;}}
+/* el profe puede fijar el ELO de un alumno desde la app de administración (prog/{uid}/rst) */
+function eloRstApply(r){try{if(!r||!r.t||!P||r.t<=(P.eloRst||0))return;
+ const e=Math.max(100,Math.min(3000,Math.round(+r.e||800)));P.eloRst=r.t;P.elo=e;P.eloMax=e;P.eloHist=[e];save();try{renderHeader();}catch(x){}toast('♟ Tu ELO ha sido ajustado por el profe: '+e);}catch(e){}}
 function eloUpdate(opp,score,K,src,cat){
- try{const cc=cat||({ej:'problemas',reto:'problemas',rush:'problemas'})[src];if(cc)catUpdate(cc,opp,score,K);}catch(e){}
+ /* ejercicios, retos y contrarreloj: solo mueven la puntuación de PROBLEMAS (🧩). El ELO solo cambia jugando partidas */
+ if(PZ_SRC.includes(src)&&!cat){try{P.rt=P.rt||{};const o=(P.rt.problemas&&P.rt.problemas.r)||800;const n=catUpdate('problemas',opp,score,K);save();renderHeader();return n-o;}catch(e){return 0;}}
+ try{if(cat)catUpdate(cat,opp,score,K);}catch(e){}
  P.elo=P.elo||800;P.eloHist=P.eloHist||[P.elo];P.eloBy=P.eloBy||{};const old=P.elo;P.eloN=(P.eloN||0)+1;
  const k=K*(P.eloN<30?1.5:1),exp=1/(1+Math.pow(10,(opp-old)/400));
  P.elo=Math.max(100,old+Math.round(k*(score-exp)));const d=P.elo-old;
  P.eloHist.push(P.elo);if(P.eloHist.length>80)P.eloHist.shift();P.eloMax=Math.max(P.eloMax||0,P.elo);
  const b=P.eloBy[src]=P.eloBy[src]||{n:0,d:0};b.n++;b.d+=d;save();renderHeader();return d;
 }
+const pzTag=d=>d?`<span class="eloTag ${d>0?'up':'dn'}">${d>0?'▲ +':'▼ '}${d} 🧩</span>`:'<span class="eloTag">= 🧩</span>';   // puntuación de problemas
 const eloTag=d=>d?`<span class="eloTag ${d>0?'up':'dn'}">${d>0?'▲ +':'▼ '}${d} ELO</span>`:'<span class="eloTag">= ELO</span>';
 const puzScore=(mistakes,help)=>help>=2||mistakes>0?0:help===1?.5:1;
 const lessonKey=(m,l)=>m+'/'+l;
@@ -2138,7 +2148,7 @@ function renderHeader(){
  $('#avbtn').onclick=()=>go('progreso');$('#setbtn').onclick=()=>showSettings();$('#mutebtn').onclick=toggleMute;
  $('#h-rank').onclick=()=>toast(`${r.icono} <b>Rango: ${r.nombre}</b><br>Tu título de ajedrecista. Sube al ganar XP${nx?` (faltan ${nx.xp-P.xp} XP para ${nx.nombre})`:''}.`,'',4200);
  $('#h-xp').onclick=()=>toast(`⭐ <b>XP: ${P.xp}</b><br>Puntos de experiencia. Los ganas con lecciones, ejercicios, retos y partidas.`,'',4200);
- $('#h-elo').onclick=()=>toast(`♟ <b>ELO ${P.elo||800} · ${eloLevel(P.elo||800)}</b><br>Mide tu nivel de juego. Sube si aciertas ejercicios difíciles y ganas partidas; baja si fallas o pierdes.`,'',4800);
+ $('#h-elo').onclick=()=>toast(`♟ <b>ELO ${P.elo||800} · ${eloLevel(P.elo||800)}</b><br>Mide tu nivel de juego. Solo cambia jugando partidas (online o contra la máquina): sube si ganas y baja si pierdes. Los ejercicios suben tu puntuación de 🧩 problemas.`,'',4800);
  $('#h-streak').onclick=()=>toast(`🔥 <b>${P.days.streak||0} día(s) seguidos</b><br>Días seguidos que has entrado a practicar.`,'',4200);
  $('#mutebtn').title=$('#mutebtn').title;fitHeader();
 }
@@ -2541,7 +2551,7 @@ function viewTema(m,arg){
  const upd=()=>{$('#ok',body).textContent=st.ok;$('#ra',body).textContent=st.racha;$('#be',body).textContent=st.best;$('#lvl',nav).textContent='Nivel '+lvl();$('#rec',nav).textContent='🏆 Récord: nivel '+tr.lvl;};
  const penalize=()=>{if(penal)return;penal=true;if(lvl()>1){P.tnivel[id]=lvl()-1;save();upd();}};
  const breakStreak=()=>{if(st.racha){st.racha=0;save();upd();}};
- const rate=(sc)=>{if(rated||!pz)return '';rated=true;return ' '+eloTag(eloUpdate(pzRating(pz.level||lvl()),sc,16,'ej'));};
+ const rate=(sc)=>{if(rated||!pz)return '';rated=true;return ' '+pzTag(eloUpdate(pzRating(pz.level||lvl()),sc,16,'ej'));};
  function start(keep){
   solved=false;if(!keep){failed=false;rated=false;penal=false;}setFb('');const p=new E.Pos(pz.fen);upd();
   $('#top',body).innerHTML=turnHTML(p.turn)+(id==='mezcla'?`<span class="pill">${THEME_OF(pz.theme).icono} ¿Qué tema será?</span>`:'');
@@ -2610,7 +2620,7 @@ function viewDaily(m,opts){
   if(!pz){cur[i]=1;$('#nx',nav).disabled=false;return;}
   const T=THEME_OF(pz.theme);const p=new E.Pos(pz.fen);
   $('#top',body).innerHTML=turnHTML(p.turn)+`<span class="pill">${i+1}/5 · ${T.icono} ${T.nombre}</span><span class="pill">Nivel ${pz.level||RETO_NIVEL[i]}/8</span>`;$('#goal',body).innerHTML=goalText(pz);
-  const rate=sc=>{if(rated||practice)return '';rated=true;return ' '+eloTag(eloUpdate(pzRating(pz.level||RETO_NIVEL[i]),sc,18,'reto'));};
+  const rate=sc=>{if(rated||practice)return '';rated=true;return ' '+pzTag(eloUpdate(pzRating(pz.level||RETO_NIVEL[i]),sc,18,'reto'));};
   runner=runPuzzle(board,{fen:pz.fen,goal:pz.goal,n:pz.n,accept:pz.accept,follow:pz.follow,fp:pz.fp},{
    onSolved:(mk,help)=>{const first=!failedFirst&&!shown&&!help;cur[i]=first?1:0;sound('ok');dots();
     const tag=rate(first?1:0);
@@ -2621,7 +2631,7 @@ function viewDaily(m,opts){
    msg:setFb},tok);
   under.innerHTML='';
  }
- $('#sol',nav).onclick=()=>{if(!runner||runner.done)return;shown=true;cur[i]=0;dots();runner.solution();const tag=(()=>{const pz=list[i];if(rated||practice)return '';rated=true;return ' '+eloTag(eloUpdate(pzRating(pz.level||RETO_NIVEL[i]),0,18,'reto'));})();setFb('👀 Mira la flecha naranja. Puedes jugarla para continuar; este ejercicio cuenta como fallo.'+tag,'info');$('#nx',nav).disabled=false;};
+ $('#sol',nav).onclick=()=>{if(!runner||runner.done)return;shown=true;cur[i]=0;dots();runner.solution();const tag=(()=>{const pz=list[i];if(rated||practice)return '';rated=true;return ' '+pzTag(eloUpdate(pzRating(pz.level||RETO_NIVEL[i]),0,18,'reto'));})();setFb('👀 Mira la flecha naranja. Puedes jugarla para continuar; este ejercicio cuenta como fallo.'+tag,'info');$('#nx',nav).disabled=false;};
  $('#nx',nav).onclick=go2;
  function finish(){
   clearInterval(clock);const ok=cur.filter(x=>x===1).length;const secs=Math.round((Date.now()-t0)/1000);
@@ -2650,7 +2660,7 @@ function viewPuzzle(m,{cat,id}){
  $('#next',nav).onclick=()=>i<list.length-1?go('puzzle',{cat,id:list[i+1].id}):go('ejercicios');
  $$('.chip',body).forEach(b=>b.onclick=()=>go('puzzle',{cat,id:list[+b.dataset.k].id}));
  let runner;
- let rated=false;const rate=sc=>{if(rated)return '';rated=true;return ' '+eloTag(eloUpdate(CAT_RATING[cat],sc,16,'ej'));};
+ let rated=false;const rate=sc=>{if(rated)return '';rated=true;return ' '+pzTag(eloUpdate(CAT_RATING[cat],sc,16,'ej'));};
  const start=()=>{setFb('');runner=runPuzzle(board,{fen:pz.fen,goal:cat==='tactica'?'move':'mate',n:cat==='mate2'?2:1,accept:pz.key,follow:cat==='tactica'},{
   onSolved:(mk,help)=>solvedPuzzle(pz,cat,mk,help,setFb,board,runner,tok,rate(puzScore(mk,help))),
   onWrong:san=>{P.noFail=0;save();const tag=rate(0);setFb(`❌ ${E.sanES(san)} no funciona. ¡Inténtalo otra vez!${tag}`,'bad');},
@@ -2964,7 +2974,7 @@ function eloCard(){
   <div style="flex:1;min-width:240px"><svg viewBox="0 0 300 62" preserveAspectRatio="none" style="width:100%;height:80px;background:#fff;border:2px solid var(--line);border-radius:12px"><polyline points="${pts}" fill="none" stroke="var(--pri)" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round" transform="translate(0,3)"/></svg>
   <div class="btnrow" style="margin-top:8px;gap:6px">${Object.keys(nm).map(k=>{const b=by[k]||{n:0,d:0};return `<span class="pill">${nm[k]}: ${b.d>0?'+':''}${b.d}</span>`;}).join('')}</div></div></div>
   <div class="btnrow" style="margin-top:12px;gap:8px">${Object.entries(RT_CATS).map(([k,t])=>{const c=(P.rt||{})[k];return `<span class="pill" style="font-size:.95rem;padding:6px 12px" title="${c?c.n+' partidas · máximo '+c.max:'Aún sin datos'}">${t}: <b>${c?c.r:'—'}</b>${c?` <small class="muted">(${c.n})</small>`:''}</span>`;}).join('')}</div>
-  <p class="muted" style="font-size:.82rem;font-weight:700;margin:10px 0 0">Cada ritmo tiene su propia puntuación (bala: menos de 3 min · blitz: de 3 a 9 min · rápidas: 10 min o más, o sin reloj). La de problemas sube y baja con tus aciertos en ejercicios, retos y contrarreloj. El ELO sube cuando resuelves ejercicios difíciles a la primera y ganas partidas; baja si fallas o pierdes. Empiezas en 800.</p>`;
+  <p class="muted" style="font-size:.82rem;font-weight:700;margin:10px 0 0">Cada ritmo tiene su propia puntuación (bala: menos de 3 min · blitz: de 3 a 9 min · rápidas: 10 min o más, o sin reloj). La de problemas sube y baja con tus aciertos en ejercicios, retos y contrarreloj. El ELO solo cambia con partidas (online o contra la máquina): sube si ganas y baja si pierdes. Empiezas en 800.</p>`;
 }
 function viewProgress(m){
  const r=rankIdx(P.xp),nx=RANKS[r+1];const wins=Object.values(P.games).reduce((a,g)=>a+g.w,0),played=Object.values(P.games).reduce((a,g)=>a+g.w+g.d+g.l,0);
@@ -3024,7 +3034,7 @@ function newProfileModal(){
  inp.addEventListener('keydown',e=>{if(e.key==='Enter')createBtn.click();});
  pr.then(v=>{if(!v)return;const p=newProfile(inp.value.trim(),av);DB.profiles[p.id]=p;save();selectProfile(p.id);toast(`¡Bienvenido/a, ${esc(p.name)}! ${p.avatar}`);});
 }
-function selectProfile(id){DB.current=id;P=DB.profiles[id];P.elo=P.elo||800;P.eloHist=P.eloHist||[P.elo];P.eloMax=P.eloMax||P.elo;P.eloBy=P.eloBy||{};P.eloN=P.eloN||0;save();checkStreak();ensureDaily();renderHeader();go('inicio');try{if(pgMine())pgPull(true);}catch(e){}}
+function selectProfile(id){DB.current=id;P=DB.profiles[id];eloFixPuzzles();P.elo=P.elo||800;P.eloHist=P.eloHist||[P.elo];P.eloMax=P.eloMax||P.elo;P.eloBy=P.eloBy||{};P.eloN=P.eloN||0;save();checkStreak();ensureDaily();renderHeader();go('inicio');try{if(pgMine())pgPull(true);}catch(e){}}
 function showSettings(){
  const S=DB.settings;const row=(k,t,d)=>`<div class="setrow"><div>${t}${d?`<div class="muted" style="font-size:.8rem;font-weight:700">${d}</div>`:''}</div><button class="switch ${S[k]?'on':''}" data-k="${k}"></button></div>`;
  const pcs=Object.keys(PIECESETS).map(k=>`<button class="psel ${S.pieces===k?'on':''}" data-p="${k}" title="${PIECENAMES[k]}"><span><img src="${pieceURL(k,'wN')}" alt=""><img src="${pieceURL(k,'bQ')}" alt=""></span><small>${PIECENAMES[k]}</small></button>`).join('')+`<button class="psel ${S.pieces==='unicode'?'on':''}" data-p="unicode" title="Texto"><span style="font-size:2rem;line-height:1">♘♛</span><small>Simples</small></button>`;
@@ -3297,14 +3307,15 @@ function viewAnalysis(m,{id}){
  const fail=(t)=>{body.innerHTML=head+`<div class="fb bad">${t}</div><button class="btn" id="bk">Volver</button>`;$('#bk',body).onclick=()=>go('jugar');};
  async function start(){
   if(SF.state==='loading'){for(let k=0;k<40&&SF.state==='loading'&&alive(tok);k++)await sleep(250);}
+  {const p=new E.Pos(g.start||undefined);let k=0;for(const u of g.moves){const mm=p.fromUci(u);if(!mm)break;p.play(mm);k++;}if(k<g.moves.length){g.moves=g.moves.slice(0,k);g.an=null;save();}}   // jugadas que no se pueden reproducir: se analiza hasta ahí
   if(!SF.ok)return fail('Para analizar partidas hace falta <b>Stockfish</b>. Sube la carpeta <b>stockfish</b> junto al archivo HTML y abre la app desde la web (no como archivo suelto).');
   if(!g.an||!g.an.ev||g.an.ev.length!==g.moves.length+1){
    body.innerHTML=head+`<div class="card" style="background:#fffdf8"><b>Stockfish está analizando tu partida…</b><div class="pbar" style="margin:10px 0"><i id="pg" style="width:0%"></i></div><div class="muted" id="pt" style="font-weight:700">Preparando…</div></div>`;
    const r=await analyseGame(g,(i,n)=>{const pg=$('#pg',body);if(pg){pg.style.width=Math.round(i/n*100)+'%';$('#pt',body).textContent=`Jugada ${i} de ${n-1}`;}},()=>alive(tok));
    if(!alive(tok))return;if(!r)return;if(r==='fail')return fail('El análisis se ha interrumpido. Inténtalo de nuevo.');
-   g.an=r;const cl0=classifyGame(g,r);g.an.acc=cl0.acc;save();
+   g.an=r;try{const cl0=classifyGame(g,r);g.an.acc=cl0.acc;}catch(e){}save();
   }
-  show();
+  try{show();}catch(e){console.error(e);g.an=null;save();fail('No se pudo mostrar el análisis. Pulsa Volver e inténtalo otra vez.');}
  }
  function show(){
   const an=g.an,cl=classifyGame(g,an);const n=g.moves.length;
@@ -5561,16 +5572,17 @@ async function pgPull(force){if(!pgMine())return;const now=Date.now();if(!force&
  const uid=myUid(),m=pgMeta();let rev;
  try{rev=await RT.get(`prog/${uid}/rev`);}catch(e){return;}   // sin conexión: se sigue con lo de este dispositivo
  if(!pgMine()||myUid()!==uid)return;
- if(!rev||rev===m.rev){PG.ok=uid;return pgPush();}   // primera vez, o nadie más ha cambiado nada: se suben los cambios de aquí (si los hay)
+ const rst=await RT.get(`prog/${uid}/rst`).catch(()=>null);   // ¿el profe ha ajustado su ELO?
+ if(!rev||rev===m.rev){PG.ok=uid;eloRstApply(rst);return pgPush();}   // primera vez, o nadie más ha cambiado nada: se suben los cambios de aquí (si los hay)
  let d=null;try{const s=await RT.get(`prog/${uid}/p`);d=s?JSON.parse(s):null;}catch(e){return;}
  if(!d||!pgMine()||myUid()!==uid)return;
  PG.ok=uid;const dirty=pgHash(JSON.stringify(pgData()))!==m.h,empty=!m.rev&&!(P.xp>0);
- if(dirty&&!empty){pgApply(pgMerge(pgData(),d));pgSetMeta({rev,h:''});await pgPush();}   // cambios en los dos lados: se juntan y se sube el resultado
- else{pgApply(d);pgSetMeta({rev,h:pgHash(JSON.stringify(pgData()))});}}
+ if(dirty&&!empty){pgApply(pgMerge(pgData(),d));eloRstApply(rst);pgSetMeta({rev,h:''});await pgPush();}   // cambios en los dos lados: se juntan y se sube el resultado
+ else{pgApply(d);pgSetMeta({rev,h:pgHash(JSON.stringify(pgData()))});eloRstApply(rst);}}
 function pgApply(d){const keep={id:P.id,cuenta:P.cuenta,uid:P.uid,cur:P.cur},base=newProfile(d.name||P.name,d.avatar||P.avatar);
  for(const k of Object.keys(P))delete P[k];Object.assign(P,base,d,keep);if(keep.cur===undefined)delete P.cur;if(keep.uid===undefined)delete P.uid;
  if(meAdm()&&(ONL.acc.real||ONL.acc.nombre))P.name=ONL.acc.real||ONL.acc.nombre;
- PG.mute=true;try{try{checkStreak();ensureDaily();}catch(e){}save();}finally{PG.mute=false;}
+ eloFixPuzzles();PG.mute=true;try{try{checkStreak();ensureDaily();}catch(e){}save();}finally{PG.mute=false;}
  try{renderHeader();}catch(e){}
  if(['inicio','camino','progreso','aprender','modulo','ejercicios','retos','liga','partidas'].includes(currentTab)&&!$('.modalbg'))go(currentTab,currentArg);}
 /* fusión (solo si hubo cambios sin subir en este dispositivo y también en la nube): se queda lo mejor de cada lado */
@@ -5622,7 +5634,7 @@ async function ligaCard(el){if(!el)return;
   <p style="margin:4px 0">Esta semana llevas <b>${L.x} XP</b>. ${pc>=0?`Vas <b>${pc+1}º</b> en ${esc(ONL.acc.grupo||'tu clase')} y <b>${pa+1}º</b> en el cole.`:'¡Gana XP para entrar en la clasificación!'}</p><p class="muted" style="margin:0;font-size:.85rem">Se reinicia cada lunes · ${ligaLeft()}</p></div><button class="btn acc" data-lg>Ver clasificación</button></div></div>`;
  $('[data-lg]',el).onclick=()=>go('liga');}
 async function viewLiga(m,arg){arg=arg||{};const tok=VIEW;const sc=arg.sc||'clase',prev=false,md=['sem','tot','elo'].includes(arg.md)?arg.md:'sem',U=md==='elo'?'ELO':'XP';
- const head=`<div class="sectitle"><h2>🏆 Clasificación general</h2>${md==='sem'?`<span class="pill">⏳ ${ligaLeft()}</span>`:''}</div><p class="muted" style="margin:0 0 12px">${{sem:'Cuenta la <b>XP ganada desde el lunes</b> (lecciones, ejercicios, retos, partidas…). Cada lunes empieza una liga nueva.',tot:'La <b>XP total</b> que has ganado desde que empezaste. No se reinicia nunca.',elo:'Tu <b>nivel de juego (ELO)</b>: sube cuando ganas partidas y ejercicios difíciles. Solo salen quienes ya tienen ELO.'}[md]}</p>`;
+ const head=`<div class="sectitle"><h2>🏆 Clasificación general</h2>${md==='sem'?`<span class="pill">⏳ ${ligaLeft()}</span>`:''}</div><p class="muted" style="margin:0 0 12px">${{sem:'Cuenta la <b>XP ganada desde el lunes</b> (lecciones, ejercicios, retos, partidas…). Cada lunes empieza una liga nueva.',tot:'La <b>XP total</b> que has ganado desde que empezaste. No se reinicia nunca.',elo:'Tu <b>nivel de juego (ELO)</b>: sube cuando ganas partidas. Solo salen quienes ya tienen ELO.'}[md]}</p>`;
  if(!onlLogged()||ONL.acc.guest){m.innerHTML=head+`<div class="card"><p style="margin:0 0 10px">Para aparecer en la liga, entra con tu usuario del cole.</p><button class="btn acc" id="lgin">🔑 Iniciar sesión</button></div>`;$('#lgin',m).onclick=()=>go('online');return;}
  m.innerHTML=head+'<div class="card"><p class="muted" style="margin:0">Cargando clasificación…</p></div>';
  await ligaSync(true);const d=await ligaLoad(true);if(!alive(tok))return;

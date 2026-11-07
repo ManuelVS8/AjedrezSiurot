@@ -445,7 +445,7 @@ function drawUsers(m){const box=$('#ul',m);if(!box)return;selBar(m);const l=filt
   if(k==='regen')return regenGroup(g,gl,m);
   if(k==='clubon'){await setClub(gl,true);drawUsers(m);return;}if(k==='pdf')printCards(gl,g);if(k==='sel'){gl.forEach(u=>A.sel.add(u.id));drawUsers(m);ns();}if(k==='add'){A.alta='grupo';A.altaG=g==='(sin grupo)'?'':g;nav('alta');}if(k==='del')bulkDel(g);});
  $$('[data-u]',box).forEach(r=>r.onclick=async()=>{const u=A.users.find(x=>x.id===r.dataset.u);if(!u)return;
-  const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'prog',e:'📊',t:'Ver su progreso'},!isGMg(u.grupo)&&{k:'club',e:'🏅',t:A.club[u.id]?'Quitar del Club':'Añadir al Club'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'ed',e:'✏️',t:'Editar jugador'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
+  const k=await sheet(`${esc(nm(u))} · ${esc(u.alias)}${u.grupo?' · '+esc(u.grupo):''}<br><span style="font-weight:600">${u.ultimoLogin?'Último acceso: '+fdate(u.ultimoLogin):'Aún no ha entrado'}</span>`,[{k:'prog',e:'📊',t:'Ver su progreso'},!isGMg(u.grupo)&&{k:'club',e:'🏅',t:A.club[u.id]?'Quitar del Club':'Añadir al Club'},{k:'card',e:'🖨️',t:'Imprimir su tarjeta'},{k:'rs',e:'🔑',t:'Generar clave nueva'},{k:'elo',e:'♟',t:'Restablecer su ELO'},{k:'ed',e:'✏️',t:'Editar jugador'},{k:'del',e:'🗑',t:'Eliminar usuario',cls:'red'}]);
   if(k==='prog')showProg(u.id,nm(u));else if(k==='club'){await setClub([u],!A.club[u.id]);drawUsers(m);}else if(k==='card')printCards([u]);else if(k)userAct(k,u);});}
 /* rehace los usuarios de un grupo con la regla actual (nombre + inicial de la 2ª palabra) y, si se pide, genera claves nuevas */
 async function regenGroup(g,gl,m){
@@ -492,6 +492,11 @@ async function delUsers(list,de,de2,btn,after,okMsg){
  toast(fail?`Borrados ${list.length-fail}; fallaron ${fail}`:`${okMsg||'Eliminados'} (${list.length})`,!!fail);render();}
 const delMarked=()=>{const l=A.users.filter(u=>A.sel.has(u.id));if(!l.length)return toast('No hay nadie marcado',1);return delUsers(l,'<b>marcados</b>','marcados','Borrar marcados',null,'Usuarios eliminados');};
 async function userAct(a,u){
+ if(a==='elo'){let cur='';try{const s=await RT.get('perfil/'+u.id);if(s&&s.elo)cur=s.elo;}catch(e){}
+  const r=await askM('♟ Restablecer ELO',`<p style="margin:0 0 8px"><b>${esc(nm(u))}</b>${cur?' tiene ahora <b>'+cur+'</b> de ELO.':''}</p><label class="f">Nuevo ELO</label><input type="number" inputmode="numeric" min="100" max="3000" value="800"><p class="muted" style="margin:8px 0 0;font-size:.85rem">800 es el ELO de inicio. Se le aplicará la próxima vez que abra la app (le saldrá un aviso).</p>`,'Aplicar');if(!r)return;
+  const e=Math.max(100,Math.min(3000,Math.round(+r[0]||800)));
+  try{const rev=await RT.get('prog/'+u.id+'/rev');if(!rev)return toast('Este alumno aún no tiene progreso guardado en la nube',1);await RT.patch('prog/'+u.id,{rst:{t:Date.now(),e}});toast('♟ ELO de '+nm(u)+' → '+e+' (al abrir la app)');}catch(er){toast(FB.msg(er),1);}
+  return;}
  if(a==='del'){if(!await confirmM('Eliminar usuario',`¿Eliminar a <b>${esc(nm(u))}</b> (${esc(u.alias)})? Se borra su cuenta y su puntuación del salón de la fama.`,'Eliminar',true))return;
   try{try{const s=await FB.signIn(u.alias,u.clave);await FB.delAccount(s.idToken);}catch(e){}
    await FB.del('users/'+u.id);try{await FB.del('hof/'+u.id);}catch(e){}try{await RT.del('prog/'+u.id);}catch(e){}try{await RT.del('liga/'+u.id);}catch(e){}try{await RT.del('club/'+u.id);await RT.del('gm/'+u.id);}catch(e){}delete A.club[u.id];delete A.gmq[u.id];
