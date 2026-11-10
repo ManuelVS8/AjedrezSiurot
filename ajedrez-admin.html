@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Siurot Admin</title><meta name="robots" content="noindex"><link rel="manifest" href="manifest-admin.webmanifest"><meta name="theme-color" content="#1f5a41"><link rel="apple-touch-icon" href="icon-admin192.png"><link rel="icon" href="icon-admin192.png">
+<title>Admin</title><script>/* Datos del CEIP Manuel Siurot (versión propia: sin config.js) */window.APP_CFG={"app": "Ajedrez Siurot", "corto": "Siurot", "centro": "CEIP Manuel Siurot", "localidad": "La Palma del Condado", "web": "ajedrezsiurot.com", "logo": "logo.png", "insignia": "https://raw.githubusercontent.com/ManuelVS8/AjedrezSiurot/refs/heads/main/Insignia.png", "insigniaAlt": "Insignia: centro distinguido en ajedrez educativo (programa aulaDjaque)", "youtubers": true, "admin": "manuelvsanchez@gmail.com", "dominioUsuarios": "ajedrez-siurot.app", "firebase": {"apiKey": "AIzaSyC4YHA4G1LWqs0ASkcD7Nlq89DTh4ZB_Mw", "projectId": "ajedrez-siurot", "databaseURL": "https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app"}};</script><meta name="robots" content="noindex"><link rel="manifest" href="manifest-admin.webmanifest"><meta name="theme-color" content="#1f5a41"><link rel="apple-touch-icon" href="icon-admin192.png"><link rel="icon" href="icon-admin192.png">
 <style>
 :root{--g:#2f7d5b;--gd:#1f5a41;--bg:#f2f5f3;--card:#fff;--tx:#1d2b25;--mu:#66756d;--ln:#dfe7e2;--rd:#c0392b;--yl:#f2b134;--r:16px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -103,8 +103,14 @@ body.framed main{max-width:none;padding:0}
 </style></head><body>
 <div id="app"></div><div id="toasts"></div>
 <script>
+/* ===== Datos del centro: vienen de config.js (cada colegio tiene el suyo) ===== */
+const CFG=(()=>{const c=window.APP_CFG||{},f=c.firebase||null;const o={logo:c.logo||'icon192.png',app:c.app||'Ajedrez escolar',corto:c.corto||c.app||'Ajedrez',centro:c.centro||'',localidad:c.localidad||'',web:c.web||location.host,admin:String(c.admin||'').toLowerCase(),fb:f};
+ o.sub=[o.centro,o.localidad].filter(Boolean).join(' · ');o.dbUrl=f&&f.databaseURL?String(f.databaseURL).replace(/\/?$/,'/'):'';o.domain=c.dominioUsuarios||'alumnos.app';
+ o.url=(location.origin+location.pathname).replace(/[^/]*$/,'');return o;})();
+document.title=CFG.corto+' Admin';
+if(!CFG.fb||!CFG.fb.apiKey||!CFG.dbUrl||!CFG.admin)document.getElementById('app').innerHTML='<div style="max-width:520px;margin:12vh auto;padding:20px;text-align:center"><h1>⚙️ Falta la configuración</h1><p>No se encuentra <b>config.js</b> o le faltan datos (Firebase o el correo del administrador).</p></div>';
 /* ===== Firebase por REST (sin SDK, sin dependencias) ===== */
-const FBC={apiKey:"AIzaSyC4YHA4G1LWqs0ASkcD7Nlq89DTh4ZB_Mw",projectId:"ajedrez-siurot",domain:"ajedrez-siurot.app",admin:"manuelvsanchez@gmail.com"};
+const FBC={apiKey:(CFG.fb||{}).apiKey||"",projectId:(CFG.fb||{}).projectId||"",domain:CFG.domain,admin:CFG.admin};
 const FB=(()=>{
  const AUTH='https://identitytoolkit.googleapis.com/v1/accounts:',TOK='https://securetoken.googleapis.com/v1/token?key='+FBC.apiKey,
   FS='https://firestore.googleapis.com/v1/projects/'+FBC.projectId+'/databases/(default)/documents';
@@ -170,7 +176,7 @@ const FB=(()=>{
  return api;
 })();
 /* Realtime Database por REST (presencia, retos y partidas) */
-const RT=(()=>{const B='https://ajedrez-siurot-default-rtdb.europe-west1.firebasedatabase.app/';
+const RT=(()=>{const B=CFG.dbUrl;
  const url=async(p,q)=>{const t=await FB.tok();return B+p+'.json?auth='+encodeURIComponent(t||'')+(q?'&'+q:'');};
  const SV={'.sv':'timestamp'};
  return{B,SV,off:0,srv(){return Date.now()+RT.off;},
@@ -277,7 +283,7 @@ const fdate=ms=>ms?new Date(ms).toLocaleString('es-ES',{day:'2-digit',month:'2-d
 const fhora=ms=>ms?new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}):'';
 const download=(name,txt,type='text/plain')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:type+';charset=utf-8'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);};
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(';')).join('\r\n');
-const A={gm:false,club:{},gmq:{},grupos:[],users:[],torneos:[],hof:[],cfg:{url:'https://ajedrezsiurot.com/',avisos:[]},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
+const A={gm:false,club:{},gmq:{},grupos:[],users:[],torneos:[],hof:[],cfg:{url:CFG.url,avisos:[]},tab:'inicio',sel:new Set(),q:'',est:'',tid:null,timer:null,open:new Set(),alta:'uno',reqN:0};
 window.ADMIN_A=A;
 const TABS=[['inicio','🏠','Inicio'],['usuarios','👥','Alumnado'],['alta','➕','Dar de alta'],['torneos','🏟️','Torneos'],['hof','🏆','Salón de la fama'],['club','🏅','Club y GM'],['profe','📝','Tareas y fichas'],['ajustes','⚙️','Ajustes']];
 const GMTABS=[['inicio','🏠','Inicio'],['profe','📝','Tareas'],['torneos','🏟️','Torneos del Club'],['hof','🏆','Salón del Club']];
@@ -319,7 +325,7 @@ async function boot(){let u=null,g=null;try{u=JSON.parse(localStorage.getItem('a
  if(g&&g.uid){A.gm=true;FB.restore(g);$('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><p class="muted">Cargando…</p></div>`;try{await loadGM();return shell();}catch(e){FB.logout();A.gm=false;}}
  loginView();}
 function loginView(){let last='';try{last=localStorage.getItem('admlast')||'';}catch(e){}
- $('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><h2 style="margin:16px 0 2px">Ajedrez Siurot</h2><p class="muted" style="margin:0 0 18px">Administración y profesorado</p><input id="em" type="text" placeholder="Correo o usuario" value="${esc(last)}" autocomplete="username" autocapitalize="none"><input id="pw" type="password" placeholder="Contraseña / clave" autocomplete="current-password"><button class="btn" id="go">Entrar</button><p class="err" id="er"></p></div>`;
+ $('#app').innerHTML=`<div class="login"><img src="${ICON}" alt=""><h2 style="margin:16px 0 2px">${esc(CFG.app)}</h2><p class="muted" style="margin:0 0 18px">Administración y profesorado</p><input id="em" type="text" placeholder="Correo o usuario" value="${esc(last)}" autocomplete="username" autocapitalize="none"><input id="pw" type="password" placeholder="Contraseña / clave" autocomplete="current-password"><button class="btn" id="go">Entrar</button><p class="err" id="er"></p></div>`;
  const go=async()=>{$('#er').textContent='';const b=$('#go');b.disabled=true;b.textContent='Entrando…';const em=$('#em').value.trim().toLowerCase();
   try{const u=await FB.signIn(em,$('#pw').value);FB.restore(u);
    if(u.email===FBC.admin){A.gm=false;FB.S.onChange(u);try{localStorage.setItem('admlast',em);}catch(e){}await loadAll();pubSync(true).catch(()=>{});syncAdm();shell();}
@@ -355,7 +361,7 @@ window.addEventListener('popstate',()=>{
  if(handled){try{history.pushState({adm:1},'');}catch(e){}}else{try{history.back();}catch(e){}}});
 function closeMenu(){const d=$('.drbg');if(d)d.remove();}
 function openMenu(){closeMenu();const bg=document.createElement('div');bg.className='drbg';
- bg.innerHTML=`<div class="drw"><div class="hd"><img src="${ICON}" alt=""><div><b>${A.gm?'Siurot Club':'Siurot Admin'}</b><div style="font-size:.8rem;opacity:.85">${esc(String(FB.S.user.email).replace('@'+FBC.domain,''))}</div></div></div>
+ bg.innerHTML=`<div class="drw"><div class="hd"><img src="${ICON}" alt=""><div><b>${esc(CFG.corto)} ${A.gm?'Club':'Admin'}</b><div style="font-size:.8rem;opacity:.85">${esc(String(FB.S.user.email).replace('@'+FBC.domain,''))}</div></div></div>
  ${tabsNow().map(([k,e,t])=>`<button class="it ${A.tab===k?'on':''}" data-k="${k}"><span class="e">${e}</span>${t}${k==='torneos'&&A.reqN?`<span class="dot">${A.reqN}</span>`:''}</button>`).join('')}<hr>
  ${standalone()?'':'<button class="it" id="din"><span class="e">📲</span>Instalar la app</button>'}<button class="it" id="dout"><span class="e">🚪</span>Cerrar sesión</button></div>`;
  bg.addEventListener('pointerdown',e=>{if(e.target===bg)closeMenu();});document.body.appendChild(bg);
@@ -363,7 +369,7 @@ function openMenu(){closeMenu();const bg=document.createElement('div');bg.classN
 function badges(){const d=$('#mdot');if(d){d.style.display=A.reqN?'':'none';d.textContent=A.reqN;}const t=$('#tdot');if(t){t.style.display=A.reqN?'':'none';t.textContent=A.reqN;}}
 function render(){clearInterval(A.timer);const m=$('#main');if(!m)return;
  const home=A.tab==='inicio';$('#bk').style.display=home?'none':'';$('#lg').style.display=home?'':'none';
- const t=A.tid&&A.torneos.find(x=>x.id===A.tid);$('#ttl').textContent=home?(A.gm?'Siurot Club':'Siurot Admin'):t?t.nombre:TT[A.tab];
+ const t=A.tid&&A.torneos.find(x=>x.id===A.tid);$('#ttl').textContent=home?(CFG.corto+(A.gm?' Club':' Admin')):t?t.nombre:TT[A.tab];
  document.body.classList.toggle('framed',A.tab==='profe');if(A.gm&&!GMTABS.some(x=>x[0]===A.tab))A.tab='inicio';
  ({inicio:A.gm?vGInicio:vInicio,usuarios:vUsers,alta:vAlta,torneos:vTorneos,hof:vHof,club:vClub,profe:vProfe,ajustes:vAjustes})[A.tab](m);badges();}
 const active=()=>A.users.filter(u=>u.ultimoLogin);
@@ -391,7 +397,7 @@ function vInicio(m){const h=new Date().getHours(),sal=h<14?'¡Buenos días!':h<2
 /* ---------- PDF de claves: una hoja por grupo, con la cabecera de la app ---------- */
 function printSheets(list){const by={};list.forEach(u=>(by[gOf(u)]=by[gOf(u)]||[]).push(u));
  const gs=Object.keys(by).sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));if(!gs.length)return toast('No hay nadie que imprimir',1);
- const head=g=>`<div class="phd"><img src="logo.png" alt=""><div class="grow"><b>Ajedrez Siurot</b><small>CEIP Manuel Siurot · La Palma del Condado</small></div><div class="pr"><b>${g==='(sin grupo)'?'':esc(g)}</b><small>ajedrezsiurot.com</small></div></div>`;
+ const head=g=>`<div class="phd"><img src="${esc(CFG.logo)}" alt=""><div class="grow"><b>${esc(CFG.app)}</b><small>${esc(CFG.sub)}</small></div><div class="pr"><b>${g==='(sin grupo)'?'':esc(g)}</b><small>${esc(CFG.web)}</small></div></div>`;
  const ov=document.createElement('div');ov.className='sheetov';
  ov.innerHTML=`<div class="bar2"><button class="btn" id="pp">🖨️ Imprimir / PDF</button><button class="btn ghost" id="px">Cerrar</button><span class="muted" style="align-self:center">${gs.length>1?gs.length+' grupos, cada uno en su hoja. ':''}Elige «Guardar como PDF».</span></div>`
   +gs.map(g=>`<section class="pg">${head(g)}<div class="cards">${by[g].sort((a,b)=>nm(a).localeCompare(nm(b),'es')).map(u=>`<div class="cd"><div class="nm">${esc(nm(u))}${u.grupo?` <span class="gp">· ${esc(u.grupo)}</span>`:''}</div><div class="cl">Usuario <span class="cr">${esc(u.alias)}</span> &nbsp;Clave <span class="cr">${esc(u.clave)}</span></div></div>`).join('')}</div></section>`).join('');
@@ -642,10 +648,10 @@ function arenaRank(rows){const by={};rows.forEach(r=>(by[r.pts||0]=by[r.pts||0]|
  return Object.keys(by).map(Number).sort((a,b)=>b-a).flatMap(k=>{const g=by[k];if(g.length>1){const ids=new Set(g.map(x=>x.id));g.forEach(x=>{x.h2h=0;Object.entries(x.vs||{}).forEach(([o,v])=>{if(ids.has(o))x.h2h+=v;});});}
   return g.sort((a,b)=>(b.h2h||0)-(a.h2h||0)||(b.w||0)-(a.w||0)||(a.pa||0)-(b.pa||0)||String(a.n).localeCompare(String(b.n),'es'));});}
 /* ---------- torneos por rondas (suizo y todos contra todos): los empareja esta app ---------- */
-const swVal=sc=>sc===1?2:sc===.5?1:0;
+const swVal=sc=>sc===1?1:sc===.5?.5:-1;   // victoria +1 · tablas +½ · derrota −1 (el total nunca baja de 0)
 const gmMax=t=>{const{m,i}=ritmoOf(t.ritmo);return (m*60+i*60)*2000+150000;};
 async function swRecord(t,lv,x,gid,sc,opp){const p=lv[x]||{};if(p.lg===gid)return;   // el alumno no lo apuntó (se desconectó): lo apunta el profe
- const val=swVal(sc);const upd={pts:(p.pts||0)+val,pa:(p.pa||0)+1,w:(p.w||0)+(sc===1?1:0),d:(p.d||0)+(sc===.5?1:0),l:(p.l||0)+(sc===0?1:0),lg:gid,busy:null,bt:null,['vs/'+opp]:((p.vs&&p.vs[opp])||0)+sc};
+ const val=swVal(sc);const upd={pts:Math.max(0,(p.pts||0)+val),pa:(p.pa||0)+1,w:(p.w||0)+(sc===1?1:0),d:(p.d||0)+(sc===.5?1:0),l:(p.l||0)+(sc===0?1:0),lg:gid,busy:null,bt:null,['vs/'+opp]:((p.vs&&p.vs[opp])||0)+sc};
  await RT.patch(`arena/${t.id}/p/${x}`,upd);Object.assign(p,upd);}
 async function roundTick(t){const now=Date.now();if(!t.inicioReal)return false;
  let st={},lv={},hb={};try{[st,lv,hb]=await Promise.all([RT.get(`arena/${t.id}/r`),RT.get(`arena/${t.id}/p`),RT.get(`ahb/${t.id}`)]);st=st||{};lv=lv||{};hb=hb||{};}catch(e){return false;}
@@ -682,7 +688,7 @@ async function roundTick(t){const now=Date.now();if(!t.inicioReal)return false;
   await RT.put('games/'+gid,{w,b,wn:W.n,bn:B.n,we:W.e||800,be:B.e||800,tc:t.ritmo||'3+0',tb:tcO.m*60000,ti:tcO.i*1000,moves:'',clk:{w:tcO.m*60000,b:tcO.m*60000},ts:{'.sv':'timestamp'},turn:'w',st:'play',draw:'',res:'',why:'',ar:t.id,af:0,fu:t.furia===false?0:1,...(t.club?{cl:1}:{})});
   await Promise.all([RT.patch(`arena/${t.id}/p/${w}`,{busy:gid,bt:{'.sv':'timestamp'},wait:null,cw:(W.cw||0)+1}),RT.patch(`arena/${t.id}/p/${b}`,{busy:gid,bt:{'.sv':'timestamp'},wait:null,cw:(B.cw||0)-1})]);
   if(!t.club)RT.put('live/'+gid,{wn:W.n,bn:B.n,tc:t.ritmo||'3+0',ar:t.id,t:{'.sv':'timestamp'}}).catch(()=>{});G[gid]={w,b};}
- if(bye&&lv[bye]){const p=lv[bye];await RT.patch(`arena/${t.id}/p/${bye}`,{pts:(p.pts||0)+2,pa:(p.pa||0)+1,bye:true});}
+ if(bye&&lv[bye]){const p=lv[bye];await RT.patch(`arena/${t.id}/p/${bye}`,{pts:(p.pts||0)+1,pa:(p.pa||0)+1,bye:true});}
  await RT.put(`arena/${t.id}/r`,{n:k,g:G,t:bt,bye:bye||null,...(roster?{rr:roster}:{})});
  toast(`♟ «${t.nombre}»: ronda ${k} emparejada (${pairs.length} partidas)`);return true;}
 /* ---------- progreso del alumnado (Realtime Database «perfil/»: no gasta lecturas de Firestore) ---------- */
@@ -852,7 +858,7 @@ function vAjustes(m){const groups=allGroups(),avs=A.cfg.avisos||[];
  <details class="box"><summary>🔒 Protección de datos</summary><div><p class="muted" style="margin:0">Solo se guardan un usuario (nombre + inicial), el grupo y la fecha del último acceso. Sin apellidos completos, sin correos ni datos personales. Servidor en la UE (Firestore eur3). Al eliminar un usuario se borra su cuenta y su puntuación.</p></div></details>
  ${standalone()?'':'<button class="btn ghost big" id="ins" style="margin-top:6px">📲 Instalar esta app en el móvil</button>'}
  <button class="btn ghost big" id="lo" style="margin-top:10px;color:var(--rd);border-color:var(--rd)">🚪 Cerrar sesión</button>`;
- $('#sv',m).onclick=async()=>{const c={url:$('#ur',m).value.trim()||'https://ajedrezsiurot.com/'};try{await FB.set('config/main',c,['url']);Object.assign(A.cfg,c);toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}};
+ $('#sv',m).onclick=async()=>{const c={url:$('#ur',m).value.trim()||CFG.url};try{await FB.set('config/main',c,['url']);Object.assign(A.cfg,c);toast('Guardado ✔️');render();}catch(e){toast(FB.msg(e),1);}};
  $('#avn',m).onclick=()=>newAviso();
  $$('.li[data-av]',m).forEach(r=>r.onclick=async e=>{if(e.target.closest('[data-avm]'))return;await toggleAviso(r.dataset.av);});
  $$('[data-avm]',m).forEach(b=>b.onclick=async e=>{e.stopPropagation();const av=(A.cfg.avisos||[]).find(x=>x.id===b.dataset.avm);if(!av)return;
@@ -881,5 +887,5 @@ $('#pn',m).onclick=async()=>{if(!await confirmM('Proteger nombres','Se sustituir
  if($('#up',m))$('#up',m).onclick=async()=>{const map={};$$('.ng',m).forEach(i=>{if(i.value.trim())map[i.dataset.g]=i.value.trim();});const ks=Object.keys(map);if(!ks.length)return toast('No hay cambios',1);
   if(!await confirmM('Subir de curso',ks.map(k=>`${esc(k)} → <b>${esc(map[k])}</b>`).join('<br>'),'Aplicar'))return;
   try{const orig=A.users.map(u=>[u,u.grupo]);for(const [u,g] of orig)if(map[g]){await FB.set('users/'+u.id,{grupo:map[g]},['grupo']);u.grupo=map[g];}A.grupos=A.grupos.map(g=>map[g]||g);await saveGroups();toast('Grupos actualizados');render();}catch(e){toast(FB.msg(e),1);}};}
-boot();
+if(CFG.fb&&CFG.fb.apiKey&&CFG.dbUrl&&CFG.admin)boot();
 </script></body></html>
