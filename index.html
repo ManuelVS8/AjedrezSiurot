@@ -856,9 +856,7 @@ input.txt:focus{border-color:var(--pri);box-shadow:0 0 0 4px rgba(31,138,95,.18)
 /* ---------- Tablero ---------- */
 .board{border-radius:8px;
   box-shadow:0 0 0 1.5px rgba(0,0,0,.55),0 0 0 3px color-mix(in srgb,var(--frame) 70%,#fff),0 0 0 8px var(--frame),0 0 0 9px color-mix(in srgb,var(--frame) 55%,#000),0 14px 0 -6px rgba(0,0,0,.18),0 26px 40px -10px rgba(40,25,5,.55)}
-.board::after{content:'';position:absolute;inset:0;z-index:6;pointer-events:none;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(0,0,0,.28),inset 0 3px 14px rgba(0,0,0,.2);background:linear-gradient(135deg,rgba(255,255,255,.1) 0%,rgba(255,255,255,0) 38%,rgba(0,0,0,0) 62%,rgba(0,0,0,.07) 100%)}
-.sq.lt{background-image:linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,0) 55%,rgba(0,0,0,.035))}
-.sq.dk{background-image:linear-gradient(135deg,rgba(255,255,255,.13),rgba(255,255,255,0) 50%,rgba(0,0,0,.1))}
+.board::after{content:'';position:absolute;inset:0;z-index:6;pointer-events:none;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(0,0,0,.28)}
 .sq.last::after{background:rgba(255,214,64,.5);box-shadow:inset 0 0 0 max(2px,.55cqw) rgba(255,190,20,.75)}
 .sq.sel::after{background:rgba(70,200,130,.5);box-shadow:inset 0 0 0 max(2px,.6cqw) rgba(20,150,90,.85)}
 .sq.dot::before{width:30%;height:30%;background:radial-gradient(circle at 38% 34%,rgba(40,80,60,.42),rgba(10,35,25,.5));box-shadow:0 0 0 max(2px,.5cqw) rgba(255,255,255,.22)}
