@@ -5217,17 +5217,17 @@ async function viewOnGame(m,{gid}){
  if(!G||!onlLogged()){toast('No se puede abrir la partida','bad');return go('online');}
  const uid=myUid(),color=G.w===uid?'w':G.b===uid?'b':null;if(!color){toast('Esta partida no es tuya','bad');return go('online');}
  const oc=color==='w'?'b':'w',oppN=color==='w'?G.bn:G.wn,oppE=color==='w'?G.be:G.we;
- const corr=G.tc==='corr';const pos=new E.Pos(G.f0||undefined);let over=false,pending=null,drawAsked=false,drawMine=false,flagSent=false,myTk=null,tkSeen=null;const tkDone=new Set();const sans=[];
+ const corr=G.tc==='corr';const pos=new E.Pos(G.f0||undefined);let over=false,pending=null,drawAsked=false,drawMine=false,flagSent=false,oppHb=0,myHbOk=0,wakeAt=Date.now(),lastTick=Date.now(),lastSig='',hbT=null,myTk=null,tkSeen=null;const tkDone=new Set();const sans=[];
  ON.inGame=true;presTick();
  let gw=null,lastEv=Date.now();
- const leave=()=>{clearInterval(poll);clearInterval(clkT);if(gw){gw.close();gw=null;}document.removeEventListener('visibilitychange',onVis);if(ON.inGame){ON.inGame=false;presTick();}};
+ const leave=()=>{clearInterval(poll);clearInterval(clkT);clearInterval(hbT);if(gw){gw.close();gw=null;}document.removeEventListener('visibilitychange',onVis);if(ON.inGame){ON.inGame=false;presTick();}};
  /* aviso de posibles ayudas: cuenta las veces que se sale de la pestaña durante la partida (solo lo ve el profe) */
  let fxN=0;const onVis=()=>{if(!document.hidden||over||corr||pos.played.length<2)return;fxN++;RT.patch('games/'+gid,{['fx/'+color]:fxN}).catch(()=>{});
   if(G.ar)RT.get(`arena/${G.ar}/p/${myUid()}/fx`).then(v=>RT.patch(`arena/${G.ar}/p/${myUid()}`,{fx:(+v||0)+1})).catch(()=>{});};
  document.addEventListener('visibilitychange',onVis);
  const ar=G.ar||null;if(ar&&!ON.arena)arenaEnsure(ar).catch(()=>{});
  const {board,body,under}=trainerShell(m,ar?'🏟️ Arena':'🌐 Partida online',async()=>{if(!over&&!corr&&!(await confirmModal('¿Salir de la sala?','La partida sigue y tu reloj corre. Puedes volver desde «Jugar online».','Salir','Seguir')))return;leave();go('online');});
- body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b class="tapn" id="oppn" title="Ver su perfil">${esc(oppN)}</b><div class="muted" style="font-size:.85rem">${oppE?'ELO '+oppE+' · ':''}${corr?'📨 A distancia (sin reloj): juega cuando quieras':'⏱️ '+tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div>${G.f0?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div><div id="fmv" style="font-weight:900;margin-top:4px;display:none"></div>${ar?'<div id="arleft" class="pill" style="margin-top:6px;font-weight:900"></div>':''}</div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
+ body.innerHTML=`<div class="botcard"><div class="be">🧑‍🎓</div><div><b class="tapn" id="oppn" title="Ver su perfil">${esc(oppN)}</b><div class="muted" style="font-size:.85rem">${oppE?'ELO '+oppE+' · ':''}${corr?'📨 A distancia (sin reloj): juega cuando quieras':'⏱️ '+tcTxtO(G.tc)} · juegas con ${color==='w'?'blancas':'negras'}</div>${G.f0?'<div style="font-size:.8rem;font-weight:800;color:#6d28d9">🔀 Chess960 · para enrocar, toca el rey y después la torre</div>':''}<div id="st" style="font-weight:800;margin-top:2px"></div><div id="fmv" style="font-weight:900;margin-top:4px;display:none"></div><div id="abn" style="font-weight:900;margin-top:4px;display:none;color:#c0392b"></div>${ar?'<div id="arleft" class="pill" style="margin-top:6px;font-weight:900"></div>':''}</div></div><div class="movelist" id="ml"></div><div id="fb"></div>`;
  under.innerHTML=`${ar&&G.fu?'<button class="btn sm" id="fury" style="background:#e8590c;color:#fff;font-weight:900" title="Antes de tu primer movimiento: tu tiempo se divide a la mitad y, si ganas, +1 punto">🔥 Modo furia</button>':''}<button class="btn ghost sm" id="flip">🔄 Girar</button><button class="btn ghost sm" id="tkb" title="Pedir al rival deshacer tu última jugada">↩️ Deshacer</button><button class="btn ghost sm" id="drw">🤝 Pedir tablas</button><button class="btn red sm" id="resign">🏳️ Rendirse</button>`;
  const tr=m.querySelector('.trainer'),bc=m.querySelector('.boardcol'),bd=$('#bd',m);tr.classList.add('game');
  $('#oppn',body).onclick=()=>playerCard({id:color==='w'?G.b:G.w,n:oppN});
@@ -5255,13 +5255,13 @@ async function viewOnGame(m,{gid}){
   for(let i=plies();i<ms.length;i++){const mv=pos.fromUci(ms[i]);if(!mv)break;sans.push(pos.san(mv));pos.play(mv);lastMv=mv;changed=true;}
   if(changed){board.hl=[];board.arrows=[];board.set(pos,{last:lastMv,anim:true});playSound(pos,lastMv);}
   board.interactive=!over;if(changed&&!over&&pos.turn===color&&board.premove)board.runPremove();return changed;}
- function finish(res,why){if(over)return;over=true;board.interactive=false;board.pickSq=null;clearInterval(clkT);clearInterval(poll);if(gw){gw.close();gw=null;}panel();document.removeEventListener('visibilitychange',onVis);
+ function finish(res,why){if(over)return;over=true;board.interactive=false;board.pickSq=null;clearInterval(clkT);clearInterval(hbT);clearInterval(poll);if(gw){gw.close();gw=null;}panel();document.removeEventListener('visibilitychange',onVis);
   RT.del('live/'+gid).catch(()=>{});if(corr){RT.del(`mygames/${myUid()}/${gid}`).catch(()=>{});RT.del(`mygames/${color==='w'?G.b:G.w}/${gid}`).catch(()=>{});}
   try{localStorage.removeItem('siurot_og');}catch(e){}
   if(why==='torneo'){ON.inGame=false;presTick();RT.patch(`arena/${ar}/p/${myUid()}`,{busy:null,bt:null,wait:null}).catch(()=>{});sound('ok');
    setTimeout(async()=>{if(!alive(tok))return;await modal({title:'⏱️ ¡Se acabó el tiempo del torneo!',html:'<div class="bigicon">🏁</div><p style="text-align:center">La partida en curso se ha detenido y no puntúa.<br>¡Vamos a ver la clasificación!</p>',buttons:[{t:'Ver resultados',v:1}],dismiss:false});go('arena',{tid:ar});},400);return;}
   const sc=res==='1/2-1/2'?.5:((res==='1-0')===(color==='w')?1:0);
-  const why2={nomove:'No hizo su primera jugada a tiempo',mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición',time:'Se acabó el tiempo',resign:'Abandono',draw:'Tablas acordadas'}[why]||why||'';
+  const why2={abandono:'Se desconectó y no volvió a tiempo',nomove:'No hizo su primera jugada a tiempo',mate:'Jaque mate',ahogado:'Rey ahogado',material:'Material insuficiente',cincuenta:'Regla de las 50 jugadas',repeticion:'Triple repetición',time:'Se acabó el tiempo',resign:'Abandono',draw:'Tablas acordadas'}[why]||why||'';
   const nr=!!(G.nr||G.cl);   // partida con GM o de un torneo del Club: no cuenta para ELO, XP ni estadísticas
   const d=nr?0:eloUpdate(oppE||800,sc,24,'online',tcCat(G.tc));const xp=sc===1?20:sc===.5?8:5;if(!nr)addXP(xp,sc===1?'Victoria online':sc===.5?'Tablas online':'Partida online');
   const oppId=color==='w'?G.b:G.w,rk=sc===1?'w':sc===.5?'d':'l';
@@ -5306,6 +5306,7 @@ async function viewOnGame(m,{gid}){
   try{await RT.patch('games/'+gid,{moves:nm,turn:by,ts:RT.SV,draw:'',tk:null,tkr:{id,r:'ok'}});tkDone.add(id);G.ts=RT.srv();G.turn=by;applyTakeback(nm);toast('↩️ Jugada deshecha');}catch(e){toast(FB.msg(e),'bad');}}
  /* la partida llega en directo (solo los cambios); si la conexión en directo falla, se lee cada 1,5 s */
  function process(g0){if(!g0||!alive(tok)||over)return;const g=JSON.parse(JSON.stringify(g0));lastEv=Date.now();
+  if(g.hb&&g.hb[oc])oppHb=Math.max(oppHb,+g.hb[oc]||0);{const sg=JSON.stringify({...g,hb:null});if(sg===lastSig)return;lastSig=sg;}   // la señal de «sigo aquí» no redibuja la partida
   if(g.tk&&tkDone.has(g.tk.id))return;   // respuesta antigua, anterior a deshacer
   const n=(g.moves||'').split(' ').filter(Boolean).length;if(n>=plies()&&!pending){G=g;sync();}else if(n<plies()&&!pending&&g.tkr&&g.tkr.r==='ok'&&!tkDone.has(g.tkr.id)){tkDone.add(g.tkr.id);G=g;applyTakeback(g.moves||'');}
   if(g.tkr&&myTk&&g.tkr.id===myTk){toast(g.tkr.r==='ok'?'↩️ '+oppN+' acepta: repite tu jugada':'↩️ '+oppN+' no acepta deshacer',g.tkr.r==='ok'?'ok':'bad');myTk=null;panel();}
@@ -5318,7 +5319,14 @@ async function viewOnGame(m,{gid}){
  /* reintenta una jugada que no llegó a enviarse; y si toca al rival y no llega nada en 10 s, comprueba (por si la conexión se quedó muda) */
  const poll=setInterval(()=>{if(!alive(tok)){leave();return;}if(over)return;if(pending)writeMove(pending);
   else if(gw&&pos.turn!==color&&Date.now()-lastEv>10000){lastEv=Date.now();gw.refresh();}},1500);
- const clkT=setInterval(()=>{if(!alive(tok)){leave();return;}paint();if(!over&&arFinF()&&RT.srv()>=arFinF()){if(G.st!=='end'){G.st='end';G.res='*';G.why='torneo';RT.patch('games/'+gid,{st:'end',res:'*',why:'torneo',draw:''}).catch(()=>{});}finish('*','torneo');return;}if(over||flagSent||corr)return;
+ /* «sigo aquí»: cada 5 s se avisa al rival. Si el rival deja de avisar (portátil cerrado, se fue…) durante 20 s, pierde por abandono */
+ const HB_MS=5000,GONE_MS=25000;
+ const hbSend=()=>{if(over||corr)return;RT.putS('games/'+gid+'/hb/'+color,RT.SV).then(()=>{myHbOk=Date.now();}).catch(()=>{});};
+ if(!corr){hbSend();hbT=setInterval(hbSend,HB_MS);}
+ const oppGone=()=>{if(corr||over||!oppHb)return 0;const t=Date.now();if(t-myHbOk>HB_MS*2||t-wakeAt<GONE_MS)return 0;return RT.srv()-oppHb;};   // solo si MI conexión va bien y llevo despierto todo el rato
+ const clkT=setInterval(()=>{if(!alive(tok)){leave();return;}{const t=Date.now();if(t-lastTick>3000)wakeAt=t;lastTick=t;}paint();
+  {const ab=$('#abn',body),gone=oppGone();if(ab){const on=gone>HB_MS*2&&!over;ab.style.display=on?'':'none';if(on)ab.textContent=`⚠ ${oppN} se ha desconectado. Si no vuelve en ${Math.max(0,Math.ceil((GONE_MS-gone)/1000))} s, ganas la partida.`;}
+   if(gone>=GONE_MS&&!over&&!flagSent){flagSent=true;setEnd(color==='w'?'1-0':'0-1','abandono');return;}}if(!over&&arFinF()&&RT.srv()>=arFinF()){if(G.st!=='end'){G.st='end';G.res='*';G.why='torneo';RT.patch('games/'+gid,{st:'end',res:'*',why:'torneo',draw:''}).catch(()=>{});}finish('*','torneo');return;}if(over||flagSent||corr)return;
   if(plies()<2){const c=pos.turn;if(RT.srv()-(G.ts||RT.srv())>=FIRST_MS){flagSent=true;setEnd(c==='w'?'0-1':'1-0','nomove');return;}}   // 15 s para la primera jugada de cada uno
   for(const c of['w','b']){if(plies()>=2&&pos.turn===c&&remain(c)<=0){flagSent=true;const o=c==='w'?'b':'w';
    if(!canMate(o))setEnd('1/2-1/2','material');else setEnd(c==='w'?'0-1':'1-0','time');break;}}},200);
@@ -5358,6 +5366,10 @@ async function arenaJoin(T){
  const me=await RT.get(path);
  const base={n:ONL.acc.nombre,g:ONL.acc.grupo||'',a:ONL.acc.alias,e:myElo(),sal:null};if(ONL.acc.guest)base.guest=true;
  if(!me)await RT.put(path,{...base,sal:null,pts:0,pa:0,w:0,d:0,l:0,streak:0,wait:null,busy:null});else await RT.patch(path,base);
+ /* si se fue a mitad de una partida que ya acabó (abandono, tiempo…), se le apunta ahora el resultado */
+ if(me&&me.busy&&me.lg!==me.busy){try{const g=await RT.get('games/'+me.busy);if(g&&g.st==='end'&&g.ar===T.id&&(g.w===uid||g.b===uid)){const c=g.w===uid?'w':'b';
+  if(g.res==='1-0'||g.res==='0-1'||g.res==='1/2-1/2'){const sc=g.res==='1/2-1/2'?.5:((g.res==='1-0')===(c==='w')?1:0);await recordArena(T.id,me.busy,sc,c==='w'?g.b:g.w,0);}
+  else await RT.patch(path,{busy:null,bt:null});}}catch(e){}}
  const hb=()=>RT.putS(`ahb/${T.id}/${uid}`,RT.SV).catch(()=>{});hb();
  if(!ONL.acc.guest){onlPublic().then(d=>{if(!insOf(d,T.id)[uid])onlJoin(T);}).catch(()=>{});}
  const A={tid:T.id,T,snap:me?{[uid]:me}:{},hb:{},entered:null,onSnap:null,busy2:false,w:null};ON.arena=A;
